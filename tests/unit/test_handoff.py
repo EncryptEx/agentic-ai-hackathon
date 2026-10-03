@@ -105,6 +105,8 @@ class HandoffRoutes(unittest.TestCase):
             a = self._wait(c)
         h = a["handoff"]
         self.assertEqual((h["status"], h["report_source"], h["customer_id"]), ("completed", "adk_agents", "CUST-00001"))
+        self.assertTrue(h["customer_mismatch"])
+        self.assertIn("does NOT appear in CUST-00001", runner.prompts[0])
         self.assertEqual(h["report"], REPORT_TEXT)  # last text part wins
         self.assertIsNone(h["adk_error"])
         self.assertIn("EVIDENCETRAIL", runner.prompts[0])
@@ -180,6 +182,19 @@ class HandoffMapping(unittest.TestCase):
         self.assertEqual((t["rule_id"], t["severity"]), ("EVIDENCETRAIL", "HIGH"))
         for fragment in (r["alert"]["alert_id"], "TX-1002", "8000 SEK", "RCP-601", "REVIEW"):
             self.assertIn(fragment, t["summary"])
+
+    def test_a_manually_chosen_customer_is_not_passed_off_as_the_transfers_owner(self):
+        _, r = run("case-takeover", FakeJev(triage=SUSPICIOUS))
+        a = r["alert"]
+        same = handoff.trigger_alert(a, a["transaction"]["customer_id"])
+        other = handoff.trigger_alert(a, "cust-00015")
+        self.assertNotIn("IMPORTANT", same["summary"])
+        self.assertIn("does NOT appear in CUST-00015", other["summary"])
+        self.assertIn("CUST-A102", other["summary"])
+        self.assertIn("Do not attribute", other["summary"])
+        self.assertFalse(handoff.customer_mismatch(a, "CUST-A102"))
+        self.assertTrue(handoff.customer_mismatch(a, "CUST-00015"))
+        self.assertFalse(handoff.customer_mismatch(a, None))
 
     def test_legacy_server_reports_that_handoff_needs_the_combined_server(self):
         api.set_manager(RunManager(alert_store=AlertStore(":memory:")))

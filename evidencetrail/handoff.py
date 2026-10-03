@@ -19,13 +19,23 @@ class CustomerNotFound(Exception):
     """The customer is not in the FRAML host database the ADK tools read from."""
 
 
-def trigger_alert(alert):
+def customer_mismatch(alert, customer_id):
+    """True when the FRAML customer chosen for review is not the customer the alert's transfer belongs to."""
+    return bool(customer_id) and customer_id.upper().strip() != alert["transaction"]["customer_id"].upper()
+
+
+def trigger_alert(alert, customer_id=None):
     """Map an EvidenceTrail alert onto the trigger-alert shape the ADK prompt builder expects."""
     tx = alert["transaction"]
     summary = (f"EvidenceTrail transfer alert {alert['alert_id']}: {alert['title']}. {alert['summary']} "
                f"Transfer {tx['transaction_id']} of {tx['amount']} {tx['currency']} to recipient "
                f"{tx['recipient_id']}. Policy outcome: {alert['policy']['action']} "
                f"({alert['policy']['status']}).")
+    if customer_mismatch(alert, customer_id):
+        summary += (f" IMPORTANT: transfer {tx['transaction_id']} belongs to EvidenceTrail scenario customer "
+                    f"{tx['customer_id']} and does NOT appear in {customer_id.upper().strip()}'s transaction history; "
+                    f"{customer_id.upper().strip()} was chosen by an analyst for a customer-level review. Do not attribute "
+                    "this transfer to that customer.")
     return {"rule_id": "EVIDENCETRAIL", "rule_name": alert["title"],
             "severity": alert["severity"].upper(), "summary": summary[:900]}
 
@@ -39,7 +49,7 @@ def prepare(alert, customer_id=None):
         packet = dispatcher.prepare_case_packet(cust)
     except ValueError as e:
         raise CustomerNotFound(str(e)) from None
-    prompt = dispatcher.generate_investigation_prompt(cust, trigger_alert(alert))
+    prompt = dispatcher.generate_investigation_prompt(cust, trigger_alert(alert, cust))
     return cust, packet, prompt
 
 
@@ -70,12 +80,13 @@ async def execute(alert, customer_id, packet, prompt, runner, app_name):
     if not report.strip():
         from app.alert_feed import generate_specialist_investigation_report
         report = await asyncio.to_thread(generate_specialist_investigation_report, customer_id,
-                                         trigger_alert(alert))
+                                         trigger_alert(alert, customer_id))
         source = SOURCE_FALLBACK
     return {"status": "completed", "customer_id": customer_id, "customer_name": packet.get("customer_name"),
             "archetype": packet.get("archetype"), "risk_tier": packet.get("risk_tier"),
             "composite_score": packet.get("composite_score"), "report_source": source,
             "adk_error": adk_error, "prompt_dispatched": prompt, "report": report,
+            "customer_mismatch": customer_mismatch(alert, customer_id),
             "completed_at": now_utc(),
             "note": ("Report written by the ADK specialist agents." if source == SOURCE_AGENTS else
                      "The ADK agents could not run, so this report was synthesized directly from the specialist "

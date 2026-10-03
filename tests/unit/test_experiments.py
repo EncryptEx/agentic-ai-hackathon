@@ -175,6 +175,20 @@ class Ablation(unittest.TestCase):
         self.assertEqual(api.handle_post("/api/experiments/ablation", {"caseIds": ["nope"]})[0], 404)
 
 
+class FailureReasons(unittest.TestCase):
+    def test_failed_runs_explain_themselves_in_summaries(self):
+        from evidencetrail.metrics import summarize_runs
+        ok = {"state": "completed", "run_id": "r1", "events": [], "final": {"status": "COMPLETE", "simulated_action": "ALLOW", "explanation": "fine"}}
+        bad = {"state": "failed", "run_id": "r2", "events": [], "failure": "Model provider unavailable: Gemini HTTP 429: quota",
+               "final": {"status": "INCOMPLETE", "simulated_action": "REVIEW", "explanation": "x"}}
+        crashed = {"state": "failed", "run_id": "r3", "events": [], "error": "KeyError: boom", "final": None}
+        s = summarize_runs([ok, bad, crashed])
+        self.assertEqual(s["failures"], [
+            {"run_id": "r2", "state": "failed", "reason": "Model provider unavailable: Gemini HTTP 429: quota"},
+            {"run_id": "r3", "state": "failed", "reason": "KeyError: boom"}])
+        self.assertEqual(s["successful_runs"], 1)
+
+
 class TraceExportAndProvenance(unittest.TestCase):
     def _run(self):
         case = get_case("case-familiar")

@@ -154,7 +154,8 @@ def summarize_ablation(exp, runs_by_id, rules_results):
             # result for the missing-tool case, but a provider outage never counts as a match.
             finished = [r for r in runs if r["state"] == "completed" and r.get("final")]
             m = sum(1 for r in finished if r["final"]["simulated_action"] == expected)
-            cases[cid] = {"summary": s, "expected": expected, "matched_runs": m, "eligible_runs": len(finished)}
+            cases[cid] = {"summary": s, "expected": expected, "matched_runs": m, "eligible_runs": len(finished),
+                          "failures": s["failures"]}
             matched += m
             eligible += len(finished)
             attempted += s["attempted_runs"]

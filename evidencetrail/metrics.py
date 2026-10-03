@@ -46,6 +46,9 @@ def summarize_runs(runs):
         "architectures": sorted({r.get("architecture") for r in finished if r.get("architecture")}),
         "tool_call_counts": [r.get("tool_call_count") for r in finished],
         "elapsed_ms": [r.get("elapsed_ms") for r in finished],
+        "failures": [{"run_id": r["run_id"], "state": r["state"],
+                      "reason": r.get("failure") or r.get("error") or (r.get("final") or {}).get("explanation")}
+                     for r in finished if r["state"] != "completed"],
         "error_counts": [_error_count(r) for r in finished],
         "usage_totals": _usage_totals(finished),
         "cost": "not computed: provider rates are not configured",

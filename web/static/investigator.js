@@ -356,6 +356,7 @@ function handoffBlock(a) {
         el("summary", {}, `ADK team report for ${h.customer_id} · ${h.risk_tier || "tier n/a"}`),
         el("span", { class: "inv-tag" + (h.report_source === "adk_agents" ? " fresh" : "") }, HANDOFF_SOURCE[h.report_source] || h.report_source),
         el("div", { class: "inv-muted" }, h.note),
+        h.customer_mismatch ? el("div", { class: "inv-warn", role: "note" }, `Customer chosen manually: the alert's transfer is not in ${h.customer_id}'s transaction history, so this is a customer-level review only.`) : null,
         el("pre", { class: "inv-pre" }, h.report)));
     return out;
 }
@@ -545,7 +546,7 @@ function renderRepeatSummary(box) {
             ["Pairwise agreement", s.pairwise_agreement == null ? "n/a (needs 2+ successful runs)" : s.pairwise_agreement.toFixed(3)],
             ["Both Allow and Review seen", s.opposite_outcome_flag ? "yes – inconsistent" : "no"],
             ["Time per run", elapsed.length ? `${Math.min(...elapsed)}–${Math.max(...elapsed)} ms` : "–"]]),
-        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), el("pre", { class: "inv-pre" }, json({ tool_sequences: s.tool_sequences, tool_call_counts: s.tool_call_counts, error_counts: s.error_counts, usage_totals: s.usage_totals, cost: s.cost, run_ids: inv.exp.run_ids, configuration: inv.exp.configuration }))),
+        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), el("pre", { class: "inv-pre" }, json({ failures: s.failures, tool_sequences: s.tool_sequences, tool_call_counts: s.tool_call_counts, error_counts: s.error_counts, usage_totals: s.usage_totals, cost: s.cost, run_ids: inv.exp.run_ids, configuration: inv.exp.configuration }))),
         el("p", { class: "inv-muted" }, inv.expKind === "counterfactual"
             ? "A change shows sensitivity under this intervention. It does not prove causal correctness or that every risk reduction should flip an action."
             : (s.note || "")));

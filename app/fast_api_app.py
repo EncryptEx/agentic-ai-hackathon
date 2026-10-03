@@ -123,9 +123,12 @@ async def run_investigation_for_realtime(customer_id: str, row: dict, runner, ad
     from google.genai import types
     from app.alert_feed import AlertDispatcher
     
+    tx_id = row.get("transaction_id", customer_id)
+    
     await manager.broadcast(json.dumps({
         "msg_type": "investigation_started",
         "customer_id": customer_id,
+        "tx_id": tx_id,
         "row": row
     }))
     
@@ -137,6 +140,7 @@ async def run_investigation_for_realtime(customer_id: str, row: dict, runner, ad
         await manager.broadcast(json.dumps({
             "msg_type": "investigation_error",
             "customer_id": customer_id,
+            "tx_id": tx_id,
             "error": str(e)
         }))
         return
@@ -197,6 +201,7 @@ async def run_investigation_for_realtime(customer_id: str, row: dict, runner, ad
     await manager.broadcast(json.dumps({
         "msg_type": "investigation_finished",
         "customer_id": customer_id,
+        "tx_id": tx_id,
         "row": row,
         "report": final_report,
         "score": score,
@@ -205,7 +210,6 @@ async def run_investigation_for_realtime(customer_id: str, row: dict, runner, ad
         "verdict": verdict
     }))
 
-
 async def triage_transaction(row: dict, runner, adk_app_name: str):
     from evidencetrail.jev import JevClient, ALERT_QUESTIONS, ProviderUnavailable
     jev_client = JevClient()
@@ -213,6 +217,7 @@ async def triage_transaction(row: dict, runner, adk_app_name: str):
         return
         
     state = f"type=transaction source=realtime payload={json.dumps(row)}"
+    tx_id = row.get("transaction_id", row.get("customer_id"))
     try:
         res = await asyncio.to_thread(jev_client.assess, state, ALERT_QUESTIONS)
         suspicion = res.get("normalized", {}).get("suspicion")
@@ -221,6 +226,7 @@ async def triage_transaction(row: dict, runner, adk_app_name: str):
         await manager.broadcast(json.dumps({
             "msg_type": "jev_triage",
             "customer_id": row["customer_id"],
+            "tx_id": tx_id,
             "row": row,
             "suspicion": suspicion,
             "severity": severity,

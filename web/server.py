@@ -1,5 +1,6 @@
 """Comprehensive HTTP server integrating KYC, AML, Fraud (FRAML), Simulation, Generation, and Data Export."""
 
+import sys
 import http.server
 import socketserver
 import json
@@ -7,10 +8,27 @@ import os
 import urllib.parse
 from typing import Dict, Any
 
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 from storage.database import DatabaseManager
-from generator.customer_generator import CustomerGenerator, ARCHETYPE_CONFIGS
-from generator.transaction_generator import TransactionGenerator
-from engine.risk_engine import RiskEngine
+try:
+    from generator.customer_generator import CustomerGenerator, ARCHETYPE_CONFIGS
+    from generator.transaction_generator import TransactionGenerator
+    from engine.risk_engine import RiskEngine
+except ImportError:
+    CustomerGenerator = None
+    TransactionGenerator = None
+    RiskEngine = None
+    ARCHETYPE_CONFIGS = {
+        "YOUNG_PROFESSIONAL": "Young Professional",
+        "HIGH_NET_WORTH": "High Net Worth",
+        "RETIREE": "Retiree",
+        "STUDENT": "Student",
+        "SMALL_BUSINESS_OWNER": "Small Business Owner"
+    }
+
 from models.customer import CustomerProfile, PEPStatus, AdverseMedia, SanctionStatus
 from models.transaction import Transaction, TransactionType, TransactionDirection
 
@@ -27,6 +45,7 @@ EXPORTS_DIR = os.path.abspath(os.path.join(WEB_DIR, "..", "exports"))
 LIVE_STREAM_HTML = os.path.join(WEB_DIR, "live_stream.html")
 SENTINEL_HTML = os.path.join(WEB_DIR, "Financialcrime.html")
 VISUALIZATION_HTML = os.path.join(WEB_DIR, "visualization.html")
+STREAMING_HTML = os.path.join(ROOT_DIR, "streaming", "index.html")
 
 ACTIVE_AGENT_RUNS: Dict[str, AgentRun] = {}
 RUNS: Dict[str, Dict[str, Any]] = {}
@@ -63,6 +82,12 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
             return
         elif path == "/visualizer":
             self._serve_file(VISUALIZATION_HTML, "text/html; charset=utf-8")
+            return
+        elif path == "/streaming" or path == "/stream-view":
+            self._serve_file(STREAMING_HTML, "text/html; charset=utf-8")
+            return
+        elif path == "/" or path == "/dashboard" or path == "/index.html":
+            self._serve_file(os.path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8")
             return
         elif path == "/api/scenarios":
             summary_list = []
@@ -505,4 +530,5 @@ def run_server(port: int = 8080):
             print("\nShutting down server...")
 
 if __name__ == "__main__":
-    run_server(8080)
+    p = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    run_server(p)

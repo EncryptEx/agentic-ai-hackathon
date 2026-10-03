@@ -6,6 +6,9 @@ import json
 import os
 import sys
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 try:
     from rich.console import Console
@@ -399,13 +402,105 @@ def handle_investigate(args):
         final_text = generate_specialist_investigation_report(cust_id, trigger_alert=packet.get("trigger_alert"))
 
     if final_text:
+        db = DatabaseManager()
+        inv_id = db.log_investigation({
+            "customer_id": cust_id,
+            "customer_name": packet.get("customer_name"),
+            "trigger_alert_id": args.alert_id,
+            "trigger_rule": (packet.get("trigger_alert") or {}).get("rule_name", "Manual Risk Review"),
+            "risk_tier": packet.get("risk_tier"),
+            "composite_score": packet.get("composite_score", 0.0),
+            "model_version": "gemini-3.8-flash",
+            "raw_prompt": prompt,
+            "final_report_text": final_text,
+            "officer_sign_off_status": "PENDING",
+        })
+        log_rec = db.get_investigation_audit_log(inv_id)
+        sha = log_rec.get("final_report_sha256", "") if log_rec else ""
+
         if HAS_RICH:
             console.print(Panel(final_text, title="[bold green]Final 11-Section Investigative Report[/bold green]"))
+            console.print(Panel(
+                f"[bold green]Audit Status:[/bold green] Recorded to Immutable Compliance Ledger\n"
+                f"[bold cyan]Investigation ID:[/bold cyan] {inv_id}\n"
+                f"[bold cyan]Cryptographic SHA-256 Digest:[/bold cyan] {sha}\n"
+                f"[bold yellow]Officer Disposition:[/bold yellow] PENDING Human Review\n"
+                f"[dim]To record review: python cli.py sign-off {inv_id} --officer \"<Name>\" --decision APPROVED_SAR_FILED[/dim]",
+                title="[bold blue]Compliance Audit Trail Verification[/bold blue]"
+            ))
         else:
             print("\n=== FINAL INVESTIGATIVE REPORT ===")
             print(final_text)
+            print(f"\nAudit Log ID: {inv_id}")
+            print(f"SHA-256 Digest: {sha}")
+            print("Status: PENDING Officer Sign-Off")
     else:
         print("Investigation completed. No text output returned.")
+
+
+def handle_audit(args):
+    """View immutable investigation audit logs."""
+    db = DatabaseManager()
+    logs = db.get_investigation_audit_logs(customer_id=args.customer_id, limit=args.limit)
+    if not logs:
+        print("No investigation audit records found.")
+        return
+
+    if HAS_RICH:
+        table = Table(title="Compliance Investigation Audit Trail", show_header=True, header_style="bold magenta")
+        table.add_column("Investigation ID", style="cyan")
+        table.add_column("Timestamp", style="dim")
+        table.add_column("Customer", style="bold")
+        table.add_column("Trigger Rule", style="yellow")
+        table.add_column("Risk Tier", style="bold")
+        table.add_column("Status", style="bold")
+        table.add_column("Officer", style="green")
+        table.add_column("SHA-256 Digest", style="dim")
+
+        for l in logs:
+            tier_col = get_tier_color(l.get("risk_tier", "LOW"))
+            table.add_row(
+                l["investigation_id"],
+                (l.get("timestamp") or "")[:19],
+                f"{l.get('customer_name', '')} ({l['customer_id']})",
+                l.get("trigger_rule") or "Manual Review",
+                f"[{tier_col}]{l.get('risk_tier', '')}[/{tier_col}]",
+                l.get("officer_sign_off_status") or "PENDING",
+                l.get("officer_name") or "Unassigned",
+                (l.get("final_report_sha256") or "")[:12] + "..."
+            )
+        console.print(table)
+    else:
+        for l in logs:
+            print(f"{l['investigation_id']} | {l['customer_id']} | {l.get('risk_tier')} | {l.get('officer_sign_off_status')} | SHA: {l.get('final_report_sha256')[:12]}")
+
+
+def handle_sign_off(args):
+    """Record compliance officer sign-off on an investigation audit log."""
+    db = DatabaseManager()
+    ok = db.update_audit_sign_off(
+        investigation_id=args.investigation_id,
+        officer_sign_off_status=args.decision,
+        officer_name=args.officer,
+        officer_notes=args.notes,
+        officer_action_taken=args.action or args.decision
+    )
+    if not ok:
+        print(f"Error: Investigation ID '{args.investigation_id}' not found.")
+        return
+    updated = db.get_investigation_audit_log(args.investigation_id)
+    if HAS_RICH:
+        console.print(Panel(
+            f"[bold green]Sign-Off Confirmed![/bold green]\n"
+            f"[bold cyan]Investigation ID:[/bold cyan] {args.investigation_id}\n"
+            f"[bold cyan]Decision / Status:[/bold cyan] {updated.get('officer_sign_off_status')}\n"
+            f"[bold cyan]Reviewing Officer:[/bold cyan] {updated.get('officer_name')}\n"
+            f"[bold cyan]Notes:[/bold cyan] {updated.get('officer_notes')}\n"
+            f"[bold cyan]Reviewed At:[/bold cyan] {updated.get('reviewed_at')}",
+            title="[bold green]Human-in-the-Loop Sign-Off Recorded[/bold green]"
+        ))
+    else:
+        print(f"Sign-off recorded for {args.investigation_id}: {args.decision} by {args.officer}")
 
 
 def handle_serve(args):
@@ -447,6 +542,21 @@ def main():
     inv_parser.add_argument("customer_id", help="Customer ID (e.g., CUST-00015)")
     inv_parser.add_argument("--alert-id", help="Optional triggering alert ID")
 
+    # Audit Trail
+    audit_parser = subparsers.add_parser("audit", help="View immutable investigation audit trail & tamper-evident digests")
+    audit_parser.add_argument("--customer-id", help="Filter by customer ID (e.g. CUST-00015)")
+    audit_parser.add_argument("--limit", type=int, default=25, help="Number of audit records (default: 25)")
+
+    # Sign-off (Human-in-the-Loop)
+    signoff_parser = subparsers.add_parser("sign-off", help="Record compliance officer sign-off on an investigation")
+    signoff_parser.add_argument("investigation_id", help="Investigation ID (e.g. INV-...)")
+    signoff_parser.add_argument("--officer", required=True, help="Name or badge of compliance officer")
+    signoff_parser.add_argument("--decision", required=True, choices=[
+        "APPROVED_SAR_FILED", "APPROVED_EDD_REQUESTED", "APPROVED_ACCOUNT_RESTRICTED", "DISMISSED_FALSE_POSITIVE"
+    ], help="Compliance decision")
+    signoff_parser.add_argument("--notes", help="Officer rationale and justification")
+    signoff_parser.add_argument("--action", help="Specific operational action taken")
+
     # Serve
     serve_parser = subparsers.add_parser("serve", help="Launch web dashboard and FastAPI agent server")
     serve_parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
@@ -465,6 +575,10 @@ def main():
         handle_alerts(args)
     elif args.command == "investigate":
         handle_investigate(args)
+    elif args.command == "audit":
+        handle_audit(args)
+    elif args.command == "sign-off":
+        handle_sign_off(args)
     elif args.command == "serve":
         handle_serve(args)
     else:

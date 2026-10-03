@@ -147,6 +147,38 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
             self._handle_alerts(query)
         elif path == "/api/archetypes":
             self._send_json(list(ARCHETYPE_CONFIGS.keys()))
+        elif path == "/api/agent/investigate":
+            cust_id = query.get("customer_id", [query.get("id", ["CUST-00043"])])[0].upper().strip()
+            from app.alert_feed import generate_specialist_investigation_report
+            from app.orchestrator.triage import DynamicTriageRouter
+            from app.orchestrator.debate import DialecticDebateEngine
+            from app.tools import (
+                get_customer_profile,
+                analyze_transactions,
+                get_transaction_alerts,
+                get_fraud_alerts,
+                get_digital_telemetry,
+                get_risk_assessment
+            )
+
+            report = generate_specialist_investigation_report(cust_id)
+            profile = get_customer_profile(cust_id)
+            txs = analyze_transactions(cust_id)
+            txs["alerts"] = get_transaction_alerts(cust_id)
+            fraud = {"alerts": get_fraud_alerts(cust_id), "telemetry": get_digital_telemetry(cust_id)}
+            risk = get_risk_assessment(cust_id)
+
+            triage = DynamicTriageRouter().triage_case(cust_id)
+            debate = DialecticDebateEngine().adjudicate(cust_id, profile, txs, fraud, risk)
+
+            self._send_json({
+                "status": "success",
+                "customer_id": cust_id,
+                "triage": triage,
+                "debate": debate.to_dict(),
+                "report": report
+            })
+            return
         elif path == "/api/download":
             filename = query.get("file", [""])[0]
             self._handle_download(filename)

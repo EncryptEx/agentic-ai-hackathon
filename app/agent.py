@@ -38,10 +38,25 @@ if os.path.exists(_ENV_PATH):
     load_dotenv(_ENV_PATH)
 load_dotenv()
 
-from google.adk.agents import Agent, SequentialAgent
-from google.adk.apps import App
-from google.adk.models import Gemini
-from google.genai import types
+try:
+    from google.adk.agents import Agent, SequentialAgent
+    from google.adk.apps import App
+    from google.adk.models import Gemini
+    from google.genai import types
+    HAS_ADK = True
+except ImportError:
+    HAS_ADK = False
+    class Agent:
+        def __init__(self, *args, **kwargs): pass
+    class SequentialAgent(Agent):
+        def __init__(self, *args, **kwargs): pass
+    class App:
+        def __init__(self, *args, **kwargs): pass
+    class Gemini:
+        def __init__(self, *args, **kwargs): pass
+    class types:
+        class HttpRetryOptions:
+            def __init__(self, *args, **kwargs): pass
 
 from app.tools import (
     CUSTOMER_TOOLS,

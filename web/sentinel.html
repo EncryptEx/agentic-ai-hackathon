@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Sentinel — Nordic AML &amp; Sanctions Screening</title>
 <style>
   :root {
-    --bg: #05070c;
-    --ink: #cfe0ff;
-    --dim: rgba(150, 180, 220, 0.6);
-    --line: rgba(90, 130, 190, 0.28);
-    --panel: rgba(8, 12, 22, 0.80);
-    --crit: #ff5f6d;
-    --high: #ffc857;
-    --med:  #6fb3ff;
-    --ok:   #4fe0a0;
+    --bg: #050505;
+    --ink: #f4f4f5;
+    --dim: #a1a1aa;
+    --line: rgba(255, 255, 255, 0.08);
+    --panel: rgba(15, 15, 17, 0.7);
+    --crit: #ef4444;
+    --high: #f59e0b;
+    --med: #3b82f6;
+    --ok: #10b981;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -22,7 +23,7 @@
     overflow: hidden;
     background: var(--bg);
     color: var(--ink);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: 'Inter', -apple-system, sans-serif;
   }
   canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
 
@@ -30,8 +31,8 @@
     position: fixed;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
     padding: 11px 13px;
     font-size: 10px;
     letter-spacing: 0.09em;
@@ -814,7 +815,8 @@
             if (payload.suspicion === 'SUSPICIOUS') {
                 const li = document.createElement('div');
                 li.className = 'case enter flash';
-                li.id = 'case-' + row.customer_id;
+                const tx_id = payload.tx_id || row.transaction_id || row.customer_id;
+                li.id = 'case-' + tx_id;
                 li.innerHTML = `
                     <div class="row1">
                         <span class="cstat">TRIAGED</span>
@@ -831,7 +833,7 @@
                         
                         const invIframe = window.parent.document.querySelector('#investigator-tab iframe');
                         if (invIframe && invIframe.contentWindow) {
-                            invIframe.contentWindow.postMessage({ type: 'highlight_case', customer_id: row.customer_id }, '*');
+                            invIframe.contentWindow.postMessage({ type: 'highlight_case', customer_id: row.customer_id, tx_id: payload.tx_id || row.transaction_id || row.customer_id }, '*');
                         }
                     }
                 };
@@ -844,14 +846,16 @@
             }
             return;
         } else if (payload.msg_type === 'investigation_started') {
-            const li = document.getElementById('case-' + payload.customer_id);
+            const id = payload.tx_id || payload.customer_id;
+            const li = document.getElementById('case-' + id);
             if (li) {
                 li.querySelector('.cstat').innerText = 'INVESTIGATING';
                 li.querySelector('.row2').innerText = 'Agents are analyzing evidence...';
             }
             return;
         } else if (payload.msg_type === 'investigation_finished') {
-            const li = document.getElementById('case-' + payload.customer_id);
+            const id = payload.tx_id || payload.customer_id;
+            const li = document.getElementById('case-' + id);
             if (li) {
                 li.querySelector('.cstat').innerText = 'CLOSED';
                 li.querySelector('.cstat').style.background = 'rgba(79, 224, 160, 0.14)';

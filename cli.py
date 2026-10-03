@@ -419,7 +419,7 @@ def handle_investigate(args):
         sha = log_rec.get("final_report_sha256", "") if log_rec else ""
 
         if HAS_RICH:
-            console.print(Panel(final_text, title="[bold green]Final 11-Section Investigative Report[/bold green]"))
+            console.print(Panel(final_text, title="[bold green]Final 13-Section Multi-Agent Case Dossier (with Arbiter Ruling & Self-Evolution Loop)[/bold green]"))
             console.print(Panel(
                 f"[bold green]Audit Status:[/bold green] Recorded to Immutable Compliance Ledger\n"
                 f"[bold cyan]Investigation ID:[/bold cyan] {inv_id}\n"

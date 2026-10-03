@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valiant Bank - FRAML KYC, AML & Fraud Risk Platform</title>
+    <link rel="stylesheet" href="/style.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="brand-icon">🛡️</div>
+            <div class="brand-text">
+                <h1>VALIANT BANK FRAML PLATFORM <span class="badge-framl">Fraud + AML</span> <span class="badge-live">Live</span></h1>
+                <p>Retail Banking Individual Customer & Transaction Monitoring Suite</p>
+            </div>
+        </div>
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-target="tab-customers">Customers</button>
+            <button class="nav-tab" data-target="tab-transactions">Transactions</button>
+            <button class="nav-tab" data-target="tab-fraud">Fraud Typologies</button>
+            <button class="nav-tab" data-target="tab-aml">AML Typologies</button>
+            <button class="nav-tab" data-target="tab-simulator">Live Simulator</button>
+            <button class="nav-tab" data-target="tab-generator">Cohort & Exports</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- KPI Metrics Grid -->
+        <section class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Active Retail Customers</div>
+                <div class="kpi-value" id="kpi-total-cust">0</div>
+                <div class="kpi-sub">100% Individual Profiles</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Transactions Monitored</div>
+                <div class="kpi-value" id="kpi-total-tx">0</div>
+                <div class="kpi-sub" id="kpi-total-vol">$0.00 USD Gross Turnover</div>
+            </div>
+            <div class="kpi-card fraud">
+                <div class="kpi-label">Active Fraud Alerts</div>
+                <div class="kpi-value" id="kpi-total-fraud">0</div>
+                <div class="kpi-sub">ATO, Card Testing, APP, Bust-Out</div>
+            </div>
+            <div class="kpi-card high">
+                <div class="kpi-label">Active AML Alerts</div>
+                <div class="kpi-value" id="kpi-total-aml">0</div>
+                <div class="kpi-sub">Structuring, Mules, Corridors</div>
+            </div>
+            <div class="kpi-card crit">
+                <div class="kpi-label">Critical & High Risk</div>
+                <div class="kpi-value" id="kpi-high-crit">0</div>
+                <div class="kpi-sub">Priority EDD & SAR Candidates</div>
+            </div>
+        </section>
+
+        <!-- Charts Row -->
+        <section class="charts-grid">
+            <div class="chart-card">
+                <h3>Portfolio Risk Tier Distribution</h3>
+                <div class="chart-wrap">
+                    <canvas id="chart-tiers"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Top Fraud & AML Typologies</h3>
+                <div class="chart-wrap">
+                    <canvas id="chart-typologies"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Transaction Volume by Channel</h3>
+                <div class="chart-wrap">
+                    <canvas id="chart-channels"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 1: CUSTOMERS DIRECTORY -->
+        <div id="tab-customers" class="tab-content">
+            <div class="controls-bar">
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Search by name, ID, nationality, occupation, or archetype...">
+                </div>
+                <div class="tier-filters">
+                    <button class="filter-btn active" data-tier="ALL">All Tiers</button>
+                    <button class="filter-btn" data-tier="CRITICAL">Critical</button>
+                    <button class="filter-btn" data-tier="HIGH">High</button>
+                    <button class="filter-btn" data-tier="MEDIUM">Medium</button>
+                    <button class="filter-btn" data-tier="LOW">Low</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Customer ID</th>
+                            <th>Customer Name</th>
+                            <th>Citizenship / Res</th>
+                            <th>Occupation & Sector</th>
+                            <th>Archetype</th>
+                            <th>Tier</th>
+                            <th>FRAML Score</th>
+                            <th>AML Score</th>
+                            <th>Fraud Score</th>
+                            <th>Monitoring Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customer-table-body">
+                        <!-- Populated dynamically via app.js -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 2: TRANSACTIONS LEDGER (Live Server-Side Queries) -->
+        <div id="tab-transactions" class="tab-content" style="display: none;">
+            <div class="controls-bar">
+                <div class="search-box">
+                    <input type="text" id="tx-search-input" placeholder="Search transaction ID, counterparty, narrative, or customer...">
+                </div>
+                <div class="tier-filters">
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fraud-magenta); font-weight: 700; cursor: pointer;">
+                        <input type="checkbox" id="tx-fraud-check"> Fraud Only
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #f97316; font-weight: 700; cursor: pointer;">
+                        <input type="checkbox" id="tx-aml-check"> AML Suspicious Only
+                    </label>
+                    <select id="tx-dir-select" style="background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 6px; font-size: 12px;">
+                        <option value="ALL">All Directions</option>
+                        <option value="INBOUND">Inbound Only</option>
+                        <option value="OUTBOUND">Outbound Only</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tx ID</th>
+                            <th>Customer ID</th>
+                            <th>Timestamp</th>
+                            <th>Type</th>
+                            <th>Direction</th>
+                            <th>Amount (USD)</th>
+                            <th>Counterparty (Country)</th>
+                            <th>Channel & Device</th>
+                            <th>Auth Status</th>
+                            <th>Flag / Typology</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tx-table-body">
+                        <!-- Populated dynamically via app.js -->
+                    </tbody>
+                </table>
+                <div class="pagination-bar">
+                    <span id="tx-pagination-info">Showing transactions...</span>
+                    <div>
+                        <button class="page-btn" id="tx-prev-btn">Previous</button>
+                        <button class="page-btn" id="tx-next-btn">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: FRAUD TYPOLOGY ATTACK FLOWS -->
+        <div id="tab-fraud" class="tab-content" style="display: none;">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 18px; margin-bottom: 4px;">Fraud Typology Attack Pathways & Automated Interventions</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Review the telemetry patterns and attack mechanics detected by real-time fraud engines.</p>
+            </div>
+
+            <!-- Fraud 1: ATO -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology FR-01</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">Account Takeover (ATO) & Impossible Travel Velocity</h3>
+                    </div>
+                    <span style="color: #ef4444; font-size: 12px; font-weight: 700;">Immediate Session Revocation</span>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Credential stuffing or SIM-swap leads to unauthorized web session from a foreign proxy. An impossible travel velocity (>900 km/h) is recorded within 40 minutes of a legitimate customer session.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node">
+                        <div class="flow-node-title">Legitimate User (14:10)</div>
+                        <div class="flow-node-val" style="color: #10b981;">Local In-Store POS</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Device DEV-390743 (GB)</div>
+                    </div>
+                    <div class="flow-arrow">➔ 40m later ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Hostile Login (14:45)</div>
+                        <div class="flow-node-val" style="color: #ef4444;">Anonymous Proxy</div>
+                        <div style="font-size: 10px; color: #ef4444;">IP 185.112.93.203 (NG)</div>
+                    </div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Hostile Wire Drain</div>
+                        <div class="flow-node-val" style="color: #ef4444;">$11,728.78 Wire Out</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">Offshore Crypto Ramp</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud 2: Card Testing -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-HIGH">Typology FR-02</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">Card Testing / Micro-Authorization Probing Attack</h3>
+                    </div>
+                    <span style="color: #f97316; font-size: 12px; font-weight: 700;">Botnet PAN Validation</span>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Botnet tests stolen card numbers via sub-$2.00 micro-charges on automated digital subscription merchants, then executes a four-figure CNP purchase within minutes.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node">
+                        <div class="flow-node-title">Probe #1 (03:12)</div>
+                        <div class="flow-node-val" style="color: #f59e0b;">$0.89 CNP E-comm</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Digital Service (Authorized)</div>
+                    </div>
+                    <div class="flow-arrow">+</div>
+                    <div class="flow-node">
+                        <div class="flow-node-title">Probe #2 (03:16)</div>
+                        <div class="flow-node-val" style="color: #f59e0b;">$1.45 CNP E-comm</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Streaming Trial (Authorized)</div>
+                    </div>
+                    <div class="flow-arrow">➔ 12m later ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">High-Dollar Drain Attempt</div>
+                        <div class="flow-node-val" style="color: #ef4444;">$3,450.00 CNP</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">Declined / Suspected Fraud</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud 3: First-Party Bust-Out -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology FR-04</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">First-Party Bust-Out & Deposit Kiting Fraud</h3>
+                    </div>
+                    <span style="color: #ef4444; font-size: 12px; font-weight: 700;">ACH Settlement Race Condition</span>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Fraudster deposits unverified external ACH funds, then races against the 48-hour clearing window to extract cash at ATMs and outbound P2P transfers before the ACH deposit bounces.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node">
+                        <div class="flow-node-title">Inbound ACH (T=0)</div>
+                        <div class="flow-node-val" style="color: #3b82f6;">+$9,850.00</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">External Link (Unverified)</div>
+                    </div>
+                    <div class="flow-arrow">➔ 24h burst ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Rapid ATM Withdrawals</div>
+                        <div class="flow-node-val" style="color: #ef4444;">2x $1,000 Cash</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Metro 24h ATM Kiosk</div>
+                    </div>
+                    <div class="flow-arrow">+</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Outbound Peer Drain</div>
+                        <div class="flow-node-val" style="color: #ef4444;">$7,300.00 P2P</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">Account Fully Depleted</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud 4: Synthetic ID -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-HIGH">Typology FR-05</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">Synthetic Identity Fraud & Burner Contact Screening</h3>
+                    </div>
+                    <span style="color: var(--fraud-magenta); font-size: 12px; font-weight: 700;">Fabricated Digital Footprint</span>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Applicant combines real SSN elements with fabricated names, disposable temporary email domains, and virtual VoIP burner numbers to construct an artificial credit file.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node" style="border-color: var(--fraud-magenta);">
+                        <div class="flow-node-title">Burner Domain</div>
+                        <div class="flow-node-val">throwawayinbox.com</div>
+                        <div style="font-size: 10px; color: var(--fraud-magenta);">Disposable Temp Mail</div>
+                    </div>
+                    <div class="flow-arrow">+</div>
+                    <div class="flow-node" style="border-color: var(--fraud-magenta);">
+                        <div class="flow-node-title">Virtual VoIP Line</div>
+                        <div class="flow-node-val">+1-555-PBX-VOIP</div>
+                        <div style="font-size: 10px; color: var(--fraud-magenta);">No Carrier SIM Identity</div>
+                    </div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Synthetic Algorithm</div>
+                        <div class="flow-node-val" style="color: #ef4444;">Risk Index: 88.5/100</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">CIF Freeze Required</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: AML TYPOLOGIES -->
+        <div id="tab-aml" class="tab-content" style="display: none;">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 18px; margin-bottom: 4px;">Anti-Money Laundering (AML) Typologies</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Review transaction laundering pathways flagged under Bank Secrecy Act / FATF standards.</p>
+            </div>
+
+            <!-- Structuring -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <span class="badge badge-HIGH">Typology TM-01</span>
+                <h3 style="font-size: 16px; margin: 4px 0 10px 0;">Currency Transaction Reporting (CTR) Structuring / Smurfing</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Depositing multiple cash tranches in the $8,500–$9,900 range within 14 days to evade the $10,000 threshold.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node"><div class="flow-node-title">Deposit 1</div><div class="flow-node-val">$9,450 Cash</div></div>
+                    <div class="flow-arrow">+</div>
+                    <div class="flow-node"><div class="flow-node-title">Deposit 2 (+2d)</div><div class="flow-node-val">$9,600 Cash</div></div>
+                    <div class="flow-arrow">+</div>
+                    <div class="flow-node"><div class="flow-node-title">Deposit 3 (+4d)</div><div class="flow-node-val">$9,800 Cash</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Total Cluster</div><div class="flow-node-val" style="color: #ef4444;">$28,850.00</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">CTR Evaded</div></div>
+                </div>
+            </div>
+
+            <!-- Mule -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px;">
+                <span class="badge badge-CRITICAL">Typology TM-02</span>
+                <h3 style="font-size: 16px; margin: 4px 0 10px 0;">Rapid Movement of Funds / Pass-Through Mule Account</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Large inbound corporate wire followed by immediate disbursement (>85% of funds) within 48 hours to crypto exchanges.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node"><div class="flow-node-title">Inbound Wire</div><div class="flow-node-val" style="color: #10b981;">+$31,986.22</div><div style="font-size: 10px; color: var(--text-muted);">Offshore FZE</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node"><div class="flow-node-title">Mule Account</div><div class="flow-node-val">Student Account</div><div style="font-size: 10px; color: var(--text-muted);">Turnover Ratio: 30x</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Crypto Outflow (T+22h)</div><div class="flow-node-val" style="color: #ef4444;">-$29,997.08 (93.8%)</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">Binance P2P</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: LIVE RISK SIMULATOR -->
+        <div id="tab-simulator" class="tab-content" style="display: none;">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 18px; margin-bottom: 4px;">Live FRAML Risk Engine Simulator</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Test the multi-pillar scoring model by varying KYC demographics, watchlist findings, products, and injecting suspicious transaction typologies.</p>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input type="text" id="sim-fname" value="Alexandre">
+                </div>
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" id="sim-lname" value="Vance">
+                </div>
+                <div class="form-group">
+                    <label>Citizenship Country Code</label>
+                    <select id="sim-citizenship">
+                        <option value="US">US - United States (Low Risk)</option>
+                        <option value="GB">GB - United Kingdom (Low Risk)</option>
+                        <option value="DE">DE - Germany (Low Risk)</option>
+                        <option value="NG">NG - Nigeria (FATF Greylist)</option>
+                        <option value="KY">KY - Cayman Islands (Offshore Secrecy)</option>
+                        <option value="VG">VG - British Virgin Islands (Offshore)</option>
+                        <option value="SY">SY - Syria (FATF Greylist)</option>
+                        <option value="IR">IR - Iran (FATF Call for Action / Blacklist)</option>
+                        <option value="KP">KP - North Korea (FATF Blacklist)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Country of Residence</label>
+                    <select id="sim-residence">
+                        <option value="US">US - United States</option>
+                        <option value="GB">GB - United Kingdom</option>
+                        <option value="DE">DE - Germany</option>
+                        <option value="SG">SG - Singapore</option>
+                        <option value="AE">AE - United Arab Emirates</option>
+                        <option value="KY">KY - Cayman Islands</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Occupation & Sector</label>
+                    <select id="sim-occupation">
+                        <option value="SOFTWARE_ENGINEER">Software Engineer (Low Risk)</option>
+                        <option value="PHYSICIAN_DOCTOR">Physician / Doctor (Low Risk)</option>
+                        <option value="ACCOUNTANT_CERTIFIED">Certified Accountant (Low Risk)</option>
+                        <option value="STUDENT">University Student (Mule Target)</option>
+                        <option value="USED_CAR_DEALER">Used Car Dealer (Medium Risk Cash)</option>
+                        <option value="NIGHTCLUB_RESTAURANT_OWNER">Nightclub / Hospitality Owner (Cash Intensive)</option>
+                        <option value="IMPORT_EXPORT_TRADER">Import / Export Trader (Trade Risk)</option>
+                        <option value="CRYPTO_BROKER">Crypto Broker / VASP (High Risk)</option>
+                        <option value="CASINO_OPERATOR">Casino / Gambling Operator (High Risk)</option>
+                        <option value="POLITICIAN_SENIOR">Senior Public Official (PEP)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Declared Annual Income (USD)</label>
+                    <input type="number" id="sim-income" value="95000">
+                </div>
+                <div class="form-group">
+                    <label>Declared Expected Monthly Turnover (USD)</label>
+                    <input type="number" id="sim-turnover" value="6000">
+                </div>
+                <div class="form-group">
+                    <label>Declared Max Single Transaction (USD)</label>
+                    <input type="number" id="sim-maxtx" value="2500">
+                </div>
+                <div class="form-group">
+                    <label>Account Purpose & Nature</label>
+                    <select id="sim-purpose">
+                        <option value="SALARY_AND_LIVING_EXPENSES">Salary & Household Living Expenses (Low Risk)</option>
+                        <option value="PERSONAL_SAVINGS">Personal Savings & Wealth Accumulation</option>
+                        <option value="CROSS_BORDER_REMITTANCES">Cross-Border Family Remittances (Medium Risk)</option>
+                        <option value="INVESTMENT_WEALTH_GROWTH">Investment & Wealth Growth</option>
+                        <option value="CRYPTO_ASSET_TRADING">Crypto Asset Trading & Arbitrage (High Risk)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Onboarding Channel</label>
+                    <select id="sim-channel">
+                        <option value="BRANCH_IN_PERSON">In-Branch Face-to-Face Biometric (Lowest Risk)</option>
+                        <option value="DIGITAL_EKYC_BIOMETRIC">Digital App with Biometric Liveness</option>
+                        <option value="DIGITAL_WEB_BASIC">Web Portal Basic Submission</option>
+                        <option value="THIRD_PARTY_INTRODUCER">Third-Party Intermediary Introduced (Higher Risk)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>PEP Screening Status</label>
+                    <select id="sim-pep">
+                        <option value="NONE">Clean (Not a PEP)</option>
+                        <option value="DOMESTIC_PEP">Domestic PEP (State / National Official)</option>
+                        <option value="FOREIGN_PEP">Foreign PEP (Mandatory Statutory EDD)</option>
+                        <option value="PEP_ASSOCIATE">Family Member / Associate of PEP</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Adverse Media Screening</label>
+                    <select id="sim-media">
+                        <option value="NONE">Clean (No Derogatory Media)</option>
+                        <option value="FINANCIAL_CRIME">Financial Crime / Money Laundering Dossier</option>
+                        <option value="FRAUD">Fraud / Tax Evasion Indictment</option>
+                        <option value="CORRUPTION_BRIBERY">Corruption & Bribery Investigation</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Sanctions List Screening</label>
+                    <select id="sim-sanction">
+                        <option value="CLEAN">Clean (No Watchlist Hit)</option>
+                        <option value="FALSE_POSITIVE_RESOLVED">False Positive Resolved</option>
+                        <option value="CONFIRMED_HIT">Confirmed OFAC / UN Sanctions Hit (Immediate Freeze)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Inject Financial Crime Typology (AML or Fraud)</label>
+                    <select id="sim-scenario">
+                        <option value="NONE">Normal Baseline Transactions Only</option>
+                        <option value="ATO">Account Takeover (Foreign Proxy Drain from Unknown Device)</option>
+                        <option value="CARD_TEST">Card Testing (2 micro-probes followed by $3,450 drain attempt)</option>
+                        <option value="APP_SCAM">Authorized Push Payment Scam ($16,300 to new payee)</option>
+                        <option value="BUSTOUT">First-Party Bust-Out (ACH deposit + 4 instant ATM cash outs)</option>
+                        <option value="STRUCTURING">Structuring / Smurfing (4 cash deposits @ $9,400-$9,800)</option>
+                        <option value="MULE">Money Mule ($35k wire in, 95% drained to Crypto in 24h)</option>
+                        <option value="BLACKLIST">FATF Blacklist Wire ($48k transfer with Iran)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column: span 2;" id="sim-products">
+                    <label style="margin-bottom: 6px;">Banking Products Held</label>
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px;">
+                        <label><input type="checkbox" value="CURRENT_ACCOUNT" checked> Checking Account</label>
+                        <label><input type="checkbox" value="SAVINGS_ACCOUNT" checked> Savings Account</label>
+                        <label><input type="checkbox" value="MULTI_CURRENCY_WALLET"> Multi-Currency Wallet</label>
+                        <label><input type="checkbox" value="INTERNATIONAL_WIRE_SERVICE"> International Wire Service</label>
+                        <label><input type="checkbox" value="CRYPTO_GATEWAY_ACCESS"> Crypto Gateway Access</label>
+                        <label><input type="checkbox" value="CASH_DEPOSIT_SERVICE"> Cash Deposit Counter</label>
+                    </div>
+                </div>
+
+                <button class="btn-primary" id="run-simulation-btn" style="grid-column: span 2;">Run Real-Time FRAML Risk Engine Scoring</button>
+            </div>
+
+            <div id="simulation-result" style="display: none; margin-top: 24px;"></div>
+        </div>
+
+        <!-- TAB 6: COHORT GENERATOR & DATA EXPORTS -->
+        <div id="tab-generator" class="tab-content" style="display: none;">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 18px; margin-bottom: 4px;">Synthetic Cohort Generator & Tabular Data Exports</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Generate custom batches of synthetic individual retail customers directly from the web application or download exported CSV datasets.</p>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Number of Individual Customers</label>
+                    <input type="number" id="gen-count" value="100" min="10" max="1000">
+                </div>
+                <div class="form-group">
+                    <label>Transaction History Span (Days)</label>
+                    <input type="number" id="gen-days" value="90" min="30" max="365">
+                </div>
+                <div class="form-group">
+                    <label>Random Seed (Reproducibility)</label>
+                    <input type="number" id="gen-seed" value="42">
+                </div>
+                <div class="form-group" style="display: flex; justify-content: flex-end; align-items: flex-end;">
+                    <button class="btn-magenta" id="run-generator-btn" style="width: 100%;">⚡ Generate Cohort & Run FRAML Scoring</button>
+                </div>
+            </div>
+
+            <div id="gen-status-box" style="display: none; padding: 16px; border-radius: 8px; margin-bottom: 24px;"></div>
+
+            <!-- Direct CSV Downloads -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px;">
+                <h3 style="font-size: 16px; margin-bottom: 12px; color: var(--accent-blue);">Direct CSV Data Downloads</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">Download the raw tabular exports generated from the persistent SQLite database.</p>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <a href="/api/download?file=customers.csv" class="page-btn" style="text-decoration: none; padding: 10px 16px; font-weight: 600;">📥 customers.csv</a>
+                    <a href="/api/download?file=transactions.csv" class="page-btn" style="text-decoration: none; padding: 10px 16px; font-weight: 600;">📥 transactions.csv</a>
+                    <a href="/api/download?file=risk_assessments.csv" class="page-btn" style="text-decoration: none; padding: 10px 16px; font-weight: 600;">📥 risk_assessments.csv</a>
+                    <a href="/api/download?file=alerts.csv" class="page-btn" style="text-decoration: none; padding: 10px 16px; font-weight: 600;">📥 alerts.csv</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Customer 360 Drawer Modal -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="dossier-panel">
+            <div class="dossier-header">
+                <div>
+                    <h2 style="font-size: 16px; text-transform: uppercase; color: var(--accent-blue);">Compliance Dossier</h2>
+                    <p style="font-size: 12px; color: var(--text-secondary);">Individual Customer 360 FRAML File</p>
+                </div>
+                <button class="close-btn" id="close-dossier">&times;</button>
+            </div>
+            <div class="dossier-body" id="dossier-content">
+                <!-- Dynamically loaded via app.js -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,2380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sentinel — Nordic AML &amp; Sanctions Screening</title>
+<style>
+  :root {
+    --bg: #05070c;
+    --ink: #cfe0ff;
+    --dim: rgba(150, 180, 220, 0.6);
+    --line: rgba(90, 130, 190, 0.28);
+    --panel: rgba(8, 12, 22, 0.80);
+    --crit: #ff5f6d;
+    --high: #ffc857;
+    --med:  #6fb3ff;
+    --ok:   #4fe0a0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+  .panel {
+    position: fixed;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    padding: 11px 13px;
+    font-size: 10px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--dim);
+    line-height: 1.8;
+    user-select: none;
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.42);
+  }
+  .panel b { color: rgba(160, 210, 255, 0.95); font-weight: 600; }
+  .panel h3 {
+    font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: rgba(150, 180, 220, 0.55); margin-bottom: 7px; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .panel h3 em { font-style: normal; color: rgba(150, 180, 220, 0.35); letter-spacing: 0.1em; }
+  .card-toggle {
+    width: 20px; height: 20px; padding: 0; margin: -3px -4px 0 8px;
+    border: 1px solid rgba(150, 180, 220, 0.22); border-radius: 5px;
+    background: rgba(120, 160, 220, 0.08); color: rgba(210, 230, 255, 0.72);
+    font: inherit; font-size: 14px; line-height: 16px; cursor: pointer;
+    text-transform: none; letter-spacing: 0;
+    pointer-events: auto;
+  }
+  .card-toggle:hover { color: var(--accent); border-color: rgba(102, 227, 208, 0.65); background: var(--accent-soft); }
+
+  /* ---------------------------------------------------------- draggable cards */
+  .panel.draggable { pointer-events: auto !important; }
+  .panel.draggable h3 { cursor: grab; touch-action: none; pointer-events: auto !important; }
+  .panel.draggable.dragging { cursor: grabbing; }
+  .panel.draggable.dragging h3 { cursor: grabbing; }
+  .panel.dragging { box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6); border-color: rgba(120, 180, 255, 0.55); }
+  .panel.draggable h3::after {
+    content: '⠿'; margin-left: 8px; font-size: 10px; line-height: 1;
+    color: rgba(150, 180, 220, 0.28); letter-spacing: 0;
+  }
+  .panel.draggable h3:hover::after { color: rgba(150, 180, 220, 0.6); }
+
+  /* Collapsed: hide EVERYTHING except the header row, so live data that keeps
+     streaming into the card never shows through while it is minimized. */
+  .panel.card-collapsed { padding-bottom: 8px; }
+  .panel.card-collapsed > :not(h3) { display: none !important; }
+  .panel.card-collapsed h3 { margin-bottom: 0; }
+  .panel.card-collapsed h3 > :not(.card-toggle) { display: none !important; }
+  .panel.card-collapsed h3::after { display: none; }
+  .panel.card-collapsed h3::before { display: none; }
+  .panel.card-collapsed .card-toggle { display: block; margin: 0 0 0 auto; }
+
+  /* ---------------------------------------------------------- title */
+  #title { left: 16px; top: 14px; letter-spacing: 0.28em; pointer-events: none; }
+  #title small { display: block; letter-spacing: 0.14em; color: rgba(150, 180, 220, 0.42); font-size: 9px; margin-top: 3px; }
+
+  /* ---------------------------------------------------------- KPI strip */
+  #kpis {
+    left: 16px; top: 78px;
+    width: 236px;
+    pointer-events: none;
+    padding: 8px 13px 7px;
+    font-size: 9.5px;
+  }
+  #kpis .kpi {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px; padding: 0.5px 0;
+  }
+  #kpis .kpi span:first-child { color: rgba(150, 180, 220, 0.62); }
+  #kpis .kpi span:last-child { color: #dceaff; font-weight: 600; font-variant-numeric: tabular-nums; }
+  #kpis .kpi.big span:last-child { font-size: 15px; letter-spacing: 0.02em; }
+  #kpis .divider { height: 1px; background: var(--line); margin: 3.5px 0; }
+
+  /* ---------------------------------------------------------- risk mix */
+  #mix { left: 16px; top: 512px; width: 236px; pointer-events: none; }
+  #mix .bar {
+    display: flex; height: 8px; border-radius: 4px; overflow: hidden;
+    background: rgba(120, 160, 220, 0.12); margin: 4px 0 8px;
+  }
+  #mix .bar i { display: block; height: 100%; transition: width .4s ease; }
+  #mix .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  #mix .legend span { display: flex; align-items: center; gap: 5px; font-size: 9px; letter-spacing: 0.06em; }
+  #mix .legend i { width: 7px; height: 7px; border-radius: 2px; display: block; }
+  #mix .legend b { color: #dceaff; }
+
+  /* ---------------------------------------------------------- HUD */
+  #hud { left: 16px; bottom: 100px; pointer-events: none; }
+
+  /* ---------------------------------------------------------- alert stream */
+  #feed {
+    right: 16px; top: 14px;
+    width: 300px;
+    max-height: 40vh;
+    overflow: hidden;
+    text-transform: none;
+    letter-spacing: 0.02em;
+    font-size: 10.5px;
+    line-height: 1.5;
+    pointer-events: none;
+  }
+  #feed .item {
+    display: flex; gap: 7px; align-items: baseline;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(90, 130, 190, 0.10);
+    animation: slide 0.35s ease;
+  }
+  @keyframes slide { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+  #feed .item .tag {
+    flex: 0 0 auto; font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 1px 5px; border-radius: 4px; font-weight: 600;
+  }
+  #feed .item .txt { color: rgba(200, 220, 255, 0.82); }
+  #feed .item .txt b { color: #e6f0ff; }
+  #feed .item .amt { color: rgba(150, 180, 220, 0.55); font-size: 9.5px; }
+  .t-crit { background: rgba(255, 95, 109, 0.18); color: #ff8f99; }
+  .t-high { background: rgba(255, 200, 87, 0.16); color: #ffd479; }
+  .t-med  { background: rgba(111, 179, 255, 0.16); color: #9ccbff; }
+  .t-ok   { background: rgba(79, 224, 160, 0.14); color: #7fe0ab; }
+
+  /* ---------------------------------------------------------- case funnel */
+  #feed .funnel {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 2px; margin: 2px 0 8px;
+    padding: 6px 4px;
+    background: rgba(90, 130, 190, 0.07);
+    border-radius: 7px;
+  }
+  #feed .funnel .stage {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  }
+  #feed .funnel .stage .n {
+    font-size: 14px; font-weight: 600; color: #dceaff; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  #feed .funnel .stage .l {
+    font-size: 7.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: rgba(150, 180, 220, 0.6);
+  }
+  #feed .funnel .arrow { color: rgba(120, 160, 220, 0.35); font-size: 13px; }
+
+  /* ---------------------------------------------------------- case rows */
+  #case-list { display: flex; flex-direction: column; }
+  #feed .case {
+    padding: 5px 0 6px;
+    border-bottom: 1px solid rgba(90, 130, 190, 0.10);
+    transition: background .3s ease;
+  }
+  #feed .case.enter { animation: slide 0.35s ease; }
+  #feed .case.flash { background: rgba(120, 200, 255, 0.07); }
+  #feed .case .row1 {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
+  }
+  #feed .case .cid {
+    font-size: 9px; color: rgba(150, 180, 220, 0.55);
+    font-variant-numeric: tabular-nums;
+  }
+  #feed .case .cstat {
+    font-size: 8px; letter-spacing: 0.09em; text-transform: uppercase;
+    padding: 1px 5px; border-radius: 4px; font-weight: 600;
+    background: rgba(120, 160, 220, 0.12); color: rgba(180, 205, 240, 0.85);
+  }
+  #feed .case .camt {
+    margin-left: auto; font-size: 9.5px; color: rgba(150, 180, 220, 0.6);
+    font-variant-numeric: tabular-nums;
+  }
+  #feed .case .row2 { color: rgba(200, 220, 255, 0.78); }
+  #feed .case .row2 b { color: #e6f0ff; }
+  #feed .case .sla {
+    height: 2px; margin-top: 4px; border-radius: 2px;
+    background: rgba(120, 160, 220, 0.12); overflow: hidden;
+  }
+  #feed .case .sla i { display: block; height: 100%; transition: width .3s linear; }
+  #feed .case.c-open .cstat { background: rgba(111, 179, 255, 0.16); color: #9ccbff; }
+  #feed .case.c-triaged .cstat { background: rgba(255, 200, 87, 0.16); color: #ffd479; }
+  #feed .case.c-escalated .cstat { background: rgba(255, 95, 109, 0.18); color: #ff8f99; }
+  #feed .case.c-conf .cstat { background: rgba(255, 95, 109, 0.18); color: #ff8f99; }
+  #feed .case.c-dism .cstat { background: rgba(79, 224, 160, 0.14); color: #7fe0ab; }
+  #feed .case.c-conf, #feed .case.c-dism { opacity: 0.62; }
+
+  /* ---------------------------------------------------------- inspector */
+  #inspector {
+    right: 16px; bottom: 14px;
+    width: 300px;
+    max-height: 52vh;
+    overflow-y: auto;
+    display: none;
+    text-transform: none;
+    letter-spacing: 0.02em;
+    font-size: 11px;
+    line-height: 1.55;
+    color: rgba(200, 220, 255, 0.85);
+    scrollbar-width: thin;
+  }
+  #inspector.on { display: block; }
+  #inspector h3 {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #ffe066; margin-bottom: 3px; font-weight: 600;
+  }
+  #inspector h3 .badge {
+    font-size: 8.5px; letter-spacing: 0.1em; padding: 2px 6px; border-radius: 4px;
+    background: rgba(255, 224, 102, 0.14); color: #ffe066;
+  }
+  #inspector .thought {
+    font-style: italic;
+    color: #cfe6ff;
+    background: rgba(120, 200, 255, 0.08);
+    border-left: 2px solid rgba(140, 200, 255, 0.6);
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin: 8px 0;
+    min-height: 30px;
+  }
+  #inspector .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin: 6px 0;
+  }
+  #inspector .grid .cell { display: flex; justify-content: space-between; gap: 8px; }
+  #inspector .grid .cell span:first-child { color: rgba(150, 180, 220, 0.6); font-size: 9.5px; }
+  #inspector .sect {
+    font-size: 8.5px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(150, 180, 220, 0.45); margin: 10px 0 4px;
+    border-top: 1px solid rgba(90, 130, 190, 0.16); padding-top: 7px;
+  }
+  #title {
+    left: 16px; top: 14px; width: 390px; padding: 0;
+    background: transparent; border: 0; box-shadow: none; backdrop-filter: none;
+    letter-spacing: 0.22em; pointer-events: none;
+  }
+  #title strong { display: block; color: #edf7ff; font-size: 22px; line-height: 1.05; font-weight: 500; letter-spacing: 0.18em; }
+  #title .eyebrow { display: block; color: var(--accent); font-size: 8px; letter-spacing: 0.22em; margin-bottom: 7px; }
+  #title small { display: block; letter-spacing: 0.12em; color: rgba(150, 180, 220, 0.48); font-size: 9px; margin-top: 6px; }
+  #title small::before { content: '●'; color: var(--accent); margin-right: 7px; font-size: 8px; }
+  #inspector .sig .s { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+  #inspector .sig .s > span {
+    width: 264px;
+    text-transform: uppercase; color: rgba(150, 180, 220, 0.65);
+  }
+  #inspector .sig .bar { flex: 1; height: 4px; border-radius: 2px; background: rgba(120, 160, 220, 0.16); overflow: hidden; }
+  #inspector .sig .bar i { display: block; height: 100%; width: 0%; background: #7fd1ff; }
+  #inspector .sig .s > em { font-style: normal; font-size: 9px; color: rgba(150, 180, 220, 0.5); width: 26px; text-align: right; }
+  #inspector .hint { margin-top: 9px; color: rgba(150, 180, 220, 0.4); font-size: 9px; }
+
+  /* ---------------------------------------------------------- controls */
+  #controls {
+    left: 50%; bottom: 14px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 10px;
+    text-transform: none; letter-spacing: 0.02em;
+    flex-wrap: wrap; justify-content: center; max-width: min(820px, 66vw);
+    border-color: rgba(102, 227, 208, 0.2);
+    background: rgba(7, 14, 24, 0.9);
+  }
+  #controls button {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 11px;
+    background: rgba(12, 18, 32, 0.6);
+    color: rgba(180, 210, 255, 0.72);
+    font: inherit; font-size: 9.5px;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+  }
+  #controls button:hover { color: #dbe9ff; border-color: rgba(120, 180, 255, 0.6); background: rgba(30, 55, 90, 0.68); }
+  #controls button.on { color: #e9f4ff; border-color: rgba(130, 195, 255, 0.85); background: rgba(70, 130, 220, 0.26); }
+  #controls .sep { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
+  #controls label { display: flex; align-items: center; gap: 6px; color: var(--dim); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; }
+  #controls input[type=range] { width: 84px; accent-color: #6fb3ff; }
+  #controls .card-toggle { flex: 0 0 auto; order: 10; }
+  #controls.card-collapsed { min-width: 42px; width: 42px; padding: 8px; }
+  #controls.card-collapsed > :not(.card-toggle) { display: none !important; }
+  #controls.card-collapsed .card-toggle { display: block; margin: 0; }
+
+  #kpis {
+    width: 264px;
+    padding: 12px 14px 11px;
+    border-left: 2px solid rgba(102, 227, 208, 0.7);
+    background: linear-gradient(135deg, rgba(8, 17, 29, 0.92), rgba(7, 12, 22, 0.78));
+  }
+  #mix {
+    top: auto;
+    bottom: 154px;
+    width: 264px;
+    background: var(--panel-soft);
+  }
+  #feed {
+    top: 74px;
+    width: 350px;
+    max-height: 58vh;
+    border-top: 2px solid rgba(102, 227, 208, 0.6);
+    background: linear-gradient(160deg, rgba(9, 18, 31, 0.94), rgba(6, 11, 20, 0.86));
+  }
+  #feed h3::before { content: 'LIVE'; color: var(--accent); font-size: 8px; letter-spacing: 0.18em; margin-right: 10px; }
+  #inspector {
+    width: 350px;
+    border-top: 2px solid rgba(255, 200, 87, 0.65);
+    background: linear-gradient(160deg, rgba(12, 20, 34, 0.95), rgba(7, 12, 22, 0.88));
+  }
+
+  @media (max-width: 1180px) {
+    #mix { display: none; }
+  }
+  @media (max-height: 900px) {
+    #mix { display: none; }
+  }
+  @media (max-height: 760px) {
+    #kpis .kpi:nth-child(n+11) { display: none; }
+  }
+  @media (max-width: 900px) {
+    #feed { display: none; }
+    #inspector { width: 250px; }
+    #kpis { width: 200px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div class="panel" id="title">
+  <span class="eyebrow">FINANCIAL CRIME OPERATIONS / NORDIC REGION</span>
+  <strong>Sentinel</strong>
+  <small>Nordic AML &middot; sanctions screening &middot; transaction risk</small>
+</div>
+
+<div class="panel" id="kpis">
+  <h3>Monitoring <em id="st-clock">--</em><button class="card-toggle" type="button" aria-label="Collapse monitoring card" aria-expanded="true">−</button></h3>
+  <div class="kpi big"><span>transactions</span><span id="st-tx">--</span></div>
+  <div class="kpi"><span>throughput</span><span id="st-rate">--</span></div>
+  <div class="kpi"><span>value screened</span><span id="st-value">--</span></div>
+  <div class="divider"></div>
+  <div class="kpi"><span>alerts raised</span><span id="st-alerts">--</span></div>
+  <div class="kpi"><span>sanctions hits</span><span id="st-sanctions">--</span></div>
+  <div class="kpi"><span>blocked</span><span id="st-blocked">--</span></div>
+  <div class="kpi"><span>value at risk</span><span id="st-var">--</span></div>
+  <div class="divider"></div>
+  <div class="kpi"><span>cases open</span><span id="st-cases">--</span></div>
+  <div class="kpi"><span>escalated</span><span id="st-escalated">--</span></div>
+  <div class="kpi"><span>confirmed</span><span id="st-confirmed">--</span></div>
+  <div class="kpi"><span>dismissed</span><span id="st-dismissed">--</span></div>
+  <div class="kpi"><span>mean time to resolve</span><span id="st-mttr">--</span></div>
+  <div class="kpi"><span>SLA breaches</span><span id="st-sla">--</span></div>
+  <div class="divider"></div>
+  <div class="kpi"><span>layering chains</span><span id="st-chains">--</span></div>
+  <div class="kpi"><span>deepest chain</span><span id="st-chainmax">--</span></div>
+  <div class="kpi"><span>opaque structures</span><span id="st-opaque">--</span></div>
+  <div class="kpi"><span>shell entities</span><span id="st-shells">--</span></div>
+  <div class="kpi"><span>onboarded</span><span id="st-onboard">--</span></div>
+  <div class="kpi"><span>offboarded</span><span id="st-exited">--</span></div>
+  <div class="divider"></div>
+  <div class="kpi"><span>precision</span><span id="st-prec">--</span></div>
+  <div class="kpi"><span>false positives</span><span id="st-fp">--</span></div>
+</div>
+
+<div class="panel" id="mix">
+  <h3>Risk distribution <button class="card-toggle" type="button" aria-label="Collapse risk distribution card" aria-expanded="true">−</button></h3>
+  <div class="bar" id="mix-bar"></div>
+  <div class="legend">
+    <span><i style="background:#4fe0a0"></i>clear <b id="mix-clear">0</b></span>
+    <span><i style="background:#6fb3ff"></i>review <b id="mix-review">0</b></span>
+    <span><i style="background:#ffc857"></i>suspicious <b id="mix-susp">0</b></span>
+    <span><i style="background:#ff5f6d"></i>blocked <b id="mix-block">0</b></span>
+  </div>
+</div>
+
+<div class="panel" id="hud">
+  <div><b id="fps">--</b> fps &middot; <b id="nodes">--</b> accounts &middot; <b id="edges">--</b> links</div>
+  <div>click an <b>account</b> to inspect &middot; drag to <b>pan</b> &middot; scroll to <b>zoom</b></div>
+</div>
+
+<div class="panel" id="feed">
+  <h3>Case queue <em id="case-count">0</em><button class="card-toggle" type="button" aria-label="Collapse case queue card" aria-expanded="true">−</button></h3>
+  <div class="funnel">
+    <div class="stage"><span class="n" id="case-open">0</span><span class="l">open</span></div>
+    <div class="arrow">&rsaquo;</div>
+    <div class="stage"><span class="n" id="case-triaged">0</span><span class="l">triaged</span></div>
+    <div class="arrow">&rsaquo;</div>
+    <div class="stage"><span class="n" id="case-esc">0</span><span class="l">escalated</span></div>
+    <div class="arrow">&rsaquo;</div>
+    <div class="stage"><span class="n" id="case-closed">0</span><span class="l">closed</span></div>
+  </div>
+  <div id="case-list"></div>
+</div>
+
+<div class="panel" id="inspector">
+  <h3><span id="ins-title">Account</span><span class="badge" id="ins-badge">--</span><button class="card-toggle" type="button" aria-label="Collapse account inspector card" aria-expanded="true">−</button></h3>
+  <div class="sub" id="ins-sub">--</div>
+  <div class="thought" id="ins-thought">&ldquo;&hellip;&rdquo;</div>
+
+  <div class="grid">
+    <div class="cell"><span>risk score</span><span id="ins-risk">--</span></div>
+    <div class="cell"><span>verdict</span><span id="ins-verdict">--</span></div>
+    <div class="cell"><span>volume</span><span id="ins-vol">--</span></div>
+    <div class="cell"><span>counterparties</span><span id="ins-cp">--</span></div>
+    <div class="cell"><span>jurisdiction</span><span id="ins-jur">--</span></div>
+    <div class="cell"><span>structuring</span><span id="ins-struct">--</span></div>
+  </div>
+
+  <div class="sect">Sanctions screening</div>
+  <div class="grid">
+    <div class="cell"><span>list match</span><span id="ins-sanction">--</span></div>
+    <div class="cell"><span>match score</span><span id="ins-sanction-score">--</span></div>
+    <div class="cell"><span>exposure</span><span id="ins-exposure">--</span></div>
+    <div class="cell"><span>hops to listed</span><span id="ins-hops">--</span></div>
+  </div>
+
+  <div class="sect">Ownership &amp; layering</div>
+  <div class="grid">
+    <div class="cell"><span>vehicle</span><span id="ins-vehicle">--</span></div>
+    <div class="cell"><span>opacity</span><span id="ins-opacity">--</span></div>
+    <div class="cell"><span>UBO depth</span><span id="ins-ubodepth">--</span></div>
+    <div class="cell"><span>ultimate owner</span><span id="ins-ubo">--</span></div>
+    <div class="cell"><span>controls</span><span id="ins-owns">--</span></div>
+    <div class="cell"><span>chain position</span><span id="ins-chainpos">--</span></div>
+  </div>
+
+  <div class="sect">Typology signals</div>
+  <div class="sig" id="ins-sigs"></div>
+  <div class="hint">click again to deselect</div>
+</div>
+
+<div class="panel" id="controls">
+  <button id="btn-pause">Pause</button>
+  <button id="btn-burst">Inject fraud ring</button>
+  <button id="btn-layer">Layer funds</button>
+  <button id="btn-sanction">Designate entity</button>
+  <button id="btn-clear">Clear alerts</button>
+  <div class="sep"></div>
+  <label>sensitivity <input id="sens" type="range" min="20" max="90" value="55" /></label>
+  <button class="card-toggle" type="button" aria-label="Collapse controls card" aria-expanded="true">−</button>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const canvas = document.getElementById('scene');
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  const $ = (id) => document.getElementById(id);
+  const fpsEl = $('fps'), nodesEl = $('nodes'), edgesEl = $('edges');
+  const stTx = $('st-tx'), stRate = $('st-rate'), stValue = $('st-value');
+  const stAlerts = $('st-alerts'), stSanctions = $('st-sanctions'), stBlocked = $('st-blocked');
+  const stVar = $('st-var'), stPrec = $('st-prec'), stFp = $('st-fp'), stClock = $('st-clock');
+  const stChains = $('st-chains'), stChainMax = $('st-chainmax'), stOpaque = $('st-opaque'), stShells = $('st-shells');
+  const stOnboard = $('st-onboard'), stExited = $('st-exited');
+  const stCases = $('st-cases'), stEscalated = $('st-escalated'), stConfirmed = $('st-confirmed');
+  const stDismissed = $('st-dismissed'), stMttr = $('st-mttr'), stSla = $('st-sla');
+  const mixBar = $('mix-bar');
+  const mixClear = $('mix-clear'), mixReview = $('mix-review'), mixSusp = $('mix-susp'), mixBlock = $('mix-block');
+  const caseList = $('case-list'), caseCount = $('case-count');
+  const caseOpen = $('case-open'), caseTriaged = $('case-triaged');
+  const caseEsc = $('case-esc'), caseClosed = $('case-closed');
+  const inspectorEl = $('inspector');
+  const insTitle = $('ins-title'), insBadge = $('ins-badge'), insSub = $('ins-sub'), insThought = $('ins-thought');
+  const insRisk = $('ins-risk'), insVerdict = $('ins-verdict'), insVol = $('ins-vol'), insCp = $('ins-cp');
+  const insJur = $('ins-jur'), insStruct = $('ins-struct');
+  const insSanction = $('ins-sanction'), insSanctionScore = $('ins-sanction-score');
+  const insExposure = $('ins-exposure'), insHops = $('ins-hops');
+  const insVehicle = $('ins-vehicle'), insOpacity = $('ins-opacity'), insUboDepth = $('ins-ubodepth');
+  const insUbo = $('ins-ubo'), insOwns = $('ins-owns'), insChainPos = $('ins-chainpos');
+  const insSigs = $('ins-sigs');
+  const btnPause = $('btn-pause'), btnBurst = $('btn-burst'), btnSanction = $('btn-sanction'), btnClear = $('btn-clear');
+  const btnLayer = $('btn-layer');
+  const sensEl = $('sens');
+
+  let W = 0, H = 0, DPR = 1;
+
+  // ---------------------------------------------------------------- config
+  const CONFIG = {
+    accountCount: 190,
+    ringSize: 9,
+    txPerSecond: 26,
+    burstRate: 140,
+    edgeLife: 2.6,
+    edgeMax: 420,
+    nodeRadius: 3.2,
+    hubRadius: 6.4,
+    linkDist: 210,
+    zoomMin: 0.45,
+    zoomMax: 3.0,
+    trailAlpha: 0.30,
+    riskDecay: 0.22,
+    riskRise: 0.85,
+    alertCooldown: 3.2,
+    sensitivity: 0.55,
+    exposureThreshold: 0.30,   // share of flow to listed parties that flags exposure
+    chainMin: 3,               // shortest layering chain worth flagging
+    chainMax: 6,               // longest layering chain we will build
+    chainMaxLive: 6,           // most chains allowed on screen at once
+    chainLife: 34,             // seconds a layering chain stays live
+    chainRate: 0.10,           // probability per tick of spawning a new chain
+    ownershipDepth: 4,         // max layers in an ownership stack
+    opaqueThreshold: 0.55,     // opacity above which a structure is 'complex'
+    caseQueueMax: 60,          // most cases held in the queue at once
+    caseSla: 26,               // seconds before an open case breaches SLA
+    autoTriageRate: 0.92,      // probability an analyst auto-triages a case
+    autoTriageDelay: [0.5, 2.2], // seconds before auto-triage fires
+    autoCloseRate: 0.55,       // probability an auto-triaged case is closed
+    autoResolveDelay: [1.0, 3.0], // seconds an escalated case takes to resolve
+    exitDelay: [2.5, 7.0],     // seconds a blocked account takes to be offboarded
+    onboardRate: 4.0,          // customers onboarded per second
+    onboardLinks: [2, 5],      // links a new customer opens on arrival
+    accountFloor: 175,         // do not onboard below this many accounts
+    accountCeil: 230,          // do not onboard above this many accounts
+  };
+
+  // ---------------------------------------------------------------- state
+  const accounts = [];
+  const edges = [];
+  const alerts = [];
+  const rings = [];
+  const chains = [];
+  const cases = [];            // open + recently closed alert cases
+  let time = 0;
+  let last = performance.now();
+  let fpsAccum = 0, fpsFrames = 0;
+  let txAccum = 0;
+  let txTotal = 0;
+  let alertTotal = 0;
+  let blockedTotal = 0;
+  let sanctionHits = 0;
+  let valueScreened = 0;
+  let valueAtRisk = 0;
+  let truePositives = 0, falsePositives = 0;
+  let paused = false;
+  let selected = null;
+  let hoverNode = null;
+  let chainTotal = 0;          // layering chains spawned
+  let chainActive = 0;         // layering chains currently live
+  let opaqueStructures = 0;    // accounts sitting under a complex ownership stack
+  let shellTotal = 0;          // shell entities in the world
+  let maxChainSeen = 0;        // deepest layering chain observed
+  let maxOwnershipDepth = 0;   // deepest ownership stack observed
+  let nextAccountId = CONFIG.accountCount; // id for the next onboarded customer
+  let onboardAccum = 0;        // fractional onboarding accumulator
+  let onboardedTotal = 0;      // customers onboarded since boot
+  let exitedTotal = 0;         // customers offboarded since boot
+
+  // ---- case management counters
+  let caseSeq = 0;             // monotonically increasing case id
+  let casesOpened = 0;         // total cases ever opened
+  let casesClosed = 0;         // total cases resolved
+  let casesEscalated = 0;      // total cases escalated to L2
+  let casesSlaBreached = 0;    // total cases that blew their SLA
+  let casesConfirmed = 0;      // closed as a true hit
+  let casesDismissed = 0;      // closed as a false positive
+  let valueRecovered = 0;      // value frozen from confirmed cases
+  let valueCleared = 0;        // value released from dismissed cases
+  let mttrSum = 0;             // sum of resolution times, for the mean
+  let mttrCount = 0;
+
+  const cam = { x: 0, y: 0, zoom: 1, targetZoom: 1, dragging: false, moved: false, lastX: 0, lastY: 0 };
+
+  // ---------------------------------------------------------------- utils
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const money = (v) => {
+    if (v >= 1e9) return '\u20ac' + (v / 1e9).toFixed(2) + 'B';
+    if (v >= 1e6) return '\u20ac' + (v / 1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return '\u20ac' + (v / 1e3).toFixed(1) + 'K';
+    return '\u20ac' + v.toFixed(0);
+  };
+  const pct = (v) => (v * 100).toFixed(0) + '%';
+
+  // ---------------------------------------------------------------- typologies
+  const TYPOLOGIES = [
+    { id: 'structuring', label: 'structuring',            weight: 1.00 },
+    { id: 'layering',    label: 'layering',               weight: 0.95 },
+    { id: 'velocity',    label: 'velocity spike',         weight: 0.80 },
+    { id: 'fanout',      label: 'fan-out',                weight: 0.85 },
+    { id: 'fanin',       label: 'fan-in',                 weight: 0.85 },
+    { id: 'roundtrip',   label: 'round-tripping',         weight: 0.90 },
+    { id: 'dormant',     label: 'dormant reactivation',   weight: 0.70 },
+    { id: 'highrisk',    label: 'high-risk jurisdiction', weight: 0.75 },
+    { id: 'mule',        label: 'mule network',           weight: 0.92 },
+    { id: 'smurf',       label: 'smurfing',               weight: 0.88 },
+    { id: 'chain',       label: 'layering chain',         weight: 0.94 },
+    { id: 'opacity',     label: 'opaque ownership',       weight: 0.86 },
+    { id: 'nested',      label: 'nested shell stack',     weight: 0.90 },
+    { id: 'nominee',     label: 'nominee control',        weight: 0.78 },
+    // Nordic-specific typologies
+    { id: 'tradeinv',    label: 'trade-based laundering', weight: 0.88 },
+    { id: 'cashintens',  label: 'cash-intensive business', weight: 0.72 },
+    { id: 'cryptooff',   label: 'crypto off-ramp',        weight: 0.84 },
+    { id: 'sanctionseva', label: 'sanctions evasion',     weight: 0.96 },
+  ];
+
+  const JURISDICTIONS = [
+    // home markets - low risk, heavily supervised
+    { code: 'SE', risk: 0.04 }, { code: 'DK', risk: 0.04 }, { code: 'NO', risk: 0.05 },
+    { code: 'FI', risk: 0.05 }, { code: 'IS', risk: 0.07 },
+    // near neighbours and the usual Nordic counterparties
+    { code: 'EE', risk: 0.22 }, { code: 'LV', risk: 0.30 }, { code: 'LT', risk: 0.24 },
+    { code: 'DE', risk: 0.06 }, { code: 'NL', risk: 0.07 }, { code: 'GB', risk: 0.06 },
+    { code: 'PL', risk: 0.18 },
+    // the corridors Nordic banks actually get fined over
+    { code: 'RU', risk: 0.82 }, { code: 'BY', risk: 0.74 }, { code: 'UA', risk: 0.44 },
+    { code: 'CY', risk: 0.52 }, { code: 'MT', risk: 0.34 }, { code: 'AE', risk: 0.38 },
+    { code: 'TR', risk: 0.46 }, { code: 'PA', risk: 0.62 }, { code: 'KY', risk: 0.58 },
+    { code: 'VG', risk: 0.66 }, { code: 'BVI', risk: 0.72 }, { code: 'SC', risk: 0.68 },
+    { code: 'LI', risk: 0.52 }, { code: 'KP', risk: 0.95 },
+  ];
+
+  const KINDS = ['retail', 'business', 'corporate', 'wallet', 'shell', 'exchange'];
+
+  // Corporate vehicles used to build ownership stacks. The opacity of a layer
+  // is how hard it is to see through it to the real controller. Nordic
+  // structures lean on foundations and holding companies rather than bearer
+  // shares, which are not issuable in SE/DK/NO/FI.
+  const VEHICLES = [
+    { id: 'holdco',   label: 'holding co',      opacity: 0.30 },
+    { id: 'ab',       label: 'aktiebolag',      opacity: 0.26 },
+    { id: 'aps',      label: 'anpartsselskab',  opacity: 0.28 },
+    { id: 'as',       label: 'aksjeselskap',    opacity: 0.28 },
+    { id: 'oy',       label: 'osakeyhtiö', opacity: 0.28 },
+    { id: 'nominee',  label: 'nominee director', opacity: 0.72 },
+    { id: 'trust',    label: 'discretionary trust', opacity: 0.80 },
+    { id: 'foundation', label: 'stiftelse',     opacity: 0.78 },
+    { id: 'spv',      label: 'SPV',             opacity: 0.44 },
+    { id: 'offshore', label: 'offshore IBC',    opacity: 0.84 },
+  ];
+
+  // Layering hops: each leg of a chain has a characteristic shape. The chain
+  // is the point - no single leg looks criminal on its own.
+  const LAYER_LEGS = [
+    { id: 'placement',  label: 'placement',   amount: [40000, 90000] },
+    { id: 'split',      label: 'split',       amount: [9000, 9900] },
+    { id: 'convert',    label: 'conversion',  amount: [15000, 60000] },
+    { id: 'merge',      label: 'consolidation', amount: [60000, 140000] },
+    { id: 'integration', label: 'integration', amount: [30000, 120000] },
+  ];
+
+  // Sanctions / watchlists a Nordic bank screens against. EU and UN lists are
+  // directly binding in SE/DK/FI; Norway mirrors them through the EEA and adds
+  // its own. National PEP registers are separate from the sanctions lists.
+  const LISTS = [
+    { id: 'EU-CFSP',   label: 'EU CFSP',        severity: 1.00 },
+    { id: 'UN-1267',   label: 'UN 1267',        severity: 0.98 },
+    { id: 'NO-EEA',    label: 'NO EEA measures', severity: 0.94 },
+    { id: 'OFAC-SDN',  label: 'OFAC SDN',       severity: 0.96 },
+    { id: 'UK-OFSI',   label: 'UK OFSI',        severity: 0.92 },
+    { id: 'PEP-SE',    label: 'SE PEP register', severity: 0.55 },
+    { id: 'PEP-DK',    label: 'DK PEP register', severity: 0.55 },
+    { id: 'PEP-NO',    label: 'NO PEP register', severity: 0.55 },
+    { id: 'PEP-FI',    label: 'FI PEP register', severity: 0.55 },
+    { id: 'ADVERSE',   label: 'adverse media',  severity: 0.45 },
+  ];
+
+  // ---------------------------------------------------------------- world
+  // A single account record. Extracted so the bank can onboard new customers
+  // at runtime, not just at boot.
+  function makeAccount(id, x, y) {
+    const kind = pick(KINDS);
+    const jur = pick(JURISDICTIONS);
+    return {
+      id,
+      name: 'AC-' + String(1000 + id),
+      kind,
+      jur,
+      x, y,
+      vx: rand(-0.12, 0.12),
+      vy: rand(-0.12, 0.12),
+      baseline: rand(0.6, 3.4),
+      volume: rand(2e4, 4e6),
+      counterparties: new Set(),
+      outTo: new Set(),
+      inFrom: new Set(),
+      recent: [],
+      band: [],
+      riskyFlow: 0,
+      risk: rand(0.02, 0.16),
+      riskTarget: 0,
+      signals: {},
+      verdict: 'clear',
+      thought: 'monitoring...',
+      thoughtT: 0,
+      lastAlert: -999,
+      ring: null,
+      isFraud: false,
+      pulse: 0,
+      structCount: 0,
+      // ---- lifecycle
+      born: time,             // when the customer was onboarded
+      exiting: false,         // blocked and on the way out of the bank
+      exitAt: Infinity,       // when the offboarding completes
+      exitT: 0,               // 0..1 progress of the exit animation
+      // ---- sanctions state
+      listed: false,          // is this account itself on a list
+      list: null,             // which list
+      matchScore: 0,          // fuzzy name-match confidence 0..1
+      exposure: 0,            // share of flow touching listed parties
+      hops: Infinity,         // graph distance to the nearest listed party
+      sanctionFlag: false,    // currently tripping the screen
+      // ---- ownership state
+      owner: null,            // account that controls this one
+      owns: [],               // accounts this one controls
+      vehicle: null,          // corporate vehicle type, if any
+      opacity: 0,             // how hard this layer is to see through 0..1
+      uboDepth: 0,            // layers between this account and its ultimate owner
+      ubo: null,              // ultimate beneficial owner account
+      nominee: false,         // controlled by a nominee rather than a real person
+      // ---- layering state
+      chain: null,            // layering chain id this account is part of
+      chainPos: -1,           // position in the chain, 0 = entry
+      chainLeg: null,         // which leg of the chain this hop represents
+    };
+  }
+
+  function buildWorld() {
+    accounts.length = 0;
+    for (let i = 0; i < CONFIG.accountCount; i++) {
+      const angle = rand(0, Math.PI * 2);
+      const radius = Math.pow(Math.random(), 0.6) * Math.min(W, H) * 0.42;
+      accounts.push(makeAccount(i, W / 2 + Math.cos(angle) * radius, H / 2 + Math.sin(angle) * radius));
+    }
+
+    for (let i = 0; i < 6; i++) {
+      const a = pick(accounts);
+      a.kind = 'exchange';
+      a.baseline *= 3.2;
+      a.volume *= 8;
+    }
+
+    buildOwnership();
+  }
+
+  // ---------------------------------------------------------------- ownership
+  // Build corporate ownership stacks. A stack is a chain of vehicles ending in
+  // an ultimate beneficial owner. The deeper and more opaque the stack, the
+  // harder it is to answer "who actually controls this account?".
+  function buildOwnership() {
+    const pool = accounts.slice();
+    // shuffle so stacks are scattered across the map
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+
+    let cursor = 0;
+    const stackCount = Math.floor(accounts.length / 14);
+    for (let s = 0; s < stackCount && cursor < pool.length - 2; s++) {
+      const depth = 2 + Math.floor(Math.random() * (CONFIG.ownershipDepth - 1));
+      const stack = [];
+      for (let d = 0; d < depth && cursor < pool.length; d++) {
+        stack.push(pool[cursor++]);
+      }
+      if (stack.length < 2) break;
+
+      // the last node in the stack is the ultimate beneficial owner
+      const ubo = stack[stack.length - 1];
+      ubo.kind = 'corporate';
+      ubo.vehicle = null;
+      ubo.opacity = 0.05;
+      ubo.ubo = ubo;
+      ubo.uboDepth = 0;
+
+      for (let d = stack.length - 2; d >= 0; d--) {
+        const node = stack[d];
+        const child = stack[d + 1];
+        const vehicle = pick(VEHICLES);
+        node.kind = 'shell';
+        node.vehicle = vehicle;
+        node.opacity = vehicle.opacity;
+        node.owner = child;
+        node.ubo = ubo;
+        node.uboDepth = stack.length - 1 - d;
+        node.nominee = vehicle.id === 'nominee' || vehicle.id === 'trust';
+        node.jur = pick(JURISDICTIONS.filter(j => j.risk > 0.4));
+        child.owns.push(node);
+        if (node.nominee) shellTotal++;
+      }
+    }
+
+    // a handful of standalone shells that are not part of a stack
+    for (const a of accounts) {
+      if (a.kind === 'shell' && !a.vehicle) {
+        const v = pick(VEHICLES);
+        a.vehicle = v;
+        a.opacity = v.opacity;
+        a.ubo = a;
+        a.uboDepth = 0;
+        shellTotal++;
+      }
+    }
+
+    maxOwnershipDepth = accounts.reduce((m, a) => Math.max(m, a.uboDepth), 0);
+    opaqueStructures = accounts.filter(a => a.opacity > CONFIG.opaqueThreshold).length;
+  }
+
+  // ---------------------------------------------------------------- lifecycle
+  // A blocked account is offboarded: the bank exits the relationship, the node
+  // fades out and is removed, and its links are torn down. New customers are
+  // onboarded continuously so the book keeps its shape.
+
+  function beginExit(a) {
+    if (a.exiting) return;
+    a.exiting = true;
+    a.exitAt = time + rand(CONFIG.exitDelay[0], CONFIG.exitDelay[1]);
+    a.pulse = 1;
+  }
+
+  function removeAccount(a) {
+    // tear down every link this account holds, in both directions
+    for (const other of accounts) {
+      if (other === a) continue;
+      if (other.counterparties.delete(a.id)) {
+        other.outTo.delete(a.id);
+        other.inFrom.delete(a.id);
+      }
+    }
+    // drop any edge still in flight that touches it
+    for (let i = edges.length - 1; i >= 0; i--) {
+      if (edges[i].a === a || edges[i].b === a) edges.splice(i, 1);
+    }
+    // release it from any ring or chain it belonged to
+    if (a.ring !== null) {
+      const r = rings.find(x => x.id === a.ring);
+      if (r) {
+        r.members = r.members.filter(m => m !== a);
+        if (r.members.length < 2) rings.splice(rings.indexOf(r), 1);
+      }
+    }
+    if (a.chain !== null) {
+      const c = chains.find(x => x.id === a.chain);
+      if (c) {
+        c.members = c.members.filter(m => m !== a);
+        if (c.members.length < 2) chains.splice(chains.indexOf(c), 1);
+      }
+    }
+    // detach from the ownership stack
+    if (a.owner) a.owner.owns = a.owner.owns.filter(x => x !== a);
+    for (const child of a.owns) child.owner = null;
+
+    const idx = accounts.indexOf(a);
+    if (idx >= 0) accounts.splice(idx, 1);
+    if (selected === a) { selected = null; updateInspector(); }
+    if (hoverNode === a) hoverNode = null;
+    exitedTotal++;
+  }
+
+  function updateLifecycle(dt) {
+    for (let i = accounts.length - 1; i >= 0; i--) {
+      const a = accounts[i];
+      if (!a.exiting) {
+        // a blocked account is a relationship the bank no longer wants
+        if (a.verdict === 'blocked' && !a.listed) beginExit(a);
+        continue;
+      }
+      a.exitT = clamp((time - (a.exitAt - CONFIG.exitDelay[1])) / CONFIG.exitDelay[1], 0, 1);
+      if (time >= a.exitAt) removeAccount(a);
+    }
+
+    // onboard new customers to keep the book at its target size
+    onboardAccum += CONFIG.onboardRate * dt;
+    while (onboardAccum >= 1) {
+      onboardAccum--;
+      if (accounts.length < CONFIG.accountFloor) onboardCustomer();
+    }
+  }
+
+  // A new customer arrives at the edge of the map and immediately opens a few
+  // links to existing accounts, so the graph stays connected as old nodes exit.
+  function onboardCustomer() {
+    if (accounts.length >= CONFIG.accountCeil) return;
+    const angle = rand(0, Math.PI * 2);
+    const radius = Math.min(W, H) * 0.46;
+    const x = clamp(W / 2 + Math.cos(angle) * radius, 40, W - 40);
+    const y = clamp(H / 2 + Math.sin(angle) * radius, 40, H - 40);
+
+    const a = makeAccount(nextAccountId++, x, y);
+    a.born = time;
+    a.pulse = 1;
+    accounts.push(a);
+
+    // open a handful of links to nearby incumbents
+    const n = Math.round(rand(CONFIG.onboardLinks[0], CONFIG.onboardLinks[1]));
+    const near = accounts
+      .filter(o => o !== a)
+      .sort((p, q) => Math.hypot(p.x - x, p.y - y) - Math.hypot(q.x - x, q.y - y))
+      .slice(0, 24);
+    for (let i = 0; i < n && near.length; i++) {
+      const peer = near[Math.floor(Math.random() * near.length)];
+      if (peer === a) continue;
+      a.counterparties.add(peer.id);
+      peer.counterparties.add(a.id);
+      a.outTo.add(peer.id);
+      peer.inFrom.add(a.id);
+      a.recent.push(time);
+      peer.recent.push(time);
+      const amount = rand(50, 42000) * (a.kind === 'corporate' ? 6 : 1);
+      a.volume += amount;
+      peer.volume += amount;
+      valueScreened += amount;
+      edges.push({
+        a, b: peer, amount, t: time, life: CONFIG.edgeLife, alpha: 0,
+        suspicious: false, reason: null, score: 0, sanction: false, layer: false, leg: null,
+      });
+    }
+    onboardedTotal++;
+  }
+
+  // ---------------------------------------------------------------- layering
+  // A layering chain is a directed path of transfers that moves value through
+  // several accounts in quick succession, changing shape at every hop so no
+  // single leg trips a simple threshold rule.
+  function spawnChain() {
+    const pool = accounts.filter(a => a.chain === null && a.ring === null && !a.exiting);
+    if (pool.length < CONFIG.chainMin + 1) return;
+    // keep the number of live chains bounded so the map stays readable
+    if (chains.length >= CONFIG.chainMaxLive) return;
+
+    const len = CONFIG.chainMin + Math.floor(Math.random() * (CONFIG.chainMax - CONFIG.chainMin + 1));
+    const start = pick(pool);
+    const members = [start];
+    const used = new Set([start.id]);
+
+    // walk to nearby accounts so the chain reads as a path on screen
+    let cur = start;
+    for (let i = 1; i < len; i++) {
+      const near = pool.filter(a =>
+        !used.has(a.id) &&
+        Math.hypot(a.x - cur.x, a.y - cur.y) < CONFIG.linkDist * 1.6
+      );
+      const next = near.length ? pick(near) : pick(pool.filter(a => !used.has(a.id)));
+      if (!next) break;
+      used.add(next.id);
+      members.push(next);
+      cur = next;
+    }
+    if (members.length < CONFIG.chainMin) return;
+
+    const id = chainTotal++;
+    members.forEach((a, i) => {
+      a.chain = id;
+      a.chainPos = i;
+      a.chainLeg = LAYER_LEGS[Math.min(i, LAYER_LEGS.length - 1)];
+      a.isFraud = true;
+      a.baseline *= rand(1.8, 3.4);
+      a.volume *= rand(2, 6);
+      if (i > 0 && i < members.length - 1) a.kind = pick(['shell', 'wallet', 'business']);
+    });
+
+    chains.push({ id, members, born: time, life: CONFIG.chainLife, leg: 0 });
+    chainActive = chains.length;
+    maxChainSeen = Math.max(maxChainSeen, members.length);
+    raiseAlert(members[0], true, 'chain');
+  }
+
+  function updateChains(dt) {
+    for (let i = chains.length - 1; i >= 0; i--) {
+      const c = chains[i];
+      c.life -= dt;
+      c.leg = Math.min(c.members.length - 1, Math.floor((1 - c.life / CONFIG.chainLife) * c.members.length));
+      if (c.life <= 0) {
+        for (const m of c.members) { m.chain = null; m.chainPos = -1; m.chainLeg = null; }
+        chains.splice(i, 1);
+      }
+    }
+    chainActive = chains.length;
+  }
+
+  // ---------------------------------------------------------------- rings
+  function injectRing() {
+    const pool = accounts.filter(a => a.ring === null && !a.exiting);
+    if (pool.length < CONFIG.ringSize) return;
+    const seed = pick(pool);
+    const cx = seed.x, cy = seed.y;
+
+    pool.sort((p, q) => Math.hypot(p.x - cx, p.y - cy) - Math.hypot(q.x - cx, q.y - cy));
+    const members = [];
+    for (let i = 0; i < CONFIG.ringSize; i++) {
+      const a = pool[i];
+      a.ring = rings.length;
+      a.isFraud = true;
+      a.kind = i === 0 ? 'shell' : pick(['wallet', 'shell', 'business']);
+      a.jur = pick(JURISDICTIONS.filter(j => j.risk > 0.4));
+      a.baseline *= rand(2.5, 5.0);
+      a.volume *= rand(4, 12);
+      members.push(a);
+    }
+    rings.push({ id: rings.length, members, born: time, life: rand(26, 44), cx, cy });
+  }
+
+  // ---------------------------------------------------------------- sanctions
+  // Designate a random account onto a watchlist. The screen then has to find it
+  // from the traffic and the name-match score alone.
+  function designateEntity() {
+    const pool = accounts.filter(a => !a.listed && !a.exiting);
+    if (!pool.length) return;
+    const a = pick(pool);
+    const list = pick(LISTS);
+    a.listed = true;
+    a.list = list;
+    // fuzzy match confidence: a real designation scores high, but not always 1.0
+    a.matchScore = clamp(rand(0.62, 0.99) * list.severity + 0.12, 0, 1);
+    a.isFraud = true;
+    a.riskTarget = Math.min(1, a.riskTarget + 0.55);
+    a.pulse = 1;
+    raiseAlert(a, true, 'sanctions');
+  }
+
+  // Breadth-first hop count from every account to the nearest listed party.
+  // This is what turns a single designation into a network exposure problem.
+  function computeExposure() {
+    const adj = new Map();
+    for (const a of accounts) adj.set(a.id, []);
+    for (const e of edges) {
+      adj.get(e.a.id).push(e.b.id);
+      adj.get(e.b.id).push(e.a.id);
+    }
+
+    const dist = new Array(accounts.length).fill(Infinity);
+    const queue = [];
+    for (const a of accounts) {
+      if (a.listed) { dist[a.id] = 0; queue.push(a.id); }
+    }
+    for (let i = 0; i < queue.length; i++) {
+      const id = queue[i];
+      for (const nb of adj.get(id)) {
+        if (dist[nb] === Infinity) { dist[nb] = dist[id] + 1; queue.push(nb); }
+      }
+    }
+
+    for (const a of accounts) {
+      a.hops = dist[a.id];
+      // exposure decays with distance: direct counterparties are the real risk
+      const hopFactor = a.hops === Infinity ? 0 : Math.pow(0.55, a.hops);
+      const flowShare = a.volume > 0 ? a.riskyFlow / a.volume : 0;
+      a.exposure = clamp(hopFactor * 0.7 + flowShare * 0.5, 0, 1);
+      a.sanctionFlag = !a.exiting && (a.listed || a.exposure > CONFIG.exposureThreshold);
+    }
+  }
+
+  // ---------------------------------------------------------------- transactions
+  function makeTransaction() {
+    const live = accounts.filter(a => !a.exiting);
+    if (!live.length) return;
+    let src;
+    if (Math.random() < 0.35) {
+      src = pick(live);
+    } else {
+      // bias toward warm accounts, but never toward ones already blocked -
+      // otherwise the hottest nodes absorb all traffic and ratchet to the
+      // ceiling, which drains the whole book through the exit path.
+      const hot = live.filter(a => a.risk > 0.25 && a.verdict !== 'blocked');
+      src = hot.length ? pick(hot) : pick(live);
+    }
+
+    let dst;
+    const ring = src.ring !== null ? rings[src.ring] : null;
+    const chain = src.chain !== null ? chains.find(c => c.id === src.chain) : null;
+    if (chain && src.chainPos < chain.members.length - 1 && Math.random() < 0.85) {
+      // layering: value moves to the next hop in the chain, not a random peer
+      dst = chain.members[src.chainPos + 1];
+    } else if (ring && Math.random() < 0.72) {
+      const others = ring.members.filter(m => m !== src);
+      dst = pick(others);
+    } else {
+      const near = live.filter(a => a !== src && Math.hypot(a.x - src.x, a.y - src.y) < CONFIG.linkDist);
+      dst = (near.length && Math.random() < 0.85) ? pick(near) : pick(live.filter(a => a !== src));
+    }
+    if (!dst) return;
+
+    const leg = src.chainLeg;
+    const amount = leg
+      ? rand(leg.amount[0], leg.amount[1])
+      : src.ring !== null
+        ? rand(8000, 9600)
+        : rand(50, 42000) * (src.kind === 'corporate' ? 6 : 1);
+
+    const e = {
+      a: src, b: dst,
+      amount,
+      t: time,
+      life: CONFIG.edgeLife,
+      alpha: 0,
+      suspicious: false,
+      reason: null,
+      score: 0,
+      sanction: false,
+      layer: false,
+      leg: null,
+    };
+
+    const jurRisk = dst.jur.risk;
+    const struct = amount > 8000 && amount < 10000;
+    const big = amount > 25000;
+    const crossBorder = src.jur.code !== dst.jur.code;
+
+    let score = 0;
+    if (struct) { score += 0.55; e.reason = 'structuring'; }
+    if (big && crossBorder) { score += 0.35; e.reason = e.reason || 'cross-border value'; }
+    if (jurRisk > 0.5) { score += jurRisk * 0.5; e.reason = e.reason || 'high-risk jurisdiction'; }
+    if (src.ring !== null && dst.ring === src.ring) { score += 0.6; e.reason = 'internal ring transfer'; }
+
+    // layering leg: a hop inside a chain. Individually unremarkable, but the
+    // sequence is the signal.
+    if (leg && dst.chain === src.chain) {
+      score += 0.42;
+      e.layer = true;
+      e.leg = leg.label;
+      e.reason = 'layering \u00b7 ' + leg.label;
+    }
+
+    // opaque ownership: moving value through a nominee or trust layer
+    if (src.opacity > CONFIG.opaqueThreshold || dst.opacity > CONFIG.opaqueThreshold) {
+      score += 0.30;
+      e.reason = e.reason || 'opaque ownership';
+    }
+
+    // sanctions leg: a transfer touching a listed party is a hard stop
+    if (src.listed || dst.listed) {
+      score += 0.9;
+      e.sanction = true;
+      e.reason = 'sanctions nexus';
+    }
+
+    e.suspicious = score > 0.45;
+    e.score = score;
+
+    src.counterparties.add(dst.id);
+    dst.counterparties.add(src.id);
+    src.outTo.add(dst.id);
+    dst.inFrom.add(src.id);
+    src.recent.push(time);
+    if (struct) src.band.push(time);
+    if (jurRisk > 0.4) src.riskyFlow += amount;
+    src.volume += amount;
+    dst.volume += amount;
+    valueScreened += amount;
+
+    src.riskTarget = Math.min(1, src.riskTarget + score * CONFIG.riskRise);
+    dst.riskTarget = Math.min(1, dst.riskTarget + score * CONFIG.riskRise * 0.6);
+
+    edges.push(e);
+    if (edges.length > CONFIG.edgeMax) edges.shift();
+    txTotal++;
+  }
+
+  // ---------------------------------------------------------------- detection
+  function detect() {
+    for (const a of accounts) {
+      if (a.exiting) continue;
+      const s = a.signals;
+      for (const t of TYPOLOGIES) s[t.id] = 0;
+
+      const window = 6;
+      const recent = a.recent.filter(t => time - t < window).length;
+      const rate = recent / window;
+      s.velocity = clamp((rate - a.baseline) / (a.baseline * 2 + 1), 0, 1);
+
+      const cp = a.counterparties.size;
+      // fan-out / fan-in are windowed like every other signal: a hub that
+      // touched 60 counterparties an hour ago is not a hub right now.
+      const win = 8;
+      const outRecent = [...a.outTo].filter(id => {
+        const o = accounts[id];
+        return o && o.recent.some(t => time - t < win);
+      }).length;
+      const inRecent = [...a.inFrom].filter(id => {
+        const o = accounts[id];
+        return o && o.recent.some(t => time - t < win);
+      }).length;
+      s.fanout = clamp((outRecent - 8) / 14, 0, 1);
+      s.fanin = clamp((inRecent - 8) / 14, 0, 1);
+      s.structuring = clamp(a.band.length / 5, 0, 1);
+
+      const share = a.volume > 0 ? a.riskyFlow / a.volume : 0;
+      s.highrisk = clamp((share - 0.30) / 0.45, 0, 1) * (0.55 + a.jur.risk * 0.45);
+
+      s.dormant = a.baseline < 1.2 && rate > 2 ? clamp(rate / 6, 0, 1) : 0;
+
+      if (a.ring !== null) {
+        s.mule = 0.85;
+        s.layering = 0.7;
+        s.roundtrip = 0.6;
+        s.smurf = 0.55;
+      }
+
+      // ---- layering chain: position in the chain drives the signal. The
+      // entry point is the riskiest (it places the funds), the tail is the
+      // integration point.
+      if (a.chain !== null) {
+        const c = chains.find(x => x.id === a.chain);
+        const len = c ? c.members.length : 3;
+        const pos = a.chainPos;
+        const entry = pos === 0 ? 1 : 0;
+        const tail = pos === len - 1 ? 1 : 0;
+        s.chain = clamp(0.55 + entry * 0.35 + tail * 0.15 + (len - 3) * 0.06, 0, 1);
+        s.layering = Math.max(s.layering, 0.6 + (len - 3) * 0.08);
+      }
+
+      // ---- opaque ownership: how many layers sit between this account and
+      // its ultimate owner, weighted by how hard each layer is to see through.
+      if (a.uboDepth > 0) {
+        const depthFactor = clamp(a.uboDepth / CONFIG.ownershipDepth, 0, 1);
+        s.opacity = clamp(a.opacity * 0.6 + depthFactor * 0.55, 0, 1);
+        s.nested = clamp((a.uboDepth - 1) / 3, 0, 1) * (0.6 + a.opacity * 0.4);
+      }
+      if (a.nominee) s.nominee = clamp(0.55 + a.opacity * 0.4, 0, 1);
+      if (a.owns.length > 2) s.nested = Math.max(s.nested, clamp((a.owns.length - 2) / 4, 0, 1) * 0.8);
+
+      // ---- Nordic typologies -------------------------------------------
+      // Trade-based laundering: high-value flows against counterparties in
+      // the trade corridors Nordic banks clear through (EE/LV/LT, TR, AE).
+      const tradeCorridor = ['EE', 'LV', 'LT', 'TR', 'AE', 'CY', 'MT'].includes(a.jur.code);
+      s.tradeinv = clamp((a.volume / 4e6 - 0.35) / 0.65, 0, 1) *
+                   (tradeCorridor ? 0.85 : 0.35) * (0.5 + a.jur.risk * 0.5);
+
+      // Cash-intensive business: many small inbound payments that never
+      // aggregate - the classic kiosk / restaurant / car-wash pattern.
+      const smallIn = a.inFrom.size;
+      s.cashintens = a.kind === 'business'
+        ? clamp((smallIn - 10) / 22, 0, 1) * clamp(1 - a.volume / 3e6, 0.2, 1)
+        : 0;
+
+      // Crypto off-ramp: value leaving to a wallet after passing through
+      // several hops, i.e. fiat in, coin out.
+      const walletOut = [...a.outTo].filter(x => x.kind === 'wallet').length;
+      s.cryptooff = clamp(walletOut / 4, 0, 1) * clamp(a.recent.length / 18, 0, 1);
+
+      // Sanctions evasion: routing around a listed party rather than through
+      // it - exposure without a direct match, plus a high-risk corridor.
+      s.sanctionseva = a.listed ? 0
+        : clamp(a.exposure / 0.5, 0, 1) * (a.jur.risk > 0.4 ? 0.9 : 0.45);
+
+      // layering / round-tripping / smurfing are all windowed too: they describe
+      // what the account is doing NOW, not everything it has ever done.
+      const recentTx = a.recent.filter(t => time - t < win).length;
+      const recentCp = [...a.counterparties].filter(id => {
+        const o = accounts[id];
+        return o && o.recent.some(t => time - t < win);
+      }).length;
+      s.layering = Math.max(s.layering, clamp((recentTx - 10) / 18, 0, 1) * 0.8);
+      s.roundtrip = Math.max(s.roundtrip, clamp((recentCp - 12) / 22, 0, 1) * 0.7);
+      s.smurf = Math.max(s.smurf, clamp((inRecent - 12) / 20, 0, 1) * 0.6);
+
+      const vals = TYPOLOGIES.map(t => s[t.id] * t.weight).sort((p, q) => q - p);
+      let total = 0;
+      for (let i = 0; i < vals.length; i++) total += vals[i] * Math.pow(0.5, i);
+
+      // sanctions exposure is a separate, additive axis: a clean account that
+      // is one hop from a listed party is still a problem.
+      const sanctionLoad = a.listed ? 0.85 : a.exposure * 0.6;
+      a.riskTarget = clamp(total * 0.92 + sanctionLoad, 0, 1);
+    }
+  }
+
+  // ---------------------------------------------------------------- verdicts
+  function verdictFor(risk) {
+    const s = CONFIG.sensitivity;
+    if (risk > 0.52 - s * 0.14) return 'blocked';
+    if (risk > 0.38 - s * 0.10) return 'suspicious';
+    if (risk > 0.24 - s * 0.06) return 'review';
+    return 'clear';
+  }
+
+  function raiseAlert(a, force, kind) {
+    if (!force && time - a.lastAlert < CONFIG.alertCooldown) return;
+    a.lastAlert = time;
+    a.pulse = 1;
+    alertTotal++;
+
+    const top = TYPOLOGIES
+      .map(t => ({ t, v: a.signals[t.id] || 0 }))
+      .sort((p, q) => q.v - p.v)
+      .filter(x => x.v > 0.15)
+      .slice(0, 3);
+
+    // 'layering' and 'layering chain' describe the same behaviour - keep only
+    // the more specific one so the alert text does not read as a stutter.
+    const hasChain = top.some(x => x.t.id === 'chain');
+    const labels = (hasChain ? top.filter(x => x.t.id !== 'layering') : top)
+      .map(x => x.t.label);
+
+    let level, text;
+    if (kind === 'sanctions' || a.listed) {
+      level = 'crit';
+      text = 'SANCTIONS MATCH \u00b7 ' + (a.list ? a.list.label : 'watchlist') +
+             ' \u00b7 ' + pct(a.matchScore);
+      sanctionHits++;
+    } else if (kind === 'chain' && a.chain !== null) {
+      const c = chains.find(x => x.id === a.chain);
+      level = 'crit';
+      text = 'LAYERING CHAIN \u00b7 ' + (c ? c.members.length : '?') + ' hops \u00b7 entry ' +
+             (a.chainLeg ? a.chainLeg.label : 'placement');
+    } else if (a.sanctionFlag) {
+      level = 'high';
+      text = 'sanctions exposure \u00b7 ' + a.hops + ' hop' + (a.hops === 1 ? '' : 's') +
+             ' \u00b7 ' + pct(a.exposure);
+    } else if (a.uboDepth > 1 && a.opacity > CONFIG.opaqueThreshold) {
+      level = 'high';
+      text = 'opaque ownership \u00b7 ' + a.uboDepth + ' layers \u00b7 ' +
+             (a.vehicle ? a.vehicle.label : 'shell') + ' \u00b7 ' + pct(a.opacity);
+    } else if (a.nominee) {
+      level = 'med';
+      text = 'nominee control \u00b7 ' + (a.vehicle ? a.vehicle.label : 'nominee') +
+             ' \u00b7 UBO ' + (a.ubo ? a.ubo.name : 'unknown');
+    } else if (a.signals.sanctionseva > 0.5) {
+      level = 'crit';
+      text = 'sanctions evasion \u00b7 ' + pct(a.exposure) + ' exposure \u00b7 ' +
+             a.jur.code + ' corridor';
+    } else if (a.signals.tradeinv > 0.5) {
+      level = 'high';
+      text = 'trade-based laundering \u00b7 ' + a.jur.code + ' corridor \u00b7 ' +
+             money(a.volume);
+    } else if (a.signals.cryptooff > 0.5) {
+      level = 'high';
+      text = 'crypto off-ramp \u00b7 fiat in, coin out \u00b7 ' + money(a.volume);
+    } else if (a.signals.cashintens > 0.5) {
+      level = 'med';
+      text = 'cash-intensive business \u00b7 ' + a.inFrom.size + ' small inflows';
+    } else {
+      level = a.verdict === 'blocked' ? 'crit' : a.verdict === 'suspicious' ? 'high' : 'med';
+      text = labels.length ? labels.join(' + ') : 'anomalous activity';
+    }
+
+    const alert = {
+      id: alertTotal,
+      account: a,
+      level,
+      typologies: top,
+      risk: a.risk,
+      at: time,
+      text,
+      amount: a.volume,
+    };
+    alerts.unshift(alert);
+    if (alerts.length > 40) alerts.pop();
+
+    if (a.isFraud) truePositives++;
+    else falsePositives++;
+
+    if (a.verdict === 'blocked' || a.listed) {
+      blockedTotal++;
+      valueAtRisk += a.volume * 0.12;
+    }
+
+    openCase(alert);
+  }
+
+  // ---------------------------------------------------------------- cases
+  // Every alert becomes a case with a lifecycle: open -> triaged -> escalated
+  // -> closed. Cases carry an SLA clock and a disposition (confirmed hit or
+  // false positive) that feeds the precision metric.
+  function openCase(alert) {
+    const a = alert.account;
+    const c = {
+      id: ++caseSeq,
+      account: a,
+      level: alert.level,
+      text: alert.text,
+      amount: alert.amount,
+      risk: alert.risk,
+      opened: time,
+      status: 'open',          // open | triaged | escalated | closed
+      disposition: null,       // confirmed | dismissed
+      closedAt: null,
+      sla: CONFIG.caseSla,
+      breached: false,
+      autoAt: Math.random() < CONFIG.autoTriageRate
+        ? time + rand(CONFIG.autoTriageDelay[0], CONFIG.autoTriageDelay[1])
+        : Infinity,
+      flash: 1,
+    };
+    cases.unshift(c);
+    casesOpened++;
+    if (cases.length > CONFIG.caseQueueMax) {
+      // drop the oldest closed case first, otherwise the oldest open one
+      const idx = cases.findIndex(x => x.status === 'closed');
+      cases.splice(idx >= 0 ? idx : cases.length - 1, 1);
+    }
+    renderCases();
+    return c;
+  }
+
+  function closeCase(c, disposition) {
+    if (c.status === 'closed') return;
+    c.status = 'closed';
+    c.disposition = disposition;
+    c.closedAt = time;
+    casesClosed++;
+    const age = time - c.opened;
+    mttrSum += age; mttrCount++;
+
+    if (disposition === 'confirmed') {
+      casesConfirmed++;
+      valueRecovered += c.amount * 0.12;
+      c.account.isFraud = true;
+    } else {
+      casesDismissed++;
+      valueCleared += c.amount * 0.12;
+    }
+    c.flash = 1;
+    renderCases();
+  }
+
+  function escalateCase(c) {
+    if (c.status === 'closed' || c.status === 'escalated') return;
+    c.status = 'escalated';
+    casesEscalated++;
+    c.flash = 1;
+    renderCases();
+  }
+
+  function triageCase(c) {
+    if (c.status !== 'open') return;
+    c.status = 'triaged';
+    c.flash = 1;
+    renderCases();
+  }
+
+  // The analyst queue runs itself: cases get triaged, then either escalated
+  // or closed. This is what makes the counters move without user input.
+  function updateCases(dt) {
+    for (const c of cases) {
+      c.flash = Math.max(0, c.flash - dt * 1.8);
+      if (c.status === 'closed') continue;
+
+      const age = time - c.opened;
+      if (!c.breached && age > c.sla) {
+        c.breached = true;
+        casesSlaBreached++;
+      }
+
+      if (c.status === 'open' && time >= c.autoAt) {
+        triageCase(c);
+        // a triaged case resolves quickly: escalate the serious ones, close
+        // the rest as false positives
+        const serious = c.level === 'crit' || c.account.listed || c.account.isFraud;
+        if (serious || Math.random() > CONFIG.autoCloseRate) {
+          escalateCase(c);
+          c.resolveAt = time + rand(CONFIG.autoResolveDelay[0], CONFIG.autoResolveDelay[1]);
+        } else {
+          c.resolveAt = time + rand(0.6, 1.8);
+        }
+      }
+
+      if (c.status === 'triaged' && c.resolveAt && time >= c.resolveAt) {
+        closeCase(c, c.account.isFraud || c.account.listed ? 'confirmed' : 'dismissed');
+      }
+
+      if (c.status === 'escalated' && c.resolveAt && time >= c.resolveAt) {
+        closeCase(c, c.account.isFraud || c.account.listed ? 'confirmed' : 'dismissed');
+      }
+    }
+  }
+
+  // Rows are keyed by case id and reused across renders. Rebuilding the list
+  // on every change re-fired the entry animation on every row, which made the
+  // whole queue blink each time a case was added.
+  const caseRows = new Map();
+
+  function caseRowHTML(c) {
+    const age = c.status === 'closed' ? (c.closedAt - c.opened) : (time - c.opened);
+    const slaPct = clamp(age / c.sla, 0, 1);
+    const slaColor = c.breached ? '#ff5f6d' : slaPct > 0.7 ? '#ffc857' : '#4fe0a0';
+    const statusTag = c.status === 'closed'
+      ? (c.disposition === 'confirmed' ? 'confirmed' : 'dismissed')
+      : c.status;
+    const cls = c.status === 'closed'
+      ? (c.disposition === 'confirmed' ? 'c-conf' : 'c-dism')
+      : 'c-' + c.status;
+    return '<div class="row1">' +
+        '<span class="cid">#' + c.id + '</span>' +
+        '<span class="tag t-' + c.level + '">' + c.level + '</span>' +
+        '<span class="cstat">' + statusTag + '</span>' +
+        '<span class="camt">' + money(c.amount) + '</span>' +
+      '</div>' +
+      '<div class="row2"><b>' + c.account.name + '</b> &middot; ' + c.text + '</div>' +
+      '<div class="sla"><i style="width:' + (slaPct * 100).toFixed(0) + '%;background:' + slaColor + '"></i></div>';
+  }
+
+  function caseRowClass(c) {
+    const cls = c.status === 'closed'
+      ? (c.disposition === 'confirmed' ? 'c-conf' : 'c-dism')
+      : 'c-' + c.status;
+    return 'case ' + cls + (c.flash > 0.05 ? ' flash' : '');
+  }
+
+  function renderCases() {
+    if (!caseList) return;
+    const shown = cases.slice(0, 12);
+    const wanted = new Set(shown.map(c => c.id));
+
+    // drop rows for cases that fell out of the visible window
+    for (const [id, el] of caseRows) {
+      if (!wanted.has(id)) { el.remove(); caseRows.delete(id); }
+    }
+
+    // walk the visible cases in order, reusing or creating a row for each
+    let prev = null;
+    for (const c of shown) {
+      let el = caseRows.get(c.id);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = caseRowClass(c) + ' enter';
+        el.innerHTML = caseRowHTML(c);
+        // drop the entry class once the animation has played so later renders
+        // do not restart it
+        el.addEventListener('animationend', () => el.classList.remove('enter'), { once: true });
+        caseRows.set(c.id, el);
+      } else {
+        const cls = caseRowClass(c);
+        if (el.className !== cls) el.className = cls;
+        el.innerHTML = caseRowHTML(c);
+      }
+      // keep DOM order in sync without touching rows that are already placed
+      const expected = prev ? prev.nextSibling : caseList.firstChild;
+      if (el !== expected) caseList.insertBefore(el, expected);
+      prev = el;
+    }
+
+    caseCount.textContent = cases.filter(c => c.status !== 'closed').length;
+    caseOpen.textContent = cases.filter(c => c.status === 'open').length;
+    caseTriaged.textContent = cases.filter(c => c.status === 'triaged').length;
+    caseEsc.textContent = cases.filter(c => c.status === 'escalated').length;
+    caseClosed.textContent = casesClosed;
+  }
+
+  // ---------------------------------------------------------------- thinking
+  function think(a, dt) {
+    a.thoughtT -= dt;
+    if (a.thoughtT > 0) return;
+    a.thoughtT = rand(2.4, 5.5);
+
+    const s = a.signals;
+    const top = TYPOLOGIES.map(t => ({ t, v: s[t.id] || 0 })).sort((p, q) => q.v - p.v)[0];
+    const cp = a.counterparties.size;
+
+    if (a.listed) {
+      a.thought = pick([
+        'name match on ' + a.list.label + ' at ' + pct(a.matchScore) + '. freezing.',
+        'confirmed designation. reporting to the FIU.',
+        'this entity is on the list. no discretion here.',
+        'EU asset freeze applies. no movement, no exceptions.',
+      ]);
+    } else if (a.sanctionFlag) {
+      a.thought = pick([
+        a.hops + ' hop' + (a.hops === 1 ? '' : 's') + ' from a listed party. exposure ' + pct(a.exposure) + '.',
+        'indirect sanctions nexus. pulling the counterparty chain.',
+        'not listed itself, but the flow says otherwise.',
+        'routing around a designated party is still evasion.',
+      ]);
+    } else if (a.chain !== null) {
+      const c = chains.find(x => x.id === a.chain);
+      a.thought = pick([
+        'hop ' + (a.chainPos + 1) + ' of ' + (c ? c.members.length : '?') + '. ' +
+          (a.chainLeg ? a.chainLeg.label : 'layering') + ' leg.',
+        'value is moving through here and changing shape each time.',
+        'no single leg is illegal. the sequence is.',
+      ]);
+    } else if (a.uboDepth > 1 && a.opacity > CONFIG.opaqueThreshold) {
+      a.thought = pick([
+        a.uboDepth + ' layers of ' + (a.vehicle ? a.vehicle.label : 'shell') + '. who really controls this?',
+        'ownership stack is opaque. UBO is ' + (a.ubo ? a.ubo.name : 'unresolved') + '.',
+        'nominee on the register. the beneficial owner is hidden.',
+      ]);
+    } else if (a.nominee) {
+      a.thought = pick([
+        'nominee director. the real controller is not on the register.',
+        'stiftelse with no named beneficiaries. who benefits?',
+        'holding chain runs through a nominee. lifting it.',
+      ]);
+    } else if (a.verdict === 'blocked') {
+      a.thought = pick([
+        'pattern confirmed. freezing the account.',
+        'this is a textbook ' + top.t.label + ' chain.',
+        'holding ' + money(a.volume) + ' pending review.',
+        'reporting obligation triggered. filing with the FIU.',
+      ]);
+    } else if (a.verdict === 'suspicious') {
+      a.thought = pick([
+        'risk ' + pct(a.risk) + '. ' + top.t.label + ' is the strongest signal.',
+        cp + ' counterparties, ' + a.jur.code + ' exposure. escalating.',
+        'something is off with the flow here.',
+        'corridor into ' + a.jur.code + ' does not match the stated business.',
+      ]);
+    } else if (a.verdict === 'review') {
+      a.thought = pick([
+        'elevated velocity. watching closely.',
+        'counterparty set is growing fast.',
+        'not conclusive yet. keeping it on the list.',
+      ]);
+    } else {
+      a.thought = pick([
+        'baseline normal. ' + cp + ' counterparties.',
+        'nothing unusual in the last window.',
+        'monitoring. ' + a.jur.code + ' exposure is low.',
+        'flow looks organic.',
+      ]);
+    }
+  }
+
+  // ---------------------------------------------------------------- update
+  function updateAccounts(dt) {
+    for (const a of accounts) {
+      a.vx += rand(-0.02, 0.02);
+      a.vy += rand(-0.02, 0.02);
+      a.vx = clamp(a.vx, -0.35, 0.35);
+      a.vy = clamp(a.vy, -0.35, 0.35);
+      a.x += a.vx * dt * 60 * 0.35;
+      a.y += a.vy * dt * 60 * 0.35;
+
+      const m = 40;
+      if (a.x < m) { a.x = m; a.vx = Math.abs(a.vx); }
+      if (a.x > W - m) { a.x = W - m; a.vx = -Math.abs(a.vx); }
+      if (a.y < m) { a.y = m; a.vy = Math.abs(a.vy); }
+      if (a.y > H - m) { a.y = H - m; a.vy = -Math.abs(a.vy); }
+
+      a.risk += (a.riskTarget - a.risk) * Math.min(1, dt * 2.2);
+      a.riskTarget = Math.max(0, a.riskTarget - dt * CONFIG.riskDecay);
+      a.risk = clamp(a.risk, 0, 1);
+
+      const cutoff = time - 8;
+      while (a.recent.length && a.recent[0] < cutoff) a.recent.shift();
+      while (a.band.length && a.band[0] < cutoff) a.band.shift();
+      a.structCount = a.band.length;
+      a.riskyFlow *= Math.max(0, 1 - dt * 0.9);
+
+      const v = verdictFor(a.risk);
+      if (v !== a.verdict) {
+        const escalated = v === 'blocked' && a.verdict !== 'blocked';
+        a.verdict = v;
+        if (escalated) raiseAlert(a, true);
+        else if (v === 'suspicious') raiseAlert(a);
+      }
+
+      a.pulse = Math.max(0, a.pulse - dt * 1.6);
+      think(a, dt);
+    }
+  }
+
+  function updateEdges(dt) {
+    for (let i = edges.length - 1; i >= 0; i--) {
+      const e = edges[i];
+      e.life -= dt;
+      e.alpha = Math.min(1, e.alpha + dt * 6);
+      if (e.life <= 0) edges.splice(i, 1);
+    }
+  }
+
+  function updateRings(dt) {
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const r = rings[i];
+      r.life -= dt;
+      if (r.life <= 0) {
+        for (const m of r.members) { m.ring = null; m.isFraud = false; }
+        rings.splice(i, 1);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- drawing
+  function worldToScreen(x, y) {
+    return {
+      x: (x - cam.x) * cam.zoom + W / 2,
+      y: (y - cam.y) * cam.zoom + H / 2,
+    };
+  }
+
+  function riskColor(risk, alpha) {
+    if (alpha === undefined) alpha = 1;
+    const h = 140 - risk * 140;
+    const l = 42 + risk * 16;
+    return 'hsla(' + h.toFixed(0) + ', 78%, ' + l.toFixed(0) + '%, ' + alpha + ')';
+  }
+
+  function drawBackground() {
+    ctx.fillStyle = 'rgba(5, 7, 12, ' + CONFIG.trailAlpha + ')';
+    ctx.fillRect(0, 0, W, H);
+
+    const step = 90 * cam.zoom;
+    if (step > 14) {
+      const ox = (-cam.x * cam.zoom + W / 2) % step;
+      const oy = (-cam.y * cam.zoom + H / 2) % step;
+      ctx.strokeStyle = 'rgba(90, 130, 190, 0.055)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = ox; x < W; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+      for (let y = oy; y < H; y += step) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+      ctx.stroke();
+    }
+  }
+
+  function drawEdges() {
+    for (const e of edges) {
+      const p = worldToScreen(e.a.x, e.a.y);
+      const q = worldToScreen(e.b.x, e.b.y);
+      const fade = clamp(e.life / CONFIG.edgeLife, 0, 1) * e.alpha;
+
+      if (e.sanction) {
+        ctx.strokeStyle = 'rgba(255, 95, 109, ' + (0.75 * fade) + ')';
+        ctx.lineWidth = 1.8;
+      } else if (e.layer) {
+        ctx.strokeStyle = 'rgba(196, 130, 255, ' + (0.62 * fade) + ')';
+        ctx.lineWidth = 1.4;
+      } else if (e.suspicious) {
+        ctx.strokeStyle = 'rgba(255, 95, 109, ' + (0.55 * fade) + ')';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.strokeStyle = 'rgba(111, 179, 255, ' + (0.20 * fade) + ')';
+        ctx.lineWidth = 0.8;
+      }
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(q.x, q.y);
+      ctx.stroke();
+
+      if ((e.suspicious || e.sanction || e.layer) && fade > 0.3) {
+        const k = 1 - clamp(e.life / CONFIG.edgeLife, 0, 1);
+        const px = p.x + (q.x - p.x) * k;
+        const py = p.y + (q.y - p.y) * k;
+        ctx.fillStyle = e.layer
+          ? 'rgba(210, 160, 255, ' + (0.9 * fade) + ')'
+          : 'rgba(255, 140, 150, ' + (0.9 * fade) + ')';
+        ctx.beginPath();
+        ctx.arc(px, py, e.sanction ? 2.6 : e.layer ? 2.3 : 2.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawAccounts() {
+    const showLabels = cam.zoom > 0.85;
+
+    for (const a of accounts) {
+      const p = worldToScreen(a.x, a.y);
+      if (p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60) continue;
+
+      // an exiting account shrinks and fades as the bank offboards it
+      const exitFade = a.exiting ? clamp(1 - a.exitT, 0, 1) : 1;
+      const r = (a.kind === 'exchange' || a.kind === 'corporate' ? CONFIG.hubRadius : CONFIG.nodeRadius) * cam.zoom * (a.exiting ? 0.4 + exitFade * 0.6 : 1);
+      const hot = a.risk > 0.3 && !a.exiting;
+
+      if (hot) {
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 6);
+        g.addColorStop(0, riskColor(a.risk, 0.30));
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r * 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (a.pulse > 0) {
+        ctx.strokeStyle = riskColor(a.risk, a.pulse * 0.8 * exitFade);
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r + (1 - a.pulse) * 26 * cam.zoom, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = a.exiting
+        ? 'rgba(255, 95, 109, ' + (0.85 * exitFade) + ')'
+        : riskColor(a.risk, 0.92);
+      ctx.beginPath();
+      if (a.kind === 'shell') {
+        ctx.moveTo(p.x, p.y - r);
+        ctx.lineTo(p.x + r, p.y);
+        ctx.lineTo(p.x, p.y + r);
+        ctx.lineTo(p.x - r, p.y);
+        ctx.closePath();
+      } else if (a.kind === 'wallet') {
+        ctx.rect(p.x - r, p.y - r, r * 2, r * 2);
+      } else {
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      }
+      ctx.fill();
+
+      // offboarding marker: a contracting red ring closing in on the node
+      if (a.exiting) {
+        ctx.strokeStyle = 'rgba(255, 95, 109, ' + (0.9 * exitFade) + ')';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r + 4 + a.exitT * 22 * cam.zoom, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.font = '8px ui-monospace, Menlo, monospace';
+        ctx.fillStyle = 'rgba(255, 140, 150, ' + (0.85 * exitFade) + ')';
+        ctx.fillText('EXITING', p.x + r + 6, p.y + 3);
+      }
+
+      // ring membership marker
+      if (a.ring !== null) {
+        ctx.strokeStyle = 'rgba(255, 95, 109, 0.85)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r + 3.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // layering chain marker: a violet chevron pointing along the chain
+      if (a.chain !== null) {
+        ctx.strokeStyle = 'rgba(196, 130, 255, 0.9)';
+        ctx.lineWidth = 1.3;
+        const b = r + 4;
+        ctx.beginPath();
+        ctx.moveTo(p.x - b, p.y - b * 0.6);
+        ctx.lineTo(p.x, p.y - b * 1.15);
+        ctx.lineTo(p.x + b, p.y - b * 0.6);
+        ctx.stroke();
+      }
+
+      // opaque ownership marker: a double ring for nominee / trust layers
+      if (a.opacity > CONFIG.opaqueThreshold) {
+        ctx.strokeStyle = 'rgba(196, 130, 255, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r + 2.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r + 4.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // sanctions marker: a rotating square bracket around the node
+      if (a.listed && !a.exiting) {
+        const spin = time * 1.4;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(spin);
+        ctx.strokeStyle = 'rgba(255, 95, 109, 0.95)';
+        ctx.lineWidth = 1.6;
+        const b = r + 6;
+        ctx.beginPath();
+        ctx.moveTo(-b, -b + 4); ctx.lineTo(-b, -b); ctx.lineTo(-b + 4, -b);
+        ctx.moveTo(b - 4, -b); ctx.lineTo(b, -b); ctx.lineTo(b, -b + 4);
+        ctx.moveTo(b, b - 4); ctx.lineTo(b, b); ctx.lineTo(b - 4, b);
+        ctx.moveTo(-b + 4, b); ctx.lineTo(-b, b); ctx.lineTo(-b, b - 4);
+        ctx.stroke();
+        ctx.restore();
+      } else if (a.sanctionFlag) {
+        // exposure halo: a dashed ring for accounts one hop from a listing
+        ctx.strokeStyle = 'rgba(255, 200, 87, 0.55)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      if (selected === a) {
+        ctx.strokeStyle = 'rgba(255, 224, 102, 0.95)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r + 9, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (showLabels && !a.exiting && (hot || selected === a || a.kind === 'exchange' || a.listed)) {
+        ctx.font = '9px ui-monospace, Menlo, monospace';
+        ctx.fillStyle = a.listed ? 'rgba(255, 150, 160, 0.9)' : 'rgba(200, 220, 255, 0.62)';
+        ctx.fillText(a.name, p.x + r + 4, p.y + 3);
+      }
+    }
+  }
+
+  function drawRingHulls() {
+    for (const r of rings) {
+      const pts = r.members.map(m => worldToScreen(m.x, m.y));
+      if (!pts.length) continue;
+      const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+      const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+      let rad = 0;
+      for (const p of pts) rad = Math.max(rad, Math.hypot(p.x - cx, p.y - cy));
+      rad += 22 * cam.zoom;
+
+      const pulse = 0.5 + 0.5 * Math.sin(time * 3);
+      ctx.strokeStyle = 'rgba(255, 95, 109, ' + (0.18 + pulse * 0.16) + ')';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.font = '9px ui-monospace, Menlo, monospace';
+      ctx.fillStyle = 'rgba(255, 140, 150, 0.7)';
+      ctx.fillText('SUSPECTED RING', cx - 38, cy - rad - 6);
+    }
+  }
+
+  function drawOwnership() {
+    // ownership links are structural, not transactional: draw them as thin
+    // dotted lines so they read as "who controls whom" rather than money flow
+    ctx.setLineDash([2, 5]);
+    for (const a of accounts) {
+      if (!a.owner) continue;
+      const p = worldToScreen(a.x, a.y);
+      const q = worldToScreen(a.owner.x, a.owner.y);
+      const opaque = a.opacity > CONFIG.opaqueThreshold;
+      ctx.strokeStyle = opaque
+        ? 'rgba(196, 130, 255, 0.30)'
+        : 'rgba(120, 160, 220, 0.16)';
+      ctx.lineWidth = opaque ? 1.1 : 0.7;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(q.x, q.y);
+      ctx.stroke();
+
+      // arrowhead at the owner end
+      const ang = Math.atan2(q.y - p.y, q.x - p.x);
+      const mx = p.x + (q.x - p.x) * 0.62;
+      const my = p.y + (q.y - p.y) * 0.62;
+      ctx.fillStyle = opaque ? 'rgba(196, 130, 255, 0.55)' : 'rgba(120, 160, 220, 0.30)';
+      ctx.beginPath();
+      ctx.moveTo(mx + Math.cos(ang) * 4, my + Math.sin(ang) * 4);
+      ctx.lineTo(mx + Math.cos(ang + 2.5) * 4, my + Math.sin(ang + 2.5) * 4);
+      ctx.lineTo(mx + Math.cos(ang - 2.5) * 4, my + Math.sin(ang - 2.5) * 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.setLineDash([]);
+  }
+
+  function drawChainHulls() {
+    for (const c of chains) {
+      const pts = c.members.map(m => worldToScreen(m.x, m.y));
+      if (pts.length < 2) continue;
+
+      // trace the chain as a directed path with a moving highlight
+      ctx.strokeStyle = 'rgba(196, 130, 255, 0.22)';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // hop markers with leg labels
+      ctx.font = '8px ui-monospace, Menlo, monospace';
+      for (let i = 0; i < pts.length; i++) {
+        const m = c.members[i];
+        const active = i === c.leg;
+        ctx.fillStyle = active ? 'rgba(220, 170, 255, 0.95)' : 'rgba(196, 130, 255, 0.45)';
+        ctx.beginPath();
+        ctx.arc(pts[i].x, pts[i].y, active ? 3.4 : 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        if (active && m.chainLeg) {
+          ctx.fillStyle = 'rgba(220, 170, 255, 0.85)';
+          ctx.fillText(m.chainLeg.label, pts[i].x + 6, pts[i].y - 6);
+        }
+      }
+
+      // label the chain at its entry point
+      ctx.fillStyle = 'rgba(196, 130, 255, 0.7)';
+      ctx.fillText('LAYERING \u00b7 ' + c.members.length + ' HOPS', pts[0].x - 30, pts[0].y - 14);
+    }
+  }
+
+  function drawVignette() {
+    const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.78);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function render() {
+    drawBackground();
+    drawOwnership();
+    drawEdges();
+    drawChainHulls();
+    drawRingHulls();
+    drawAccounts();
+    drawVignette();
+  }
+
+  // ---------------------------------------------------------------- inspector
+  function updateInspector() {
+    if (!selected) { inspectorEl.classList.remove('on'); return; }
+    inspectorEl.classList.add('on');
+    const a = selected;
+
+    insTitle.textContent = a.name;
+    insBadge.textContent = a.listed ? 'LISTED' : a.sanctionFlag ? 'EXPOSED' : a.verdict;
+    insBadge.style.color = a.listed ? '#ff8f99' : a.sanctionFlag ? '#ffd479' : '#ffe066';
+    insSub.textContent = a.kind + ' \u00b7 ' + a.jur.code + ' \u00b7 ' + (a.ring !== null ? 'ring member' : 'standalone');
+    insThought.textContent = '\u201c' + a.thought + '\u201d';
+
+    insRisk.textContent = pct(a.risk);
+    insVerdict.textContent = a.verdict;
+    insVerdict.style.color = a.verdict === 'blocked' ? '#ff8f99'
+      : a.verdict === 'suspicious' ? '#ffd479'
+      : a.verdict === 'review' ? '#9ccbff' : '#7fe0ab';
+    insVol.textContent = money(a.volume);
+    insCp.textContent = a.counterparties.size;
+    insJur.textContent = a.jur.code + ' (' + pct(a.jur.risk) + ')';
+    insStruct.textContent = a.structCount ? a.structCount + ' in band' : 'none';
+
+    // sanctions block
+    if (a.listed) {
+      insSanction.textContent = a.list.label;
+      insSanction.style.color = '#ff8f99';
+      insSanctionScore.textContent = pct(a.matchScore);
+      insSanctionScore.style.color = '#ff8f99';
+    } else {
+      insSanction.textContent = 'no direct match';
+      insSanction.style.color = 'rgba(150, 180, 220, 0.6)';
+      insSanctionScore.textContent = '\u2014';
+      insSanctionScore.style.color = 'rgba(150, 180, 220, 0.6)';
+    }
+    insExposure.textContent = pct(a.exposure);
+    insExposure.style.color = a.exposure > CONFIG.exposureThreshold ? '#ffd479' : 'rgba(150, 180, 220, 0.6)';
+    insHops.textContent = a.hops === Infinity ? '\u2014' : a.hops;
+
+    // ownership & layering block
+    insVehicle.textContent = a.vehicle ? a.vehicle.label : (a.kind === 'corporate' ? 'operating co' : 'none');
+    insVehicle.style.color = a.vehicle && a.opacity > CONFIG.opaqueThreshold ? '#c482ff' : '#dceaff';
+    insOpacity.textContent = a.opacity > 0 ? pct(a.opacity) : '\u2014';
+    insOpacity.style.color = a.opacity > CONFIG.opaqueThreshold ? '#c482ff' : 'rgba(150, 180, 220, 0.6)';
+    insUboDepth.textContent = a.uboDepth > 0 ? a.uboDepth + ' layer' + (a.uboDepth === 1 ? '' : 's') : 'direct';
+    insUbo.textContent = a.ubo && a.ubo !== a ? a.ubo.name : (a.uboDepth === 0 ? 'self' : '\u2014');
+    insOwns.textContent = a.owns.length ? a.owns.length + ' entit' + (a.owns.length === 1 ? 'y' : 'ies') : 'none';
+    if (a.chain !== null) {
+      const c = chains.find(x => x.id === a.chain);
+      insChainPos.textContent = (a.chainPos + 1) + '/' + (c ? c.members.length : '?') +
+        (a.chainLeg ? ' \u00b7 ' + a.chainLeg.label : '');
+      insChainPos.style.color = '#c482ff';
+    } else {
+      insChainPos.textContent = 'not in a chain';
+      insChainPos.style.color = 'rgba(150, 180, 220, 0.6)';
+    }
+
+    const rows = TYPOLOGIES
+      .map(t => ({ t, v: a.signals[t.id] || 0 }))
+      .sort((p, q) => q.v - p.v)
+      .slice(0, 5);
+
+    insSigs.innerHTML = rows.map(r =>
+      '<div class="s"><span>' + r.t.label + '</span>' +
+      '<div class="bar"><i style="width:' + (r.v * 100).toFixed(0) + '%;background:' +
+      riskColor(r.v, 0.9) + '"></i></div>' +
+      '<em>' + (r.v * 100).toFixed(0) + '</em></div>'
+    ).join('');
+  }
+
+  // ---------------------------------------------------------------- mix panel
+  function updateMix() {
+    let clear = 0, review = 0, susp = 0, block = 0;
+    for (const a of accounts) {
+      if (a.exiting) continue;
+      if (a.verdict === 'blocked') block++;
+      else if (a.verdict === 'suspicious') susp++;
+      else if (a.verdict === 'review') review++;
+      else clear++;
+    }
+    const n = (clear + review + susp + block) || 1;
+    mixBar.innerHTML =
+      '<i style="width:' + (clear / n * 100) + '%;background:#4fe0a0"></i>' +
+      '<i style="width:' + (review / n * 100) + '%;background:#6fb3ff"></i>' +
+      '<i style="width:' + (susp / n * 100) + '%;background:#ffc857"></i>' +
+      '<i style="width:' + (block / n * 100) + '%;background:#ff5f6d"></i>';
+    mixClear.textContent = clear;
+    mixReview.textContent = review;
+    mixSusp.textContent = susp;
+    mixBlock.textContent = block;
+  }
+
+  // ---------------------------------------------------------------- stats
+  function refreshStats() {
+    fpsEl.textContent = Math.round(fpsFrames / Math.max(fpsAccum, 0.001));
+    nodesEl.textContent = accounts.length;
+    edgesEl.textContent = edges.length;
+    stTx.textContent = txTotal.toLocaleString();
+    stRate.textContent = Math.round(CONFIG.txPerSecond + rings.length * CONFIG.burstRate * 0.35) + '/s';
+    stValue.textContent = money(valueScreened);
+    stAlerts.textContent = alertTotal;
+    stSanctions.textContent = sanctionHits;
+    stBlocked.textContent = blockedTotal;
+    stVar.textContent = money(valueAtRisk);
+    stChains.textContent = chainActive + (chainTotal > chainActive ? ' / ' + chainTotal : '');
+    stChainMax.textContent = maxChainSeen ? maxChainSeen + ' hops' : '--';
+    stOpaque.textContent = opaqueStructures;
+    stShells.textContent = shellTotal;
+    stOnboard.textContent = onboardedTotal;
+    stExited.textContent = exitedTotal;
+    stCases.textContent = cases.filter(c => c.status !== 'closed').length;
+    stEscalated.textContent = casesEscalated;
+    stConfirmed.textContent = casesConfirmed;
+    stDismissed.textContent = casesDismissed;
+    stMttr.textContent = mttrCount ? (mttrSum / mttrCount).toFixed(1) + 's' : '--';
+    stSla.textContent = casesSlaBreached;
+    const total = truePositives + falsePositives;
+    stPrec.textContent = total ? Math.round(truePositives / total * 100) + '%' : '--';
+    stFp.textContent = falsePositives;
+    const mm = Math.floor(time / 60), ss = Math.floor(time % 60);
+    stClock.textContent = String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+    updateMix();
+    if (selected) updateInspector();
+  }
+
+  // Keep the dashboard readable when the operator wants more canvas space.
+  // Every card can be collapsed to just its header, and dragged anywhere on
+  // screen. While collapsed the card hides ALL of its content, including data
+  // that keeps streaming in live (KPI values, case rows, inspector fields), so
+  // a minimized card never leaks new information.
+  function setupCollapsiblePanels() {
+    const panelIds = ['kpis', 'mix', 'feed', 'inspector', 'controls'];
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('sentinel-collapsed-panels') || '{}'); } catch (_) {}
+
+    for (const id of panelIds) {
+      const panel = $(id);
+      const toggle = panel && panel.querySelector('.card-toggle');
+      if (!panel || !toggle) continue;
+
+      const setCollapsed = (collapsed, persist) => {
+        panel.classList.toggle('card-collapsed', collapsed);
+        toggle.textContent = collapsed ? '+' : '−';
+        toggle.setAttribute('aria-expanded', String(!collapsed));
+        toggle.setAttribute('aria-label', (collapsed ? 'Expand ' : 'Collapse ') + id + ' card');
+        if (persist) {
+          saved[id] = collapsed;
+          try { localStorage.setItem('sentinel-collapsed-panels', JSON.stringify(saved)); } catch (_) {}
+        }
+      };
+
+      setCollapsed(Boolean(saved[id]), false);
+      toggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setCollapsed(!panel.classList.contains('card-collapsed'), true);
+      });
+
+      makeDraggable(panel, id);
+    }
+  }
+
+  // ---------------------------------------------------------------- dragging
+  // Cards are position:fixed, so we drag them by writing left/top directly and
+  // clearing any centering transform. The header (h3) is the grab handle; the
+  // collapse button and any other control inside the header stay clickable.
+  function makeDraggable(panel, id) {
+    const handle = panel.querySelector('h3') || panel;
+    panel.classList.add('draggable');
+
+    let drag = null;
+
+    const onDown = (event) => {
+      if (event.button !== undefined && event.button !== 0) return;
+      if (event.target.closest('button, input, select, a, label')) return;
+      const rect = panel.getBoundingClientRect();
+      drag = {
+        pointerId: event.pointerId,
+        dx: event.clientX - rect.left,
+        dy: event.clientY - rect.top,
+        w: rect.width,
+        h: rect.height,
+      };
+      panel.classList.add('dragging');
+      try { handle.setPointerCapture(event.pointerId); } catch (_) {}
+      event.preventDefault();
+    };
+
+    const onMove = (event) => {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      // Pin the card with left/top and drop the centering transform so the
+      // pointer offset stays exact for the rest of the drag.
+      panel.style.transform = 'none';
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+      panel.style.width = drag.w + 'px';
+      const maxX = Math.max(0, window.innerWidth - drag.w);
+      const maxY = Math.max(0, window.innerHeight - drag.h);
+      panel.style.left = clamp(event.clientX - drag.dx, 0, maxX) + 'px';
+      panel.style.top = clamp(event.clientY - drag.dy, 0, maxY) + 'px';
+    };
+
+    const onUp = (event) => {
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      drag = null;
+      panel.classList.remove('dragging');
+      try { handle.releasePointerCapture(event.pointerId); } catch (_) {}
+    };
+
+    handle.addEventListener('pointerdown', onDown);
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
+  }
+
+  // ---------------------------------------------------------------- loop
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+
+    if (!paused) {
+      time += dt;
+
+      const rate = CONFIG.txPerSecond + rings.length * CONFIG.burstRate * 0.35;
+      txAccum += rate * dt;
+      while (txAccum >= 1) { makeTransaction(); txAccum--; }
+
+      updateAccounts(dt);
+      updateEdges(dt);
+      updateRings(dt);
+      updateChains(dt);
+      updateCases(dt);
+      updateLifecycle(dt);
+      if (Math.random() < CONFIG.chainRate * dt * 60) spawnChain();
+      detect();
+      computeExposure();
+    }
+
+    cam.zoom += (cam.targetZoom - cam.zoom) * Math.min(1, dt * 8);
+
+    render();
+
+    fpsAccum += dt; fpsFrames++;
+    if (fpsAccum > 0.35) {
+      refreshStats();
+      fpsAccum = 0; fpsFrames = 0;
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  // ---------------------------------------------------------------- input
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  function nodeAtScreen(mx, my) {
+    let best = null, bestD = 16;
+    for (const a of accounts) {
+      const p = worldToScreen(a.x, a.y);
+      const d = Math.hypot(p.x - mx, p.y - my);
+      if (d < bestD) { bestD = d; best = a; }
+    }
+    return best;
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    cam.dragging = true;
+    cam.moved = false;
+    cam.lastX = e.clientX; cam.lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!cam.dragging) {
+      hoverNode = nodeAtScreen(e.clientX, e.clientY);
+      canvas.style.cursor = hoverNode ? 'pointer' : 'crosshair';
+      return;
+    }
+    const dx = e.clientX - cam.lastX;
+    const dy = e.clientY - cam.lastY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) cam.moved = true;
+    cam.lastX = e.clientX; cam.lastY = e.clientY;
+    cam.x -= dx / cam.zoom;
+    cam.y -= dy / cam.zoom;
+  });
+
+  canvas.addEventListener('pointerup', (e) => {
+    cam.dragging = false;
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (!cam.moved) {
+      const hit = nodeAtScreen(e.clientX, e.clientY);
+      selected = (hit && hit !== selected) ? hit : null;
+      updateInspector();
+    }
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    cam.targetZoom = clamp(cam.targetZoom * (e.deltaY > 0 ? 0.9 : 1.1), CONFIG.zoomMin, CONFIG.zoomMax);
+  }, { passive: false });
+
+  window.addEventListener('resize', resize);
+
+  btnPause.addEventListener('click', () => {
+    paused = !paused;
+    btnPause.textContent = paused ? 'Resume' : 'Pause';
+    btnPause.classList.toggle('on', paused);
+  });
+
+  btnBurst.addEventListener('click', () => {
+    injectRing();
+    for (let i = 0; i < 40; i++) makeTransaction();
+  });
+
+  btnSanction.addEventListener('click', () => {
+    designateEntity();
+    for (let i = 0; i < 20; i++) makeTransaction();
+  });
+
+  btnLayer.addEventListener('click', () => {
+    spawnChain();
+    for (let i = 0; i < 24; i++) makeTransaction();
+  });
+
+  btnClear.addEventListener('click', () => {
+    alerts.length = 0;
+    cases.length = 0;
+    caseRows.clear();
+    caseList.innerHTML = '';
+    caseCount.textContent = '0';
+    alertTotal = 0;
+    blockedTotal = 0;
+    sanctionHits = 0;
+    valueAtRisk = 0;
+    truePositives = 0;
+    falsePositives = 0;
+    caseSeq = 0;
+    casesOpened = 0;
+    casesClosed = 0;
+    casesEscalated = 0;
+    casesSlaBreached = 0;
+    casesConfirmed = 0;
+    casesDismissed = 0;
+    valueRecovered = 0;
+    valueCleared = 0;
+    mttrSum = 0;
+    mttrCount = 0;
+    onboardedTotal = 0;
+    exitedTotal = 0;
+    // push the cooldown out so still-hot accounts do not instantly re-alert
+    // and make the reset look like it did nothing
+    for (const a of accounts) a.lastAlert = time;
+    renderCases();
+    refreshStats();
+  });
+
+  sensEl.addEventListener('input', () => {
+    CONFIG.sensitivity = Number(sensEl.value) / 100;
+  });
+
+  // ---------------------------------------------------------------- boot
+  setupCollapsiblePanels();
+  resize();
+  buildWorld();
+  for (let i = 0; i < 120; i++) makeTransaction();
+  for (let i = 0; i < 3; i++) spawnChain();
+  detect();
+  computeExposure();
+  renderCases();
+  refreshStats();
+  requestAnimationFrame((t) => { last = t; frame(t); });
+})();
+</script>
+</body>
+</html>

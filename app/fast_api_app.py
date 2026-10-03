@@ -471,6 +471,12 @@ app.include_router(evidencetrail_router)  # EvidenceTrail investigations, experi
 app.title = "Financial Crime Investigation Platform (FRAML)"
 app.description = "API and Autonomous Multi-Agent System for KYC, AML, & Fraud Compliance"
 
+from fastapi.staticfiles import StaticFiles
+_STATIC_DIR = os.path.join(AGENT_DIR, "web", "static")
+if os.path.exists(_STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+
 
 # --------------------------------------------------------------------------
 # REST API Endpoints (Data & Analytics)
@@ -1328,6 +1334,30 @@ async def serve_unified():
         with open(UNIFIED_PATH, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     return HTMLResponse("<h1>Unified dashboard file missing</h1>", status_code=404)
+
+
+@app.post("/api/voice/chat")
+async def voice_copilot_chat(request: Request, payload: Dict[str, Any]):
+    """
+    Intelligent Google Voice Copilot dialogue endpoint for bank investigators.
+    Processes spoken and typed questions, queries SQLite database and live scenarios,
+    uses Gemini LLM when available, and returns deep analytical briefings + voice audio text.
+    """
+    from app.voice_copilot_service import VoiceCopilotReasoner
+
+    message = payload.get("message", "")
+    customer_id = payload.get("customer_id")
+    context = payload.get("context", {})
+    api_key = request.headers.get("X-Gemini-Api-Key") or payload.get("api_key") or os.environ.get("GEMINI_API_KEY", "")
+
+    result = VoiceCopilotReasoner.process_query(
+        message=message,
+        customer_id=customer_id,
+        context=context,
+        api_key=api_key
+    )
+    return result
+
 
 
 @app.websocket("/ws/transactions")

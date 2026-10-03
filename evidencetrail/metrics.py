@@ -51,6 +51,7 @@ def summarize_runs(runs):
                      for r in finished if r["state"] != "completed"],
         "error_counts": [_error_count(r) for r in finished],
         "usage_totals": _usage_totals(finished),
+        "context_compression": summarize_context(finished),
         "cost": "not computed: provider rates are not configured",
         "note": ("Agreement can be consistently wrong; five synthetic cases do not establish "
                  "precision, recall or calibration."),
@@ -59,6 +60,26 @@ def summarize_runs(runs):
 
 def _error_count(run):
     return sum(1 for e in run.get("events", []) if e["event_type"] in ("tool_error", "run_failed"))
+
+
+def summarize_context(runs):
+    """Request bytes are measured; they are not Gemini token counts or cost savings."""
+    totals = {name: 0 for name in ("before_bytes", "after_bytes", "api_calls", "cache_hits",
+                                 "accepted", "rejected", "duration_ms")}
+    statuses = Counter()
+    for run in runs:
+        for event in run.get("events", []):
+            stats = (event.get("result_snapshot") or {}).get("context_compression")
+            if not isinstance(stats, dict):
+                continue
+            statuses[stats.get("status", "unknown")] += 1
+            for name in totals:
+                totals[name] += stats.get(name, 0)
+    totals["statuses"] = dict(statuses)
+    totals["byte_reduction_fraction"] = (
+        1 - totals["after_bytes"] / totals["before_bytes"] if totals["before_bytes"] else None)
+    totals["note"] = "Request byte reduction, not token or monetary savings; compare provider usage separately."
+    return totals
 
 
 def _usage_totals(runs):

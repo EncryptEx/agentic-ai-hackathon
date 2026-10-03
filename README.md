@@ -1,8 +1,8 @@
-# Financial Crime Investigation & FRAML Platform
+# EvidenceTrail — Financial Crime Investigation & FRAML Platform
 
-A unified enterprise banking intelligence platform combining a **5-Pillar Financial Crime Risk Engine (FRAML: Fraud + Anti-Money Laundering)** with an autonomous **Google Agent Development Kit (ADK) Multi-Agent AI Investigation Team**.
+EvidenceTrail is a unified banking intelligence platform. A **5-Pillar Financial Crime Risk Engine (FRAML: Fraud + Anti-Money Laundering)** raises alerts, and a **team of AI agents** (Google Agent Development Kit) investigates them: it gathers evidence from the bank's own tools, cross-checks the specialists against each other, and hands a consolidated, evidence-cited case file to a human compliance officer.
 
-> **IMPORTANT COMPLIANCE GUARDRAIL:** All customer, transaction, and device telemetry in this system is **100% synthetic and fictional**. The AI agent team provides evidence analysis and investigative drafts for **human compliance officers**; it does **not** make autonomous legal, SAR filing, or regulatory decisions.
+> **IMPORTANT COMPLIANCE GUARDRAIL:** All customer, transaction, and device telemetry in this system is **100% synthetic and fictional**. The AI agent team provides evidence analysis and investigative drafts for **human compliance officers**; it does **not** make autonomous legal, SAR filing, or regulatory decisions. A deterministic policy, not a model, sets every simulated outcome.
 
 ---
 
@@ -39,21 +39,24 @@ flowchart TD
     subgraph ADKAgents ["5. Google ADK Multi-Agent Team"]
         CasePacket --> RootAgent["investigation_agent (Root Orchestrator)"]
         RootAgent --> Pipeline["investigation_pipeline (Sequential)"]
-        
+
         Pipeline --> AgCust["customer_agent<br/>(CDD, wealth plausibility, watchlists, synthetic ID)"]
         Pipeline --> AgTxn["transaction_agent<br/>(Velocity, structuring, round amounts, corridors)"]
         Pipeline --> AgFraud["fraud_agent<br/>(ATO, impossible travel, card micro-probing, APP scams)"]
         Pipeline --> AgOwn["ownership_agent<br/>(UBOs, corporate layers, secrecy havens)"]
         Pipeline --> AgRisk["risk_agent<br/>(5-pillar score, statutory overrides, audit checklist)"]
+        Pipeline --> AgArb["arbiter_agent<br/>(cross-specialist contradiction tribunal)"]
 
-        Pipeline --> AgConsol["consolidator_agent<br/>(11-Section Comprehensive SAR Dossier)"]
+        Pipeline --> AgConsol["consolidator_agent<br/>(13-Section Comprehensive SAR Dossier)"]
     end
 
     subgraph Delivery ["6. Interfaces & Delivery"]
-        AgConsol --> Dashboard["Web Dashboard (http://localhost:8000/dashboard)"]
+        AgConsol --> Dashboard["Web Dashboard (/dashboard)"]
+        AgConsol --> Investigator["Investigator tab (/investigator)"]
         AgConsol --> LiveStream["⚡ Live Stream & Agent Interrogation (/live-stream)"]
         AgConsol --> SentinelRadar["📡 Sentinel Radar (/sentinel)"]
         AgConsol --> Visualizer["Interactive Visualizer (/visualizer)"]
+        AgConsol --> AdkFlow["ADK Agent Workflow (/adk-workflow)"]
         AgConsol --> CLI["Terminal CLI ('python cli.py investigate CUST-00015')"]
         AgConsol --> API["FastAPI REST & A2A RPC Server"]
     end
@@ -87,15 +90,16 @@ Individual customer risk is calculated on a normalized **0 to 100 scale** across
 
 ## 🤖 Autonomous Google ADK Multi-Agent Team
 
-When an alert is flagged or a customer is inspected, the system dispatches the case to 5 specialist agents followed by the consolidator:
+When an alert is flagged or a customer is inspected, the system dispatches the case to the specialist agents, then an arbiter, then the consolidator. A dynamic triage router (`app/orchestrator/triage.py`) classifies the case topology so specialist effort goes where the risk indicators are.
 
 1. **`customer_agent`**: Verifies CDD identity, plausibility of wealth vs declared income, onboarding channel verification, PEP status, adverse media, and synthetic ID signals.
-2. **`transaction_agent`**: Evaluates chronological inflow/outflow velocity, cash intensity, structuring, turnover deviations, round amounts, and high-risk corridors.
+2. **`transaction_agent`**: Evaluates chronological inflow/outflow velocity, cash intensity, structuring, turnover deviations, round amounts, and high-risk corridors. Uses a bounded, prioritized evidence page (`get_transaction_evidence`) with full-population totals and an explicit warning that omitted records are unreviewed, not clean.
 3. **`fraud_agent`**: Investigates device telemetry, recognized vs anomalous device fingerprints, impossible travel velocity (>900 km/h), card entry modes (EMV vs CNP eCommerce), authorization declines, and scam payee velocity.
 4. **`ownership_agent`**: Maps beneficial ownership (UBOs), control links, directorships, and checks jurisdictions against FATF Blacklist/Greylist and secrecy haven ratings.
 5. **`risk_agent`**: Evaluates the 5-pillar composite score, explains separate AML and Fraud sub-scores, validates statutory and fraud overrides, and generates the compliance action checklist.
-6. **`consolidator_agent`**: Synthesizes all findings into a formal **11-section SAR-ready investigative report**:
-   - Case overview (Case ID, Subject, Trigger / Rationale, Scope, Typologies, Priority, Executive Synopsis)
+6. **`arbiter_agent`** (`app/orchestrator/`): A tribunal that looks for contradictory hypotheses between specialists (money mule vs APP coercion victim, ATO vs friendly fraud, wealth influx vs layered structuring), cross-examines them, and returns a calibrated consensus.
+7. **`consolidator_agent`**: Synthesizes all findings into a formal **13-section SAR-ready investigative report**:
+   - Case overview (Case ID, Subject, Triage classification, Trigger / Rationale, Scope, Typologies, Priority, Executive Synopsis)
    - Customer overview
    - Key observations
    - Transaction patterns & AML monitoring
@@ -104,9 +108,43 @@ When an alert is flagged or a customer is inspected, the system dispatches the c
    - Relevant risk indicators & FRAML score
    - Evidence supporting each finding (transaction IDs, timestamps, amounts, device IDs)
    - Contradictory or mitigating evidence
+   - Multi-specialist cross-debate & contradiction resolution (Arbiter Tribunal ruling)
    - Missing information & investigative gaps
    - Suggested next investigative questions (audit checklist)
    - Overall case summary & human compliance disclaimer
+
+### Context management for the agents
+Each specialist sees its own tool exchanges plus the other specialists' written findings, not their raw tool dumps (`app/context_callbacks.py`). Large lists of uniform records are sent in a lossless columnar form. The optional **condense.chat** compression layer (`app/context_compression.py`) is **off by default** (`CONDENSE_ENABLED=0`): it only touches older narrative text, rejects any result that changes a number, name or caution sentence, and falls back to the original text on any error. See `.env.example`.
+
+---
+
+## 🔎 Investigator: transfer-level triage with evidence IDs
+
+The **Investigator** tab (`/investigator`) answers a narrower question than the ADK suite: *should this one transfer be allowed, checked with the customer, or reviewed?* Code lives in `evidencetrail/`.
+
+- **Agent team:** an orchestrator plus three specialists (behaviour & device, recipient & network, risk judge) that call registered tools. Every result is stored as evidence with a stable ID (`EV-001`, ...).
+- **Deterministic policy v1 is authoritative.** The model recommends; the policy decides. Agent disagreement is recorded, not hidden.
+- **Jev** (risk model) is a tool the risk judge can call and also triages alerts: an alert is raised when Jev or the policy flags a transfer.
+- **Auditability:** a hash-chained trace and a saved record per investigation (`data/investigations/`, never committed), restart-safe.
+- **Plain-language UI** for bank staff: reasons, missing evidence and next steps; technical details stay saved in the background.
+- **Hand-off:** an alert can be passed to the ADK specialist team for a customer-level case file.
+- **Seed data:** investigations can run on real transactions from `data/kyc_aml.db`, with time-causal evidence (an agent only sees what was knowable before the transfer) and the generator's labels hidden from the agents.
+
+Quality and impact tooling:
+
+```bash
+python -m evidencetrail.live_check            # confirms the Gemini and Jev wire formats against the live APIs
+python -m evidencetrail.consistency           # recorded decision-consistency report (run occasionally, e.g. monthly)
+python -m evidencetrail.impact --each 24      # rules vs agents vs agents+Jev on labelled seed cases (spends API quota)
+```
+
+G-Eval (DeepEval) scores each explanation for evidence grounding, completeness and relevance after the decision; it sits outside the decision path. Measured results, cost assumptions and limits are written up in [`docs/EvidenceTrail-Overview-and-Impact.md`](docs/EvidenceTrail-Overview-and-Impact.md).
+
+---
+
+## ♻️ Self-Evolving Agent Loop
+
+`app/evolution/` closes the loop between adjudicated cases and detection rules: a **Reflexion engine** diagnoses failure modes in cases the arbiter or a human overrode, a **policy optimizer** proposes rule or threshold mutations, a **shadow backtester** compares baseline against the mutation on synthetic regression cases, and the result becomes a **governance proposal** for human approval. Nothing is changed automatically.
 
 ---
 
@@ -155,19 +193,24 @@ python cli.py serve --port 8000
 ```
 Open in browser:
 - **Interactive Compliance Dashboard**: `http://localhost:8000/dashboard`
+- **Investigator**: `http://localhost:8000/investigator`
+- **ADK Agent Workflow**: `http://localhost:8000/adk-workflow`
 - **FRAML Risk Visualizer**: `http://localhost:8000/visualizer`
 - **Swagger / OpenAPI Documentation**: `http://localhost:8000/docs`
+
+### 7. Configure keys
+Copy `.env.example` to `.env` (gitignored) and add the keys you have: `GEMINI_API_KEY` for the agents and the G-Eval judge, `TYPESAFE_API_KEY` for Jev, and optionally `CONDENSE_API_KEY` with `CONDENSE_ENABLED=1` for context compression. Without keys, live investigations report the provider as unavailable; the unit tests never need keys.
 
 ---
 
 ## 🧪 Testing & Validation
 
-Run unit tests covering the scoring engine, detectors, and agent architectures:
+Run unit tests covering the scoring engine, detectors, agent architectures, the Investigator, the seed adapter, context handling and the impact statistics:
 
 ```bash
 python -m pytest tests/unit
 ```
-*46 tests covering fraud detectors, transaction monitoring rules, KYC scoring, composite risk engine, and ADK agent tool mappings.*
+*Unit tests never call live providers (a kill switch and stripped keys enforce it). Seed tests run against a small deterministic fixture database (`tests/unit/seed_fixture.py`), not the regenerated `data/kyc_aml.db`. A few legacy tests in `tests/unit/test_investigator.py` pin the old dataset and arbiter-less pipeline and may fail until they are updated.*
 
 ---
 
@@ -216,18 +259,36 @@ fin-crime-platform/
 ├── storage/                    # Unified database and data export layer
 │   └── database.py             # SQLite manager & CSV exporter
 ├── app/                        # Google ADK Multi-Agent System
-│   ├── agent.py                # 5 specialist agents + consolidator + root orchestrator
+│   ├── agent.py                # 5 specialists + arbiter + consolidator + root orchestrator
 │   ├── tools.py                # Plain Python tool callable wrappers
+│   ├── context_callbacks.py    # Per-agent request filtering, columnar tool results, usage capture
+│   ├── context_compression.py  # Optional fail-open condense.chat compression
 │   ├── alert_feed.py           # Alert triage queue & agent case packet dispatcher
 │   ├── fast_api_app.py         # FastAPI application (A2A RPC + REST APIs + Web UI)
+│   ├── orchestrator/           # Dynamic triage router, debate engine, arbiter agent
+│   ├── evolution/              # Reflexion, policy optimizer, shadow backtest, governance loop
+│   ├── live_agent/             # Real-time stream investigator, policy engine, scenarios
 │   └── app_utils/              # A2A protocol and service connectors
-├── web/                        # Web dashboard & interactive visualizers
-│   ├── static/                 # Compliance monitoring dashboard (app.js, style.css, index.html)
+├── evidencetrail/              # Investigator: transfer-level agent team, policy, Jev, alerts, records, evaluation
+│   ├── team.py                 # Orchestrator + specialists, shared evidence store, trace
+│   ├── policy.py               # Deterministic policy v1 (authoritative)
+│   ├── jev.py, alerts.py       # Jev client and alert triage / queue
+│   ├── seed.py, seed_labels.py # Time-causal seed adapter; evaluator-only answer key
+│   ├── evaluator.py            # G-Eval explanation scoring
+│   ├── consistency.py          # Recorded decision-consistency report
+│   ├── impact.py               # Rules vs agents vs agents+Jev study and cost model
+│   └── handoff.py              # Hand-off of an alert to the ADK specialist team
+├── web/                        # Web dashboard & interactive pages
+│   ├── dashboard.html          # Unified dashboard (alerts, metrics, realtime, Investigator, ADK workflow)
+│   ├── investigator.html/.js   # Investigator page
+│   ├── adk_workflow.html       # ADK agent workflow studio
+│   ├── live_stream.html, sentinel.html, realtime.html
 │   ├── visualization.html      # Chart.js interactive visualizer
-│   └── Financialcrime.html     # High-density Nordic screening visualizer
+│   └── static/                 # Live stream assets (live_stream.css/.js)
+├── docs/                       # Overview and measured impact report
 ├── exports/                    # Exported CSV tables (customers, transactions, alerts, assessments)
-├── data/                       # SQLite database (kyc_aml.db)
-├── tests/                      # 46 unit & integration tests
+├── data/                       # SQLite database (kyc_aml.db); local records and reports are gitignored
+├── tests/                      # Unit & integration tests (tests/unit/seed_fixture.py is the test seed)
 ├── cli.py                      # Unified CLI (generate, portfolio, inspect, alerts, investigate, serve)
 ├── pyproject.toml              # Dependencies & build configuration
 ├── agents-cli-manifest.yaml    # Google ADK manifest

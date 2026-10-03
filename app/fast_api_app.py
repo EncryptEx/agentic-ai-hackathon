@@ -467,7 +467,7 @@ app: FastAPI = get_fast_api_app(
     otel_to_cloud=otel_to_cloud,
     lifespan=lifespan,
 )
-app.include_router(evidencetrail_router)  # EvidenceTrail investigations, experiments and alert queue
+app.include_router(evidencetrail_router)  # Investigator runs, experiments and alert queue
 app.title = "Financial Crime Investigation Platform (FRAML)"
 app.description = "API and Autonomous Multi-Agent System for KYC, AML, & Fraud Compliance"
 
@@ -1082,7 +1082,7 @@ INVESTIGATOR_JS_PATH = os.path.join(AGENT_DIR, "web", "investigator.js")
 
 @app.get("/investigator", response_class=HTMLResponse)
 async def serve_investigator():
-    """EvidenceTrail Investigator (also shown as a tab of the unified dashboard)."""
+    """Investigator page (also shown as a tab of the unified dashboard)."""
     if os.path.exists(INVESTIGATOR_PATH):
         with open(INVESTIGATOR_PATH, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())

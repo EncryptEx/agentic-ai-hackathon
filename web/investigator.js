@@ -1,4 +1,4 @@
-// EvidenceTrail "Investigator" tab. All server data is rendered via textContent / DOM nodes
+// "Investigator" tab. All server data is rendered via textContent / DOM nodes
 // (never innerHTML) because tool-returned free text is untrusted. Synthetic data only.
 
 const inv = {

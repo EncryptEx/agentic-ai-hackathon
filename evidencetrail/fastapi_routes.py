@@ -1,4 +1,4 @@
-"""FastAPI adapter for the EvidenceTrail API.
+"""FastAPI adapter for the Investigator API.
 
 The route logic lives in evidencetrail.api (framework-agnostic), so the same handlers serve both
 the legacy zero-dependency server (web/server.py) and the combined FastAPI app (app/fast_api_app.py).
@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 class RunIdConvertor(Convertor):
-    """Matches only EvidenceTrail run ids ('run-' + 10 hex characters). The combined app also serves
+    """Matches only Investigator run ids ('run-' + 10 hex characters). The combined app also serves
     /api/investigations/audit-trail, /sign-off and /{investigation id} for the audit ledger, so these routes must not
     claim the whole /api/investigations/... namespace: anything that is not a run id falls through to those handlers,
     whatever the registration order."""
@@ -94,7 +94,7 @@ async def evidencetrail_handoff(alert_id: str, request: Request):
     except handoff.CustomerNotFound:
         who = (customer_id or alert["transaction"]["customer_id"]).upper()
         return JSONResponse({
-            "error": (f"Customer {who} is not in the FRAML database the ADK team reads from. EvidenceTrail "
+            "error": (f"Customer {who} is not in the FRAML database the ADK team reads from. Investigator "
                       "scenario customers are separate synthetic records; send a customerId from the FRAML "
                       "database (for example CUST-00015)."),
             "needs_customer_id": True}, status_code=409)

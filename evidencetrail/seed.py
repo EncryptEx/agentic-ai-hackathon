@@ -34,6 +34,7 @@ HISTORY_MIN = 5                 # prior outbound transactions needed for a behav
 GRAPH_MAX_PAYERS = 8
 FLAG_SEVERITIES = ("HIGH", "CRITICAL")
 FLAG_RATIO = 0.25               # association with flagged payers counts only above this share of a recipient's payers
+MIN_FLAGGED_PAYERS = 2          # ...and only with at least this many: "1 of 1 payers" is not evidence of anything
 
 # Only these columns are ever read. Label columns are deliberately absent.
 _TX_COLUMNS = ("transaction_id", "customer_id", "timestamp", "transaction_type", "direction", "amount_usd",
@@ -125,11 +126,12 @@ class SeedData:
     def flagged_payers(self, name, t, customer_id):
         """Other payers of a recipient who were already flagged before t, and whether that association is
         meaningful. Guilt by association only counts when a sizeable SHARE of the payers is flagged: a utility
-        paid by a hundred customers will always have some flagged payer, which says nothing about it."""
+        paid by a hundred customers will always have some flagged payer, which says nothing about it. A single flagged
+        payer is not enough either: for the first few payers of a recipient it would read as "1 of 1"."""
         payers = {r["customer_id"] for r in self._before(self.by_counterparty.get(name, []), t)
                   if r["customer_id"] != customer_id}
         flagged = sorted(p for p in payers if self.flagged_before(p, t))
-        meaningful = bool(flagged) and len(flagged) / len(payers) >= FLAG_RATIO
+        meaningful = len(flagged) >= MIN_FLAGGED_PAYERS and len(flagged) / len(payers) >= FLAG_RATIO
         return flagged, len(payers), meaningful
 
     def flagged_before(self, customer_id, t):
@@ -267,7 +269,7 @@ class SeedData:
                 "category": tx["counterparty_category"], "country": tx["counterparty_country"],
                 "is_new_payee_for_customer": bool(tx["is_new_payee"]),
                 "flag_basis": ("other payers with a HIGH/CRITICAL FRAML rule-engine alert already knowable before this "
-                               f"transfer; counted only when at least {int(FLAG_RATIO * 100)}% of the recipient's payers are flagged")}
+                               f"transfer; counted only when at least {MIN_FLAGGED_PAYERS} payers and {int(FLAG_RATIO * 100)}% of the recipient's payers are flagged")}
 
     def _graph(self, tx, rid):
         t, cust, name = tx["dt"], tx["customer_id"], tx["counterparty_name"]

@@ -448,12 +448,9 @@
 
 <div class="panel" id="controls">
   <button id="btn-pause">Pause</button>
-  <button id="btn-burst">Inject fraud ring</button>
-  <button id="btn-layer">Layer funds</button>
-  <button id="btn-sanction">Designate entity</button>
   <button id="btn-clear">Clear alerts</button>
   <div class="sep"></div>
-  <label>sensitivity <input id="sens" type="range" min="20" max="90" value="55" /></label>
+  <label>stream speed <input id="speed" type="range" min="1" max="1000" value="250" dir="rtl" /></label>
   <button class="card-toggle" type="button" aria-label="Collapse controls card" aria-expanded="true">−</button>
 </div>
 
@@ -487,17 +484,16 @@
   const insVehicle = $('ins-vehicle'), insOpacity = $('ins-opacity'), insUboDepth = $('ins-ubodepth');
   const insUbo = $('ins-ubo'), insOwns = $('ins-owns'), insChainPos = $('ins-chainpos');
   const insSigs = $('ins-sigs');
-  const btnPause = $('btn-pause'), btnBurst = $('btn-burst'), btnSanction = $('btn-sanction'), btnClear = $('btn-clear');
-  const btnLayer = $('btn-layer');
-  const sensEl = $('sens');
+  const btnPause = $('btn-pause'), btnClear = $('btn-clear');
+  const btnBurst = null, btnSanction = null, btnLayer = null;
+  const speedEl = $('speed');
 
   let W = 0, H = 0, DPR = 1;
 
   // ---------------------------------------------------------------- config
   const CONFIG = {
-    accountCount: 190,
     ringSize: 9,
-    txPerSecond: 26,
+    txPerSecond: 0, // Disabled: using real-time websocket
     burstRate: 140,
     edgeLife: 2.6,
     edgeMax: 420,
@@ -510,7 +506,7 @@
     riskDecay: 0.22,
     riskRise: 0.85,
     alertCooldown: 3.2,
-    sensitivity: 0.55,
+    streamSpeedMs: 250,
     exposureThreshold: 0.30,   // share of flow to listed parties that flags exposure
     chainMin: 3,               // shortest layering chain worth flagging
     chainMax: 6,               // longest layering chain we will build
@@ -545,6 +541,7 @@
   let txAccum = 0;
   let txTotal = 0;
   let alertTotal = 0;
+  let activeWs = null;
   let blockedTotal = 0;
   let sanctionHits = 0;
   let valueScreened = 0;
@@ -735,22 +732,136 @@
     };
   }
 
-  function buildWorld() {
+  const accountIndexMap = {}; // mapping customer_id to accounts index
+
+  async function buildWorld() {
     accounts.length = 0;
-    for (let i = 0; i < CONFIG.accountCount; i++) {
-      const angle = rand(0, Math.PI * 2);
-      const radius = Math.pow(Math.random(), 0.6) * Math.min(W, H) * 0.42;
-      accounts.push(makeAccount(i, W / 2 + Math.cos(angle) * radius, H / 2 + Math.sin(angle) * radius));
+    
+    try {
+      const res = await fetch('/api/customers');
+      const jsonResponse = await res.json();
+      
+      // The API returns { total: 100, customers: [...] }
+      const data = Array.isArray(jsonResponse) ? jsonResponse : (jsonResponse.customers || []);
+      
+      data.forEach((c, i) => {
+        const angle = rand(0, Math.PI * 2);
+        const radius = Math.pow(Math.random(), 0.6) * Math.min(W, H) * 0.42;
+        
+        const a = makeAccount(i, W / 2 + Math.cos(angle) * radius, H / 2 + Math.sin(angle) * radius);
+        a.customerId = c.customer_id;
+        a.name = c.name || c.customer_id;
+        a.kind = 'retail';
+        if (c.archetype && c.archetype.includes('BUSINESS')) a.kind = 'business';
+        if (c.archetype && c.archetype.includes('CORP')) a.kind = 'corporate';
+        
+        accounts.push(a);
+        accountIndexMap[c.customer_id] = i;
+      });
+      
+      setupWebsocket();
+    } catch (e) {
+      console.error("Failed to load customers:", e);
     }
+  }
 
-    for (let i = 0; i < 6; i++) {
-      const a = pick(accounts);
-      a.kind = 'exchange';
-      a.baseline *= 3.2;
-      a.volume *= 8;
+  function getOrCreateCounterparty(name) {
+    if (accountIndexMap[name] !== undefined) {
+      return accounts[accountIndexMap[name]];
     }
+    // Create an external node dynamically
+    const angle = rand(0, Math.PI * 2);
+    const radius = Math.min(W, H) * 0.48; // place on the outer edge
+    const id = accounts.length;
+    const a = makeAccount(id, W / 2 + Math.cos(angle) * radius, H / 2 + Math.sin(angle) * radius);
+    a.customerId = name;
+    a.name = name;
+    a.kind = 'external';
+    accounts.push(a);
+    accountIndexMap[name] = id;
+    return a;
+  }
 
-    buildOwnership();
+  function setupWebsocket(speed = CONFIG.streamSpeedMs) {
+    if (activeWs) activeWs.close();
+    const ws = new WebSocket(`ws://${window.location.host}/ws/transactions?speed_ms=${speed}`);
+    activeWs = ws;
+    
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.status || payload.error) return; // stream status or error
+        
+        const custId = payload.customer_id;
+        const cpName = payload.counterparty_name || payload.counterparty_account || 'Unknown';
+        const direction = payload.direction;
+        const amount = parseFloat(payload.amount_usd || payload.amount || 0);
+        
+        let srcCust = getOrCreateCounterparty(custId);
+        let dstCust = getOrCreateCounterparty(cpName);
+        
+        if (direction === 'INBOUND') {
+          const temp = srcCust;
+          srcCust = dstCust;
+          dstCust = temp;
+        }
+        
+        const e = {
+          a: srcCust, b: dstCust,
+          amount,
+          t: time,
+          life: CONFIG.edgeLife,
+          alpha: 0,
+          suspicious: false,
+          reason: null,
+          score: 0,
+          sanction: false,
+          layer: false,
+          leg: null,
+        };
+        
+        // Basic real-time logic (no simulated fraud for now, but leave structure)
+        const struct = amount > 8000 && amount < 10000;
+        const big = amount > 25000;
+        let score = 0;
+        if (struct) { score += 0.55; e.reason = 'structuring'; }
+        if (big) { score += 0.35; e.reason = e.reason || 'large volume'; }
+        
+        if (score > 0.6) {
+          e.suspicious = true;
+          e.score = score;
+          srcCust.riskyFlow += amount;
+          dstCust.riskyFlow += amount;
+          srcCust.signals.velocity = (srcCust.signals.velocity || 0) + 0.3;
+        }
+        
+        if (!srcCust.outTo) srcCust.outTo = new Set();
+        if (!dstCust.inFrom) dstCust.inFrom = new Set();
+        if (!srcCust.counterparties) srcCust.counterparties = new Set();
+        if (!dstCust.counterparties) dstCust.counterparties = new Set();
+        srcCust.outTo.add(dstCust.id);
+        dstCust.inFrom.add(srcCust.id);
+        srcCust.counterparties.add(dstCust.id);
+        dstCust.counterparties.add(srcCust.id);
+        if (!srcCust.recent) srcCust.recent = [];
+        if (!dstCust.recent) dstCust.recent = [];
+        srcCust.recent.push(time);
+        dstCust.recent.push(time);
+        
+        txTotal++;
+        edges.push(e);
+        
+      } catch (err) {
+        console.error("WS error:", err);
+      }
+    };
+    
+    ws.onclose = () => {
+      // Only try to reconnect if this is still the active connection
+      if (activeWs === ws) {
+        setTimeout(() => setupWebsocket(CONFIG.streamSpeedMs), 5000); // Try reconnect
+      }
+    };
   }
 
   // ---------------------------------------------------------------- ownership
@@ -1277,7 +1388,7 @@
 
   // ---------------------------------------------------------------- verdicts
   function verdictFor(risk) {
-    const s = CONFIG.sensitivity;
+    const s = 0.55; // static default sensitivity
     if (risk > 0.52 - s * 0.14) return 'blocked';
     if (risk > 0.38 - s * 0.10) return 'suspicious';
     if (risk > 0.24 - s * 0.06) return 'review';
@@ -2218,19 +2329,21 @@
     if (!paused) {
       time += dt;
 
-      const rate = CONFIG.txPerSecond + rings.length * CONFIG.burstRate * 0.35;
-      txAccum += rate * dt;
-      while (txAccum >= 1) { makeTransaction(); txAccum--; }
+      // Disabled random transactions, waiting for websocket instead
+      // const rate = CONFIG.txPerSecond + rings.length * CONFIG.burstRate * 0.35;
+      // txAccum += rate * dt;
+      // while (txAccum >= 1) { makeTransaction(); txAccum--; }
 
       updateAccounts(dt);
       updateEdges(dt);
       updateRings(dt);
-      updateChains(dt);
-      updateCases(dt);
-      updateLifecycle(dt);
-      if (Math.random() < CONFIG.chainRate * dt * 60) spawnChain();
-      detect();
-      computeExposure();
+      // Disabled chain spawning & cases logic since we disabled simulated fraud
+      // updateChains(dt);
+      // updateCases(dt);
+      // updateLifecycle(dt);
+      // if (Math.random() < CONFIG.chainRate * dt * 60) spawnChain();
+      // detect();
+      // computeExposure();
     }
 
     cam.zoom += (cam.targetZoom - cam.zoom) * Math.min(1, dt * 8);
@@ -2312,19 +2425,16 @@
     btnPause.classList.toggle('on', paused);
   });
 
-  btnBurst.addEventListener('click', () => {
+  if (btnBurst) btnBurst.addEventListener('click', () => {
     injectRing();
-    for (let i = 0; i < 40; i++) makeTransaction();
   });
 
-  btnSanction.addEventListener('click', () => {
+  if (btnSanction) btnSanction.addEventListener('click', () => {
     designateEntity();
-    for (let i = 0; i < 20; i++) makeTransaction();
   });
 
-  btnLayer.addEventListener('click', () => {
+  if (btnLayer) btnLayer.addEventListener('click', () => {
     spawnChain();
-    for (let i = 0; i < 24; i++) makeTransaction();
   });
 
   btnClear.addEventListener('click', () => {
@@ -2359,15 +2469,16 @@
     refreshStats();
   });
 
-  sensEl.addEventListener('input', () => {
-    CONFIG.sensitivity = Number(sensEl.value) / 100;
+  speedEl.addEventListener('change', () => {
+    CONFIG.streamSpeedMs = Number(speedEl.value);
+    setupWebsocket(CONFIG.streamSpeedMs); // reconnect with new speed
   });
 
   // ---------------------------------------------------------------- boot
   setupCollapsiblePanels();
   resize();
   buildWorld();
-  for (let i = 0; i < 120; i++) makeTransaction();
+  // for (let i = 0; i < 120; i++) makeTransaction();
   for (let i = 0; i < 3; i++) spawnChain();
   detect();
   computeExposure();

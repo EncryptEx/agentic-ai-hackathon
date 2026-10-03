@@ -20,18 +20,24 @@ import contextlib
 from datetime import datetime
 import json
 import os
+import csv
+import asyncio
 from collections.abc import AsyncIterator
 from typing import Any, Dict, Optional
 
 from a2a.server.tasks import InMemoryTaskStore
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from google.adk.cli.fast_api import get_fast_api_app
 from google.adk.runners import Runner
 from pydantic import BaseModel
+
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.alert_feed import AlertDispatcher
 from app.app_utils import services
@@ -73,10 +79,34 @@ allow_origins = (
 otel_to_cloud = False
 
 AGENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STATIC_DIR = os.path.join(AGENT_DIR, "web", "static")
 EXPORTS_DIR = os.path.join(AGENT_DIR, "exports")
 VISUALIZATION_PATH = os.path.join(AGENT_DIR, "web", "visualization.html")
-SENTINEL_PATH = os.path.join(AGENT_DIR, "Financialcrime.html")
+SENTINEL_PATH = os.path.join(AGENT_DIR, "web", "sentinel.html")
+REALTIME_PATH = os.path.join(AGENT_DIR, "web", "realtime.html")
+UNIFIED_PATH = os.path.join(AGENT_DIR, "web", "dashboard.html")
+TRANSACTIONS_CSV = os.path.join(EXPORTS_DIR, "transactions.csv")
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception:
+                pass
+
+manager = ConnectionManager()
 
 
 @contextlib.asynccontextmanager
@@ -104,7 +134,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app: FastAPI = get_fast_api_app(
     agents_dir=AGENT_DIR,
-    web=True,
+    web=False,
     artifact_service_uri=services.ARTIFACT_SERVICE_URI,
     allow_origins=allow_origins,
     session_service_uri=services.SESSION_SERVICE_URI,
@@ -631,37 +661,33 @@ async def get_investigation_detail(investigation_id: str):
 # Web Dashboard & Visualizer
 # --------------------------------------------------------------------------
 
-if os.path.exists(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+INVESTIGATOR_PATH = os.path.join(AGENT_DIR, "web", "investigator.html")
+INVESTIGATOR_JS_PATH = os.path.join(AGENT_DIR, "web", "investigator.js")
 
 
-@app.get("/style.css")
-async def serve_style():
-    """Serve style.css directly for root-level dashboard requests."""
-    return FileResponse(os.path.join(STATIC_DIR, "style.css"), media_type="text/css")
-
-
-@app.get("/app.js")
-async def serve_app_js():
-    """Serve app.js directly for root-level dashboard requests."""
-    return FileResponse(os.path.join(STATIC_DIR, "app.js"), media_type="application/javascript")
+@app.get("/investigator", response_class=HTMLResponse)
+async def serve_investigator():
+    """EvidenceTrail Investigator (also shown as a tab of the unified dashboard)."""
+    if os.path.exists(INVESTIGATOR_PATH):
+        with open(INVESTIGATOR_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Investigator page missing</h1>", status_code=404)
 
 
 @app.get("/investigator.js")
 async def serve_investigator_js():
-    """Serve the EvidenceTrail Investigator tab script for root-level dashboard requests."""
-    return FileResponse(os.path.join(STATIC_DIR, "investigator.js"), media_type="application/javascript")
+    """Script for the Investigator page."""
+    return FileResponse(INVESTIGATOR_JS_PATH, media_type="application/javascript")
 
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/dashboard", response_class=HTMLResponse)
 async def serve_dashboard():
     """Interactive compliance monitoring dashboard."""
-    index_path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
+    if os.path.exists(UNIFIED_PATH):
+        with open(UNIFIED_PATH, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    return HTMLResponse("<h1>Compliance Dashboard static files missing</h1>", status_code=404)
+    return HTMLResponse("<h1>Unified Dashboard file missing</h1>", status_code=404)
 
 
 @app.get("/visualizer", response_class=HTMLResponse)
@@ -682,6 +708,57 @@ async def serve_sentinel():
     return HTMLResponse("<h1>Sentinel file missing</h1>", status_code=404)
 
 
+@app.get("/realtime", response_class=HTMLResponse)
+async def serve_realtime():
+    """Realtime stream visualizer."""
+    if os.path.exists(REALTIME_PATH):
+        with open(REALTIME_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Realtime file missing</h1>", status_code=404)
+
+
+@app.get("/unified", response_class=HTMLResponse)
+async def serve_unified():
+    """Unified dashboard."""
+    if os.path.exists(UNIFIED_PATH):
+        with open(UNIFIED_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Unified dashboard file missing</h1>", status_code=404)
+
+
+@app.websocket("/ws/transactions")
+async def websocket_transactions(websocket: WebSocket, speed_ms: int = 1000):
+    """
+    WebSocket endpoint that streams rows from the transactions CSV.
+    :param speed_ms: Time in milliseconds to wait between sending each row (simulating real-time).
+    """
+    await manager.connect(websocket)
+    try:
+        if not os.path.exists(TRANSACTIONS_CSV):
+            await websocket.send_text(json.dumps({"error": f"Data file {TRANSACTIONS_CSV} not found."}))
+            return
+
+        with open(TRANSACTIONS_CSV, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            # Send events iteratively
+            for row in reader:
+                # We could perform sorting by timestamp if needed, but for now we stream as-is
+                payload = json.dumps(row)
+                await websocket.send_text(payload)
+                await asyncio.sleep(speed_ms / 1000.0)
+                
+        await websocket.send_text(json.dumps({"status": "Stream completed."}))
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        manager.disconnect(websocket)
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.fast_api_app:app", host="0.0.0.0", port=8000, reload=True)
+    import sys
+    port = 8000
+    if len(sys.argv) > 1 and sys.argv[1] == "--port":
+        port = int(sys.argv[2])
+    # Disable the dev server in the get_fast_api_app config above by setting web=False
+    uvicorn.run("app.fast_api_app:app", host="0.0.0.0", port=port, reload=True)

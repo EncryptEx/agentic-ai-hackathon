@@ -27,7 +27,12 @@ class PortfolioVolume(unittest.TestCase):
             conn.close()
         self.assertGreater(expected, 0)
         self.assertEqual(summary["total_volume_usd"], expected)
-        self.assertEqual(summary["total_transactions"], 6461)  # existing fields are untouched
+        conn = sqlite3.connect(self.path)
+        try:
+            count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(summary["total_transactions"], count)  # existing fields are untouched (the dataset itself may change)
 
     def test_an_empty_ledger_reports_zero_not_none(self):
         conn = sqlite3.connect(self.path)

@@ -4,6 +4,9 @@ import sqlite3
 import json
 import os
 import csv
+import hashlib
+import uuid
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from models.customer import CustomerProfile
 from models.transaction import Transaction
@@ -219,6 +222,31 @@ class DatabaseManager:
                 expected_monthly_count INTEGER,
                 description TEXT,
                 max_single_tx_usd REAL,
+                FOREIGN KEY (customer_id) REFERENCES customers (customer_id)
+            )
+            """)
+
+            # Investigation Audit Logs Table (Tamper-evident record of multi-agent investigations)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS investigation_audit_logs (
+                investigation_id TEXT PRIMARY KEY,
+                timestamp TEXT,
+                customer_id TEXT NOT NULL,
+                customer_name TEXT,
+                trigger_alert_id TEXT,
+                trigger_rule TEXT,
+                risk_tier TEXT,
+                composite_score REAL,
+                model_version TEXT,
+                raw_prompt TEXT,
+                specialist_findings_json TEXT,
+                final_report_text TEXT,
+                final_report_sha256 TEXT,
+                officer_sign_off_status TEXT DEFAULT 'PENDING',
+                officer_name TEXT,
+                officer_notes TEXT,
+                officer_action_taken TEXT,
+                reviewed_at TEXT,
                 FOREIGN KEY (customer_id) REFERENCES customers (customer_id)
             )
             """)
@@ -735,3 +763,113 @@ class DatabaseManager:
                     writer.writerow([d[0] for d in cursor.description])
                     writer.writerows(rows)
                 print(f"Exported {len(rows)} rows to {file_path}")
+
+    def log_investigation(self, record: Dict[str, Any]) -> str:
+        """Persists an immutable audit log entry for a multi-agent investigation execution.
+        
+        Computes SHA-256 digest of the final report to guarantee tamper-evidence.
+        Returns the unique investigation_id.
+        """
+        inv_id = record.get("investigation_id") or f"INV-{uuid.uuid4().hex[:12].upper()}"
+        now_iso = datetime.now(timezone.utc).isoformat()
+        final_report = record.get("final_report_text", "")
+        report_sha256 = hashlib.sha256(final_report.encode("utf-8")).hexdigest() if final_report else ""
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT OR REPLACE INTO investigation_audit_logs (
+                investigation_id, timestamp, customer_id, customer_name,
+                trigger_alert_id, trigger_rule, risk_tier, composite_score,
+                model_version, raw_prompt, specialist_findings_json,
+                final_report_text, final_report_sha256,
+                officer_sign_off_status, officer_name, officer_notes,
+                officer_action_taken, reviewed_at
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+            """, (
+                inv_id,
+                record.get("timestamp") or now_iso,
+                record["customer_id"],
+                record.get("customer_name"),
+                record.get("trigger_alert_id"),
+                record.get("trigger_rule"),
+                record.get("risk_tier"),
+                record.get("composite_score", 0.0),
+                record.get("model_version", "gemini-3.8-flash"),
+                record.get("raw_prompt", ""),
+                record.get("specialist_findings_json", "{}") if isinstance(record.get("specialist_findings_json"), str) else json.dumps(record.get("specialist_findings_json", {})),
+                final_report,
+                report_sha256,
+                record.get("officer_sign_off_status", "PENDING"),
+                record.get("officer_name"),
+                record.get("officer_notes"),
+                record.get("officer_action_taken"),
+                record.get("reviewed_at")
+            ))
+            conn.commit()
+        return inv_id
+
+    def update_audit_sign_off(
+        self,
+        investigation_id: str,
+        officer_sign_off_status: str,
+        officer_name: str,
+        officer_notes: Optional[str] = None,
+        officer_action_taken: Optional[str] = None
+    ) -> bool:
+        """Records human compliance officer sign-off / review on an investigation audit log."""
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            UPDATE investigation_audit_logs
+            SET officer_sign_off_status = ?,
+                officer_name = ?,
+                officer_notes = ?,
+                officer_action_taken = ?,
+                reviewed_at = ?
+            WHERE investigation_id = ?
+            """, (
+                officer_sign_off_status,
+                officer_name,
+                officer_notes or "",
+                officer_action_taken or officer_sign_off_status,
+                now_iso,
+                investigation_id
+            ))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_investigation_audit_logs(
+        self,
+        customer_id: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Returns investigation audit logs, optionally filtered by customer_id."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if customer_id:
+                cursor.execute("""
+                SELECT * FROM investigation_audit_logs
+                WHERE customer_id = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """, (customer_id, limit))
+            else:
+                cursor.execute("""
+                SELECT * FROM investigation_audit_logs
+                ORDER BY timestamp DESC
+                LIMIT ?
+                """, (limit,))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def get_investigation_audit_log(self, investigation_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a single investigation audit log by ID."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM investigation_audit_logs WHERE investigation_id = ?", (investigation_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+

@@ -265,3 +265,70 @@ class TestAgentArchitecture:
         assert "Investigation Trigger / Rationale" in consolidator_agent.instruction
         assert "Primary Typologies Identified" in consolidator_agent.instruction
         assert "Executive Synopsis" in consolidator_agent.instruction
+
+    def test_investigation_audit_trail_and_sign_off(self) -> None:
+        """Verify immutable audit logging, SHA-256 digest computation, and officer sign-off."""
+        import hashlib
+        from storage.database import DatabaseManager
+
+        db = DatabaseManager()
+        test_report = "Comprehensive 11-section FRAML investigation for CUST-00015"
+        expected_sha = hashlib.sha256(test_report.encode("utf-8")).hexdigest()
+
+        inv_id = db.log_investigation({
+            "customer_id": "CUST-00015",
+            "customer_name": "James Moran",
+            "trigger_rule": "TM-01 Structuring",
+            "risk_tier": "CRITICAL",
+            "composite_score": 86.5,
+            "final_report_text": test_report,
+        })
+
+        assert inv_id.startswith("INV-")
+        log = db.get_investigation_audit_log(inv_id)
+        assert log is not None
+        assert log["customer_id"] == "CUST-00015"
+        assert log["final_report_sha256"] == expected_sha
+        assert log["officer_sign_off_status"] == "PENDING"
+
+        # Update sign-off
+        ok = db.update_audit_sign_off(
+            investigation_id=inv_id,
+            officer_sign_off_status="APPROVED_SAR_FILED",
+            officer_name="Officer Jane",
+            officer_notes="Confirmed structuring pattern",
+        )
+        assert ok is True
+
+        updated = db.get_investigation_audit_log(inv_id)
+        assert updated["officer_sign_off_status"] == "APPROVED_SAR_FILED"
+        assert updated["officer_name"] == "Officer Jane"
+        assert updated["officer_notes"] == "Confirmed structuring pattern"
+        assert updated["reviewed_at"] is not None
+
+    def test_framl_deterministic_eval_metric(self) -> None:
+        """Verify the deterministic compliance metric evaluates section coverage and disclaimers."""
+        from tests.eval.framl_metric import evaluate
+
+        compliant_report = """
+        # Case Overview
+        Subject CUST-00015
+        # Customer Overview
+        # Key Observations
+        # Transaction Patterns & AML Monitoring
+        TM-01 Structuring alert
+        # Fraud & Cybercrime Telemetry Findings
+        # Ownership & Control Findings
+        # Relevant Risk Indicators & FRAML Score
+        # Evidence Supporting Each Finding
+        # Contradictory or Mitigating Evidence
+        # Missing Information
+        # Suggested Next Investigative Questions
+        # Overall Case Summary
+        All data is synthetic and fictional. Human compliance officer decision required.
+        """
+        res = evaluate({"response": compliant_report})
+        assert res["score"] >= 0.9
+        assert "Synthetic guardrail: True" in res["explanation"]
+        assert "HITL guardrail: True" in res["explanation"]
+

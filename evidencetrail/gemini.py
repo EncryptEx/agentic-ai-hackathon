@@ -8,6 +8,8 @@ import json
 import urllib.error
 import urllib.request
 
+from app.context_compression import ContextCompressor, prepare_interactions
+
 from .config import GEMINI_BASE_URL, GEMINI_MODEL, GENERATION_SETTINGS, REQUEST_TIMEOUT_S, gemini_key
 from .jev import ProviderUnavailable, post_json_with_retry
 
@@ -27,6 +29,8 @@ class GeminiClient:
     def __init__(self, model=None, generation_settings=None):
         self.requested_model = model or GEMINI_MODEL
         self.generation_settings = dict(generation_settings or GENERATION_SETTINGS)
+        self._compressor = ContextCompressor()
+        self._context_scope = None
 
     def available(self):
         return bool(gemini_key())
@@ -35,9 +39,15 @@ class GeminiClient:
         key = gemini_key()
         if not key:
             raise ProviderUnavailable("GEMINI_API_KEY is not configured")
+        # A client can be reused by evaluations; never reuse a case's cache in another case.
+        scope = json.dumps(steps[0] if steps else None, sort_keys=True)
+        if scope != self._context_scope:
+            self._compressor = ContextCompressor()
+            self._context_scope = scope
+        prepared_steps, context_stats = prepare_interactions(steps, self._compressor)
         body = {
             "model": self.requested_model,
-            "input": steps,
+            "input": prepared_steps,
             "store": False,  # stateless: no server-side answer reuse between runs
             "generation_config": dict(self.generation_settings),
         }
@@ -55,8 +65,11 @@ class GeminiClient:
         calls = [{"id": s.get("id"), "name": s.get("name"), "arguments": s.get("arguments", {})}
                  for s in out_steps if s.get("type") == "function_call"]
         text = _extract_text(out_steps)
-        return ModelTurn(out_steps, calls, text, raw.get("model") or raw.get("model_version"),
+        turn = ModelTurn(out_steps, calls, text, raw.get("model") or raw.get("model_version"),
                          raw.get("usage"))
+        turn.request_steps = prepared_steps
+        turn.context_stats = context_stats
+        return turn
 
 
 def _extract_text(steps) -> str:

@@ -513,6 +513,9 @@ class DatabaseManager:
             cursor.execute("SELECT COUNT(*) FROM transactions")
             total_transactions = cursor.fetchone()[0]
 
+            cursor.execute("SELECT COALESCE(SUM(amount_usd), 0) FROM transactions")
+            total_volume_usd = round(cursor.fetchone()[0] or 0, 2)
+
             cursor.execute("""
             SELECT risk_tier, COUNT(*) as cnt, AVG(composite_score) as avg_score,
                    AVG(aml_score) as avg_aml, AVG(fraud_score) as avg_fraud
@@ -546,6 +549,7 @@ class DatabaseManager:
             return {
                 "total_customers": total_customers,
                 "total_transactions": total_transactions,
+                "total_volume_usd": total_volume_usd,
                 "total_alerts": total_aml_alerts + total_fraud_alerts,
                 "total_aml_alerts": total_aml_alerts,
                 "total_fraud_alerts": total_fraud_alerts,

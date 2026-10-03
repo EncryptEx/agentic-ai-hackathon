@@ -119,6 +119,15 @@ venv.bak/
 .spyderproject
 .spyproject
 
+# Temporary test databases
+data/test_*.db
+
+# DeepEval local cache
+.deepeval/
+
+# EvidenceTrail alert queue (separate from the committed host database)
+data/evidencetrail*.db
+
 # Rope project settings
 .ropeproject
 
@@ -214,3 +223,9 @@ tools/a2a-inspector/
 *.pem
 *-key.json
 credentials*.json
+
+# Recorded decision-consistency reports (python -m evidencetrail.consistency)
+data/consistency/
+
+# Complete saved records of investigations
+data/investigations/

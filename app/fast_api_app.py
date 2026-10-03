@@ -67,6 +67,7 @@ from generator.scenarios import (
 )
 from generator.transaction_generator import TransactionGenerator
 from engine.risk_engine import RiskEngine
+from evidencetrail.fastapi_routes import router as evidencetrail_router
 from models.customer import AdverseMedia, CustomerProfile, PEPStatus, SanctionStatus
 from models.transaction import Transaction, TransactionDirection, TransactionType
 from storage.database import DatabaseManager
@@ -140,6 +141,7 @@ app: FastAPI = get_fast_api_app(
     otel_to_cloud=otel_to_cloud,
     lifespan=lifespan,
 )
+app.include_router(evidencetrail_router)  # EvidenceTrail investigations, experiments and alert queue
 app.title = "Financial Crime Investigation Platform (FRAML)"
 app.description = "API and Autonomous Multi-Agent System for KYC, AML, & Fraud Compliance"
 
@@ -658,6 +660,25 @@ async def get_investigation_detail(investigation_id: str):
 # --------------------------------------------------------------------------
 # Web Dashboard & Visualizer
 # --------------------------------------------------------------------------
+
+INVESTIGATOR_PATH = os.path.join(AGENT_DIR, "web", "investigator.html")
+INVESTIGATOR_JS_PATH = os.path.join(AGENT_DIR, "web", "investigator.js")
+
+
+@app.get("/investigator", response_class=HTMLResponse)
+async def serve_investigator():
+    """EvidenceTrail Investigator (also shown as a tab of the unified dashboard)."""
+    if os.path.exists(INVESTIGATOR_PATH):
+        with open(INVESTIGATOR_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Investigator page missing</h1>", status_code=404)
+
+
+@app.get("/investigator.js")
+async def serve_investigator_js():
+    """Script for the Investigator page."""
+    return FileResponse(INVESTIGATOR_JS_PATH, media_type="application/javascript")
+
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/dashboard", response_class=HTMLResponse)

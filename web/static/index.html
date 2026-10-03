@@ -26,6 +26,7 @@
             <button class="nav-tab" data-target="tab-simulator">Live Simulator</button>
             <button class="nav-tab" data-target="tab-generator">Cohort & Exports</button>
             <button class="nav-tab" data-target="tab-audit">Audit Trail & Evals</button>
+            <button class="nav-tab" data-target="tab-call">📞 Customer Video Call</button>
         </div>
     </header>
 
@@ -1051,6 +1052,212 @@
                         <tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading audit records...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- TAB 8: CUSTOMER VERIFICATION CALL (VIDEO & AUDIO PERSONA) -->
+        <div id="tab-call" class="tab-content" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <h2 style="font-size: 18px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+                        <span>📞</span> AI Customer Verification & Outreach Call Suite
+                        <span class="badge badge-LOW" style="font-size: 11px;">Anti-Tipping-Off Safeguards Active</span>
+                    </h2>
+                    <p style="color: var(--text-secondary); font-size: 13px;">
+                        Interactive audio/video call simulation powered by <strong>Gemini Audio & Persona</strong>. The agent (Claire Sterling) probes for transaction legitimacy, source of funds, and counterparty relationships without exposing SAR or internal AML investigation details.
+                    </p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="font-size: 12px; color: var(--text-muted);">Target Customer:</label>
+                    <select id="call-target-customer" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 12px; border-radius: 6px; font-size: 13px;">
+                        <option value="CUST-00019">Kimberly Henson (CUST-00019 — Student Mule / Pass-Through)</option>
+                        <option value="CUST-00015">James Moran (CUST-00015 — Cash Structuring Operator)</option>
+                        <option value="CUST-00021">Mark Johnson (CUST-00021 — Used Car Dealer Structuring)</option>
+                        <option value="CUST-00009">Ashley Miller (CUST-00009 — Synthetic Identity Risk)</option>
+                        <option value="CUST-00002">Anthony Gonzalez (CUST-00002 — Clean Baseline Salaried)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Quick Pick Preset Call Buttons -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+                <button class="quick-chip" onclick="quickSelectCallCustomer('CUST-00019')">⚡ Call Kimberly Henson (Mule Wire Drain)</button>
+                <button class="quick-chip" onclick="quickSelectCallCustomer('CUST-00015')">⚡ Call James Moran (CTR Cash Structuring)</button>
+                <button class="quick-chip" onclick="quickSelectCallCustomer('CUST-00021')">⚡ Call Mark Johnson (Used Car Dealer)</button>
+                <button class="quick-chip" onclick="quickSelectCallCustomer('CUST-00002')">⚡ Call Anthony Gonzalez (Clean Baseline)</button>
+            </div>
+
+            <!-- Interactive Call Container -->
+            <div class="call-container">
+                <!-- Video Persona Viewport -->
+                <div class="persona-viewport">
+                    <div class="persona-canvas-wrapper">
+                        <!-- Top HUD Overlay -->
+                        <div class="persona-overlay-top">
+                            <div class="security-badge">
+                                <span>🛡️</span>
+                                <span>VALIANT SECURE LINE | AGENT CLAIRE STERLING</span>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <div id="call-status-badge" class="badge badge-HIGH" style="font-size: 10px; background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4);">
+                                    DISCONNECTED
+                                </div>
+                                <div class="call-timer-badge" id="call-duration-timer">
+                                    <span>⏱️</span> <span id="call-timer-text">00:00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 60FPS Animated Persona Canvas -->
+                        <canvas id="persona-canvas" width="640" height="400"></canvas>
+
+                        <!-- Interruption Banner Notification -->
+                        <div id="call-interruption-alert" class="call-interruption-alert" style="display: none;">
+                            <span>⚡</span>
+                            <span><strong>Interrupted:</strong> Agent Sterling yielded to listen to customer</span>
+                        </div>
+
+                        <!-- Realistic Video Call Self-View Tile (Customer Picture-In-Picture) -->
+                        <div class="customer-pip-tile" id="customer-pip-tile">
+                            <div class="customer-pip-header">
+                                <span class="pip-live-dot" id="pip-live-dot"></span>
+                                <span id="customer-pip-name">You (Customer)</span>
+                                <span id="customer-pip-mic-badge" class="pip-mic-badge">🎤 Muted</span>
+                            </div>
+                            <div class="customer-pip-body">
+                                <div class="customer-avatar-render">
+                                    <div class="customer-avatar-circle">👤</div>
+                                </div>
+                                <div class="customer-pip-waves" id="customer-pip-waves">
+                                    <span></span><span></span><span></span><span></span><span></span>
+                                </div>
+                            </div>
+                            <div class="customer-pip-footer" id="customer-pip-footer">
+                                Click "Talk" or press Space
+                            </div>
+                        </div>
+
+                        <!-- Bottom HUD Overlay -->
+                        <div class="persona-overlay-bottom">
+                            <div id="call-live-captions" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(59, 130, 246, 0.3); backdrop-filter: blur(8px); padding: 8px 14px; border-radius: 6px; font-size: 12px; color: #f8fafc; max-width: 68%; line-height: 1.4;">
+                                <em>Click "Start Verification Call" to dial the customer.</em>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; pointer-events: auto;">
+                                <button id="btn-call-interrupt" class="call-btn-interrupt" style="display: none;" title="Interrupt Agent Claire Sterling (or press Spacebar)">
+                                    ⚡ Interrupt
+                                </button>
+                                <canvas id="waveform-canvas" width="130" height="32" class="waveform-canvas"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Call Control Bar -->
+                    <div class="call-controls-bar">
+                        <button id="btn-call-start" class="call-btn call-btn-primary">
+                            <span>📞</span> Start Verification Call
+                        </button>
+                        <select id="call-voice-select" class="call-select" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;" title="Select Neural Voice Persona">
+                            <option value="Aoede" selected>🎙️ Claire (Warm & Natural)</option>
+                            <option value="Kore">🎙️ Kore (Clear & Direct)</option>
+                            <option value="Puck">🎙️ Puck (Conversational Male)</option>
+                            <option value="Charon">🎙️ Charon (Senior Officer)</option>
+                        </select>
+                        <button id="btn-call-mic" class="call-btn call-btn-secondary call-btn-mic" disabled title="Click or Hold Spacebar to Speak">
+                            <span>🎤</span> Talk (Mic)
+                        </button>
+                        <button id="btn-call-interrupt-bar" class="call-btn call-btn-interrupt-bar" style="display: none;" title="Interrupt Agent Claire Sterling">
+                            <span>⚡</span> Interrupt
+                        </button>
+                        <button id="btn-call-duplex" class="call-btn call-btn-secondary call-btn-duplex" disabled title="Enable Hands-Free Live Call (Auto-interrupt when you speak)">
+                            <span>🎧</span> Hands-Free: Off
+                        </button>
+                        <button id="btn-call-audio-toggle" class="call-btn call-btn-secondary" title="Toggle Spoken Audio Output">
+                            <span>🔊</span> Audio: On
+                        </button>
+                        <button id="btn-call-end" class="call-btn call-btn-danger" style="display: none;">
+                            <span>🛑</span> End Call & Compile Dossier
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Side: Real-time Transcript & Plausibility HUD -->
+                <div class="transcript-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <div>
+                            <h3 style="font-size: 14px; font-weight: 700; color: var(--accent-blue);">Live Verification Telemetry</h3>
+                            <p style="font-size: 11px; color: var(--text-secondary);">Real-Time Plausibility & Evasiveness Analysis</p>
+                        </div>
+                        <span id="plausibility-verdict-badge" class="badge badge-MED" style="font-size: 11px;">
+                            AWAITING CALL
+                        </span>
+                    </div>
+
+                    <!-- Plausibility Gauge -->
+                    <div style="margin: 12px 0; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px;">
+                            <span>Customer Statement Plausibility</span>
+                            <strong id="plausibility-score-text" style="color: var(--tier-med);">75.0%</strong>
+                        </div>
+                        <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                            <div id="plausibility-bar" style="width: 75%; height: 100%; background: var(--tier-med); transition: all 0.3s;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px;">
+                            <span style="color: var(--text-muted);">Observed Demeanor: <strong id="customer-sentiment-text" style="color: var(--text-primary);">N/A</strong></span>
+                            <span style="color: var(--text-muted);">Agent Emotion: <strong id="agent-emotion-text" style="color: #38bdf8;">Warm & Reassuring 🌸</strong></span>
+                            <span style="color: #34d399;">🔒 Anti-Tipping-Off: 100% Compliant</span>
+                        </div>
+                    </div>
+
+                    <!-- Extracted Claims & Red Flags -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; font-size: 11px;">
+                        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; padding: 8px;">
+                            <div style="font-weight: 700; color: #34d399; margin-bottom: 4px;">Verified Claims (<span id="claims-count">0</span>)</div>
+                            <div id="extracted-claims-list" style="color: var(--text-secondary); max-height: 48px; overflow-y: auto;">None yet</div>
+                        </div>
+                        <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 6px; padding: 8px;">
+                            <div style="font-weight: 700; color: #f87171; margin-bottom: 4px;">Evasive / Red Flags (<span id="flags-count">0</span>)</div>
+                            <div id="evasive-flags-list" style="color: var(--text-secondary); max-height: 48px; overflow-y: auto;">None detected</div>
+                        </div>
+                    </div>
+
+                    <!-- Live Transcript Bubble Stream -->
+                    <div class="transcript-stream" id="call-transcript-stream">
+                        <div style="text-align: center; color: var(--text-muted); font-size: 12px; padding: 40px 10px;">
+                            Call not initiated. Select a customer and click "Start Verification Call" to begin dialogue.
+                        </div>
+                    </div>
+
+                    <!-- Customer Response Input & Quick Replies -->
+                    <div style="margin-top: auto; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                        <div style="display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 4px;" id="quick-replies-container">
+                            <button class="quick-chip" onclick="sendCustomerQuickReply('I sell used vehicles and customers pay me in cash for purchases.')">💬 "I sell used cars for cash"</button>
+                            <button class="quick-chip" onclick="sendCustomerQuickReply('I received that wire for freelance software consulting work.')">💬 "Freelance consulting work"</button>
+                            <button class="quick-chip" onclick="sendCustomerQuickReply('A friend asked me to transfer the money for them as a favor.')">💬 "A friend asked me as a favor"</button>
+                            <button class="quick-chip" onclick="sendCustomerQuickReply('Why are you asking me this? Is there a problem with my account?')">💬 "Why are you asking?"</button>
+                        </div>
+                        <form id="call-customer-input-form" style="display: flex; gap: 8px;">
+                            <input type="text" id="call-customer-text-input" placeholder="Type customer reply (or speak with Mic)..." disabled style="flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 12px; border-radius: 6px; font-size: 12px;">
+                            <button type="submit" id="btn-call-send" class="btn-magenta" disabled style="padding: 8px 16px; font-size: 12px; font-weight: 600;">
+                                Send
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Post-Call Interview Dossier Report Panel -->
+            <div id="post-call-dossier-panel" style="display: none; margin-top: 24px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 22px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                    <div>
+                        <h3 style="color: var(--accent-blue); font-size: 16px; text-transform: uppercase;">Formal Customer Verification Dossier</h3>
+                        <p style="color: var(--text-secondary); font-size: 12px;">Generated by Agent Claire Sterling & Gemini Audio Reasoning</p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="btn-copy-call-dossier" class="btn-pick-test">📋 Copy Dossier</button>
+                        <button id="btn-view-audit-dossier" class="btn-pick-test" style="border-color: #10b981; color: #10b981;">📜 View in Audit Trail</button>
+                    </div>
+                </div>
+                <div id="post-call-dossier-content" style="font-size: 13px; line-height: 1.6;"></div>
             </div>
         </div>
     </main>

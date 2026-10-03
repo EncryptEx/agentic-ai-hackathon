@@ -15,6 +15,8 @@ investigation_agent (Root Orchestrator)
 │   ├── ownership_agent     (Tools: get_ownership_structure, get_country_risk)
 │   └── risk_agent          (Tools: get_risk_assessment, get_customer_profile, get_country_risk, get_ownership_structure)
 └── consolidator_agent     (Synthesizes specialist findings into 11-section report with Case Overview & Action Checklist)
+
+executive_summary_agent     (Synthesizes findings into concise 1-page Executive Decision Briefing for human leadership)
 ```
 
 ### Critical Domain Guardrails

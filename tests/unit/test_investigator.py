@@ -25,6 +25,7 @@ import pytest
 from app.agent import (
     consolidator_agent,
     customer_agent,
+    executive_summary_agent,
     fraud_agent,
     investigation_pipeline,
     ownership_agent,
@@ -32,8 +33,10 @@ from app.agent import (
     root_agent,
     transaction_agent,
 )
+from app.alert_feed import generate_executive_summary_report
 from app.tools import (
     CUSTOMER_TOOLS,
+    EXECUTIVE_SUMMARY_TOOLS,
     FRAUD_TOOLS,
     OWNERSHIP_TOOLS,
     RISK_TOOLS,
@@ -254,6 +257,7 @@ class TestAgentArchitecture:
             ownership_agent,
             risk_agent,
             consolidator_agent,
+            executive_summary_agent,
         ]:
             assert "SYNTHETIC" in agent.instruction
             assert "human investigator" in agent.instruction.lower()
@@ -265,6 +269,47 @@ class TestAgentArchitecture:
         assert "Investigation Trigger / Rationale" in consolidator_agent.instruction
         assert "Primary Typologies Identified" in consolidator_agent.instruction
         assert "Executive Synopsis" in consolidator_agent.instruction
+
+    def test_executive_summary_agent_architecture(self) -> None:
+        """Verify executive_summary_agent setup, tools, and decision-briefing sections."""
+        assert executive_summary_agent.name == "executive_summary_agent"
+        assert executive_summary_agent.tools == EXECUTIVE_SUMMARY_TOOLS
+        assert set(executive_summary_agent.tools) == {
+            get_customer_profile,
+            get_risk_assessment,
+            get_transaction_alerts,
+            get_fraud_alerts,
+            analyze_transactions,
+        }
+        # Check core decision-briefing sections in prompt
+        assert "Bottom Line Up Front (BLUF)" in executive_summary_agent.instruction
+        assert "Case & Subject Snapshot" in executive_summary_agent.instruction
+        assert "FRAML Risk Profile & Scores" in executive_summary_agent.instruction
+        assert "Critical Red Flags & Primary Typologies" in executive_summary_agent.instruction
+        assert "Financial Exposure & Impact" in executive_summary_agent.instruction
+        assert "Immediate Recommended Action" in executive_summary_agent.instruction
+        assert "Human Governance & Compliance Authority" in executive_summary_agent.instruction
+
+    def test_generate_executive_summary_report(self) -> None:
+        """Verify deterministic executive summary generation for high-risk and baseline customers."""
+        # Structuring customer CUST-00015
+        summary_c15 = generate_executive_summary_report("CUST-00015")
+        assert "EXECUTIVE BRIEFING" in summary_c15
+        assert "Bottom Line Up Front (BLUF)" in summary_c15
+        assert "CASE-CUST-00015" in summary_c15
+        assert "FRAML Risk Profile & Scores" in summary_c15
+        assert "CRITICAL" in summary_c15 or "HIGH" in summary_c15
+        assert "Financial Exposure & Impact" in summary_c15
+        assert "Immediate Recommended Action" in summary_c15
+        assert "Human Governance & Compliance Authority" in summary_c15
+        assert "SYNTHETIC" in summary_c15
+
+        # Clean baseline customer CUST-00002
+        summary_c2 = generate_executive_summary_report("CUST-00002")
+        assert "EXECUTIVE BRIEFING" in summary_c2
+        assert "Bottom Line Up Front (BLUF)" in summary_c2
+        assert "CASE-CUST-00002" in summary_c2
+        assert "LOW" in summary_c2
 
     def test_investigation_audit_trail_and_sign_off(self) -> None:
         """Verify immutable audit logging, SHA-256 digest computation, and officer sign-off."""

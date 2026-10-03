@@ -120,9 +120,30 @@ agents never see them. `data/impact/impact-20261003-165251.json` has every row.
 | CUST-00085 | 301,888 | 130,338 | -57% |
 | Total | 1,385,051 | 380,197 | **-72.5%** |
 
-Caveats: three customers, one run each; output tokens did not fall; the reports cited somewhat different sets of
-transaction IDs (before/after IDs in common: 23 of 35/25, 27 of 34/27, 23 of 26/33), so quality equivalence is **not**
-proven. A paired quality check with repeated runs is the next step before claiming it as a pure saving.
+**Paired quality check (repeated runs).** 5 customers x 3 repeats, code before vs after the cleanup, run from frozen
+code snapshots; 28 of 30 runs produced usable output (14 per side).
+
+| Check (mean per case file) | Before | After |
+|---|---|---|
+| Prompt tokens | 463,576 | 125,588 (**-73%**, every customer between -68% and -78%) |
+| Output tokens | 11,837 | 11,976 |
+| Triggered alert rule IDs mentioned | 100% | 100% |
+| Composite risk score and tier stated correctly | 100% | 100% |
+| Transaction IDs cited that do not exist for the customer | 0 | 0 |
+| Required sections present (of 12) | 12 | 12 |
+| Transaction IDs cited | 22.3 | 14.9 (-33%) |
+| Report length (characters) | 18,730 | 17,892 (-4%) |
+
+A blind pairwise judge (Gemini, shown the bank-tool ground truth, order randomised) over 14 paired case files chose the
+reduced version 7 times, called 6 a tie, and chose the original once. Cited-ID overlap between a before-run and an
+after-run (0.57) is close to the overlap between two before-runs (0.60), so most of that difference is ordinary
+run-to-run variation.
+
+Caveats: the reduced version cites about a third fewer transaction IDs. The likely cause is that agents now read a
+bounded, prioritized page of transactions instead of the full history, so reports point to fewer individual records.
+Facts the checks can verify did not degrade, but if per-transaction citation density matters to the reviewer,
+raise the page size in `get_transaction_evidence`. Five customers is still a small sample, and the ground-truth checks
+are narrower than a human expert's review.
 
 ## 6. What it costs, and what it saves
 
@@ -148,7 +169,7 @@ What to take from it:
 3. **Jev trades more false alerts for more attacks caught.** In this sample that is 6 more wasted reviews
    (about 112 USD at the assumed review cost) against about 94,000 USD of attack value no longer missed.
 4. **Context cleanup cut the model cost of a case file by about 60%** (input tokens fell 72.5%, output unchanged),
-   subject to the quality caveat above.
+   with the facts the checks can verify unchanged (section 5.5).
 
 Scaling these to a portfolio is not valid from this sample: it is enriched with attacks (74 of 106 candidate
 transactions are flagged), so real-world alert volumes and rates will differ.
@@ -170,4 +191,4 @@ transactions are flagged), so real-world alert volumes and rates will differ.
 - Agent decisions equal policy by construction; agent value is in the case file, which is not yet scored.
 - Prices and analyst costs are placeholders.
 - Jev's per-call price is unknown and counted as zero.
-- Context cleanup quality is unverified on repeated runs.
+- Context cleanup was checked on 5 customers with automated checks and a model judge, not by a human expert.

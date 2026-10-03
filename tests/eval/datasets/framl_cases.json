@@ -1,0 +1,89 @@
+{
+  "eval_dataset_id": "framl_benchmark_v1",
+  "eval_cases": [
+    {
+      "eval_case_id": "eval_cust00015_structuring",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Investigate customer CUST-00015 (James Moran) for suspicious financial activity and potential AML structuring violations."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Investigation of customer CUST-00015 (James Moran), a UK-based Used Car Dealer assigned the STRUCTURING_CASH_OPERATOR archetype, confirms critical AML risk: composite FRAML score of 86.5 (CRITICAL tier). Key evidence includes alert TM-01 (inbound cash deposits in the $7,500–$9,999 band evading the $10,000 CTR threshold) and alert TM-03 (actual monthly turnover exceeding declared baseline by over 4x). Recommends SAR filing and account restrictions. Synthetic data and human compliance officer disclaimers included."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "eval_cust00002_clean_salaried",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Perform a financial crime and KYC review for customer CUST-00002 (Anthony Gonzalez). Are there any indicators of money laundering or fraud?"
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Customer CUST-00002 (Anthony Gonzalez) is a Software Engineer residing in Australia with the DOMESTIC_SALARIED_LOW_RISK archetype. Scored at LOW risk tier with zero triggered transaction monitoring alerts, clean watchlist screening (no PEP, no sanctions, no adverse media), and no fraud telemetry anomalies. Recommends standard periodic KYC review. No SAR filing or restrictions warranted."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "eval_cust00019_student_mule",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Conduct an anti-money laundering investigation on customer CUST-00019 (Kimberly Henson) for potential money mule or pass-through activity."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Customer CUST-00019 (Kimberly Henson) is a 19-year-old student classified under the STUDENT_MONEY_MULE archetype. Scored at CRITICAL tier (score 86.5). Key findings include alert TM-02 (rapid movement of funds: inbound wire rapidly dissipated >85% within 48 hours to offshore/crypto ramps), alert TM-03 (turnover drastically exceeding student baseline), and alert TM-05 (high-risk corridor exposure). Recommends immediate SAR filing and account freezing."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "eval_cust00033_adverse_media",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Investigate customer CUST-00033 (Kimberly Reed) regarding negative news, watchlist hits, and regulatory risk."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "Customer CUST-00033 (Kimberly Reed) is flagged under the ADVERSE_MEDIA_FINANCIAL_CRIME archetype. Watchlist screening confirmed a derogatory adverse media hit for Financial Crime in an international regulatory dossier. Composite score in HIGH tier requiring formal Enhanced Due Diligence (EDD) review, source-of-wealth proof collection, and ongoing transaction monitoring."
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -20,18 +20,24 @@ import contextlib
 from datetime import datetime
 import json
 import os
+import csv
+import asyncio
 from collections.abc import AsyncIterator
 from typing import Any, Dict, Optional
 
 from a2a.server.tasks import InMemoryTaskStore
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from google.adk.cli.fast_api import get_fast_api_app
 from google.adk.runners import Runner
 from pydantic import BaseModel
+
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.alert_feed import AlertDispatcher
 from app.app_utils import services
@@ -61,6 +67,7 @@ from generator.scenarios import (
 )
 from generator.transaction_generator import TransactionGenerator
 from engine.risk_engine import RiskEngine
+from evidencetrail.fastapi_routes import router as evidencetrail_router
 from models.customer import AdverseMedia, CustomerProfile, PEPStatus, SanctionStatus
 from models.transaction import Transaction, TransactionDirection, TransactionType
 from storage.database import DatabaseManager
@@ -72,11 +79,13 @@ allow_origins = (
 otel_to_cloud = False
 
 AGENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STATIC_DIR = os.path.join(AGENT_DIR, "web", "static")
 EXPORTS_DIR = os.path.join(AGENT_DIR, "exports")
 VISUALIZATION_PATH = os.path.join(AGENT_DIR, "web", "visualization.html")
-SENTINEL_PATH = os.path.join(AGENT_DIR, "web", "Financialcrime.html") if os.path.exists(os.path.join(AGENT_DIR, "web", "Financialcrime.html")) else os.path.join(AGENT_DIR, "Financialcrime.html")
+SENTINEL_PATH = os.path.join(AGENT_DIR, "web", "sentinel.html") if os.path.exists(os.path.join(AGENT_DIR, "web", "sentinel.html")) else (os.path.join(AGENT_DIR, "web", "Financialcrime.html") if os.path.exists(os.path.join(AGENT_DIR, "web", "Financialcrime.html")) else os.path.join(AGENT_DIR, "Financialcrime.html"))
+REALTIME_PATH = os.path.join(AGENT_DIR, "web", "realtime.html")
+UNIFIED_PATH = os.path.join(AGENT_DIR, "web", "dashboard.html")
 LIVE_STREAM_HTML_PATH = os.path.join(AGENT_DIR, "web", "live_stream.html")
+TRANSACTIONS_CSV = os.path.join(EXPORTS_DIR, "transactions.csv")
 
 # Sentinel Live Stream & Autonomous Agent Interrogation Layer
 import uuid
@@ -88,6 +97,27 @@ from app.live_agent.database import DatabaseInformationService
 ACTIVE_AGENT_RUNS: Dict[str, AgentRun] = {}
 RUNS: Dict[str, Dict[str, Any]] = {}
 
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception:
+                pass
+
+manager = ConnectionManager()
 
 
 @contextlib.asynccontextmanager
@@ -115,13 +145,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app: FastAPI = get_fast_api_app(
     agents_dir=AGENT_DIR,
-    web=True,
+    web=False,
     artifact_service_uri=services.ARTIFACT_SERVICE_URI,
     allow_origins=allow_origins,
     session_service_uri=services.SESSION_SERVICE_URI,
     otel_to_cloud=otel_to_cloud,
     lifespan=lifespan,
 )
+app.include_router(evidencetrail_router)  # EvidenceTrail investigations, experiments and alert queue
 app.title = "Financial Crime Investigation Platform (FRAML)"
 app.description = "API and Autonomous Multi-Agent System for KYC, AML, & Fraud Compliance"
 
@@ -564,7 +595,27 @@ async def investigate_customer(req: InvestigateRequest, request: Request):
     if req.alert_id and final_report:
         dispatcher.mark_alert_investigated(req.alert_id, notes=final_report[:500])
 
+    # Log to immutable audit ledger with SHA-256 integrity hash
+    db = DatabaseManager()
+    inv_id = db.log_investigation({
+        "customer_id": cust_id,
+        "customer_name": packet.get("customer_name"),
+        "trigger_alert_id": req.alert_id,
+        "trigger_rule": (packet.get("trigger_alert") or {}).get("rule_name", "Manual Risk Review"),
+        "risk_tier": packet.get("risk_tier"),
+        "composite_score": packet.get("composite_score", 0.0),
+        "model_version": "gemini-3.8-flash",
+        "raw_prompt": prompt,
+        "final_report_text": final_report,
+        "officer_sign_off_status": "PENDING",
+    })
+    log_record = db.get_investigation_audit_log(inv_id)
+    report_sha256 = log_record.get("final_report_sha256") if log_record else ""
+
     return {
+        "investigation_id": inv_id,
+        "report_sha256": report_sha256,
+        "officer_sign_off_status": "PENDING",
         "customer_id": cust_id,
         "customer_name": packet["customer_name"],
         "archetype": packet["archetype"],
@@ -575,35 +626,79 @@ async def investigate_customer(req: InvestigateRequest, request: Request):
     }
 
 
+class SignOffRequest(BaseModel):
+    investigation_id: str
+    officer_name: str
+    decision: str
+    notes: Optional[str] = None
+    action_taken: Optional[str] = None
+
+
+@app.post("/api/investigations/sign-off")
+async def sign_off_investigation(req: SignOffRequest):
+    """Records human compliance officer sign-off and rationale for an investigation."""
+    db = DatabaseManager()
+    ok = db.update_audit_sign_off(
+        investigation_id=req.investigation_id,
+        officer_sign_off_status=req.decision,
+        officer_name=req.officer_name,
+        officer_notes=req.notes,
+        officer_action_taken=req.action_taken or req.decision
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Investigation {req.investigation_id} not found")
+    updated = db.get_investigation_audit_log(req.investigation_id)
+    return {"status": "success", "audit_log": updated}
+
+
+@app.get("/api/investigations/audit-trail")
+async def get_audit_trail(customer_id: Optional[str] = None, limit: int = 50):
+    """Retrieves immutable audit logs for compliance reviews, optionally filtered by customer."""
+    db = DatabaseManager()
+    return db.get_investigation_audit_logs(customer_id=customer_id, limit=limit)
+
+
+@app.get("/api/investigations/{investigation_id}")
+async def get_investigation_detail(investigation_id: str):
+    """Retrieves a single investigation audit log and its SHA-256 integrity verification."""
+    db = DatabaseManager()
+    log = db.get_investigation_audit_log(investigation_id)
+    if not log:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    return log
+
+
 # --------------------------------------------------------------------------
 # Web Dashboard & Visualizer
 # --------------------------------------------------------------------------
 
-if os.path.exists(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+INVESTIGATOR_PATH = os.path.join(AGENT_DIR, "web", "investigator.html")
+INVESTIGATOR_JS_PATH = os.path.join(AGENT_DIR, "web", "investigator.js")
 
 
-@app.get("/style.css")
-async def serve_style():
-    """Serve style.css directly for root-level dashboard requests."""
-    return FileResponse(os.path.join(STATIC_DIR, "style.css"), media_type="text/css")
+@app.get("/investigator", response_class=HTMLResponse)
+async def serve_investigator():
+    """EvidenceTrail Investigator (also shown as a tab of the unified dashboard)."""
+    if os.path.exists(INVESTIGATOR_PATH):
+        with open(INVESTIGATOR_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Investigator page missing</h1>", status_code=404)
 
 
-@app.get("/app.js")
-async def serve_app_js():
-    """Serve app.js directly for root-level dashboard requests."""
-    return FileResponse(os.path.join(STATIC_DIR, "app.js"), media_type="application/javascript")
+@app.get("/investigator.js")
+async def serve_investigator_js():
+    """Script for the Investigator page."""
+    return FileResponse(INVESTIGATOR_JS_PATH, media_type="application/javascript")
 
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/dashboard", response_class=HTMLResponse)
 async def serve_dashboard():
     """Interactive compliance monitoring dashboard."""
-    index_path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
+    if os.path.exists(UNIFIED_PATH):
+        with open(UNIFIED_PATH, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    return HTMLResponse("<h1>Compliance Dashboard static files missing</h1>", status_code=404)
+    return HTMLResponse("<h1>Unified Dashboard file missing</h1>", status_code=404)
 
 
 @app.get("/visualizer", response_class=HTMLResponse)
@@ -629,7 +724,6 @@ async def serve_sentinel():
 # --------------------------------------------------------------------------
 
 @app.get("/live-stream", response_class=HTMLResponse)
-@app.get("/investigator", response_class=HTMLResponse)
 async def serve_live_stream():
     """Sentinel Real-Time Live Streaming & Autonomous Agent Interrogation Console."""
     if os.path.exists(LIVE_STREAM_HTML_PATH):
@@ -820,7 +914,57 @@ async def test_repeatability(payload: Dict[str, Any]):
     }
 
 
+@app.get("/realtime", response_class=HTMLResponse)
+async def serve_realtime():
+    """Realtime stream visualizer."""
+    if os.path.exists(REALTIME_PATH):
+        with open(REALTIME_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Realtime file missing</h1>", status_code=404)
+
+
+@app.get("/unified", response_class=HTMLResponse)
+async def serve_unified():
+    """Unified dashboard."""
+    if os.path.exists(UNIFIED_PATH):
+        with open(UNIFIED_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Unified dashboard file missing</h1>", status_code=404)
+
+
+@app.websocket("/ws/transactions")
+async def websocket_transactions(websocket: WebSocket, speed_ms: int = 1000):
+    """
+    WebSocket endpoint that streams rows from the transactions CSV.
+    :param speed_ms: Time in milliseconds to wait between sending each row (simulating real-time).
+    """
+    await manager.connect(websocket)
+    try:
+        if not os.path.exists(TRANSACTIONS_CSV):
+            await websocket.send_text(json.dumps({"error": f"Data file {TRANSACTIONS_CSV} not found."}))
+            return
+
+        with open(TRANSACTIONS_CSV, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            # Send events iteratively
+            for row in reader:
+                # We could perform sorting by timestamp if needed, but for now we stream as-is
+                payload = json.dumps(row)
+                await websocket.send_text(payload)
+                await asyncio.sleep(speed_ms / 1000.0)
+                
+        await websocket.send_text(json.dumps({"status": "Stream completed."}))
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        manager.disconnect(websocket)
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.fast_api_app:app", host="0.0.0.0", port=8000, reload=True)
-
+    import sys
+    port = 8000
+    if len(sys.argv) > 1 and sys.argv[1] == "--port":
+        port = int(sys.argv[2])
+    # Disable the dev server in the get_fast_api_app config above by setting web=False
+    uvicorn.run("app.fast_api_app:app", host="0.0.0.0", port=port, reload=True)

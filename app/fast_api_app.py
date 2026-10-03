@@ -29,7 +29,7 @@ from a2a.server.tasks import InMemoryTaskStore
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from google.adk.cli.fast_api import get_fast_api_app
 from google.adk.runners import Runner
@@ -85,6 +85,7 @@ SENTINEL_PATH = os.path.join(AGENT_DIR, "web", "sentinel.html") if os.path.exist
 REALTIME_PATH = os.path.join(AGENT_DIR, "web", "realtime.html")
 UNIFIED_PATH = os.path.join(AGENT_DIR, "web", "dashboard.html")
 LIVE_STREAM_HTML_PATH = os.path.join(AGENT_DIR, "web", "live_stream.html")
+ADK_WORKFLOW_PATH = os.path.join(AGENT_DIR, "web", "adk_workflow.html")
 TRANSACTIONS_CSV = os.path.join(EXPORTS_DIR, "transactions.csv")
 
 # Sentinel Live Stream & Autonomous Agent Interrogation Layer
@@ -1083,6 +1084,187 @@ async def websocket_transactions(websocket: WebSocket, speed_ms: int = 1000):
         manager.disconnect(websocket)
     except Exception as e:
         manager.disconnect(websocket)
+
+
+# --------------------------------------------------------------------------
+# Google ADK Agent Workflow Studio & Dev UI
+# --------------------------------------------------------------------------
+
+@app.get("/adk-workflow", response_class=HTMLResponse)
+async def serve_adk_workflow():
+    """Google ADK Multi-Agent Workflow studio (integrated tab in the unified dashboard)."""
+    if os.path.exists(ADK_WORKFLOW_PATH):
+        with open(ADK_WORKFLOW_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>ADK Workflow page missing</h1>", status_code=404)
+
+
+@app.get("/api/adk/agents")
+async def api_get_adk_agents():
+    """List metadata for all Google ADK specialist agents."""
+    from app import agent as adk_agents
+    specialists = [
+        adk_agents.customer_agent,
+        adk_agents.transaction_agent,
+        adk_agents.fraud_agent,
+        adk_agents.ownership_agent,
+        adk_agents.risk_agent,
+        adk_agents.consolidator_agent,
+    ]
+    return [
+        {
+            "name": "all",
+            "title": "⚡ Complete Investigation Pipeline",
+            "role": "Orchestrates all 5 specialist agents in sequence followed by Consolidator synthesis",
+            "tools": [],
+        }
+    ] + [
+        {
+            "name": a.name,
+            "title": a.name.replace("_", " ").title(),
+            "role": a.description,
+            "tools": [getattr(t, "__name__", str(t)) for t in (a.tools or [])],
+        }
+        for a in specialists
+    ]
+
+
+class ADKChatStreamRequest(BaseModel):
+    message: str
+    agent_target: Optional[str] = "all"
+    customer_id: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+@app.post("/api/adk/chat/stream")
+async def api_adk_chat_stream(req: ADKChatStreamRequest, request: Request):
+    """Interactive streaming chat with Google ADK agents and real-time tool execution tracking."""
+    import re
+    from google.genai import types
+    from app import agent as adk_agents
+    from google.adk.apps import App
+    from app.alert_feed import generate_specialist_investigation_report
+
+    prompt = req.message.strip()
+    target = req.agent_target or "all"
+    cust_id = (req.customer_id or "").upper().strip()
+
+    if not cust_id:
+        m = re.search(r"CUST-\d{5}", prompt.upper())
+        if m:
+            cust_id = m.group(0)
+
+    # Determine runner
+    if target in ("all", "investigation_agent", "pipeline"):
+        runner = getattr(request.app.state, "runner", None)
+        adk_app_name = getattr(request.app.state, "agent_app_name", "app")
+        if not runner:
+            runner = Runner(
+                app=adk_agents.app,
+                session_service=services.get_session_service(),
+                artifact_service=services.get_artifact_service(),
+                auto_create_session=True,
+            )
+            adk_app_name = adk_agents.app.name
+    else:
+        specialist_map = {
+            "customer_agent": adk_agents.customer_agent,
+            "transaction_agent": adk_agents.transaction_agent,
+            "fraud_agent": adk_agents.fraud_agent,
+            "ownership_agent": adk_agents.ownership_agent,
+            "risk_agent": adk_agents.risk_agent,
+            "consolidator_agent": adk_agents.consolidator_agent,
+        }
+        sp_agent = specialist_map.get(target, adk_agents.root_agent)
+        temp_app = App(root_agent=sp_agent, name=f"app_{sp_agent.name}")
+        runner = Runner(
+            app=temp_app,
+            session_service=services.get_session_service(),
+            artifact_service=services.get_artifact_service(),
+            auto_create_session=True,
+        )
+        adk_app_name = temp_app.name
+
+    async def event_generator():
+        session_id = req.session_id
+        if not session_id or not runner or not runner.session_service:
+            try:
+                sess = await runner.session_service.create_session(
+                    app_name=adk_app_name,
+                    user_id="compliance_dashboard"
+                )
+                session_id = sess.id
+            except Exception:
+                session_id = f"sess_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        yield f"data: {json.dumps({'type': 'init', 'session_id': session_id, 'agent_target': target})}\n\n"
+
+        start_agent = "customer_agent" if target in ("all", "investigation_agent", "pipeline") else target
+        yield f"data: {json.dumps({'type': 'agent_start', 'agent': start_agent})}\n\n"
+
+        executed_tools = 0
+        current_agent = start_agent
+
+        try:
+            new_message = types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            )
+            async for event in runner.run_async(
+                user_id="compliance_dashboard",
+                session_id=session_id,
+                new_message=new_message,
+            ):
+                author = getattr(event, "author", None) or current_agent
+                if author != current_agent:
+                    yield f"data: {json.dumps({'type': 'agent_done', 'agent': current_agent})}\n\n"
+                    yield f"data: {json.dumps({'type': 'agent_start', 'agent': author})}\n\n"
+                    current_agent = author
+
+                content = getattr(event, "content", None)
+                parts = getattr(content, "parts", []) if content else []
+                for part in parts:
+                    if hasattr(part, "function_call") and part.function_call:
+                        fc = part.function_call
+                        executed_tools += 1
+                        args_dict = dict(fc.args) if fc.args else {}
+                        yield f"data: {json.dumps({'type': 'tool_call', 'agent': author, 'tool': fc.name, 'args': args_dict})}\n\n"
+                    elif hasattr(part, "function_response") and part.function_response:
+                        fr = part.function_response
+                        resp_str = str(fr.response)[:350] if fr.response else ""
+                        yield f"data: {json.dumps({'type': 'tool_response', 'agent': author, 'tool': fr.name, 'summary': resp_str})}\n\n"
+                    elif hasattr(part, "text") and part.text:
+                        yield f"data: {json.dumps({'type': 'agent_text', 'agent': author, 'text': part.text})}\n\n"
+
+            yield f"data: {json.dumps({'type': 'agent_done', 'agent': current_agent})}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'tool_call', 'agent': current_agent, 'tool': 'data_fallback_synthesis', 'args': {'customer_id': cust_id}})}\n\n"
+            if cust_id:
+                fb_report = generate_specialist_investigation_report(cust_id)
+                yield f"data: {json.dumps({'type': 'agent_text', 'agent': current_agent, 'text': fb_report})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'agent_text', 'agent': current_agent, 'text': f'Unable to complete investigation: {e}. Please ensure customer ID is provided.'})}\n\n"
+            yield f"data: {json.dumps({'type': 'agent_done', 'agent': current_agent})}\n\n"
+
+        yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'total_tools': executed_tools})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# Mount official Google ADK Web UI assets under /dev-ui/
+import google.adk.cli
+_adk_browser_dir = os.path.join(os.path.dirname(google.adk.cli.__file__), "browser")
+if os.path.exists(_adk_browser_dir):
+    @app.get("/dev-ui/assets/config/runtime-config.json")
+    async def get_adk_runtime_config():
+        return JSONResponse({"backendUrl": "", "telemetry": False}, headers={"Cache-Control": "no-store"})
+
+    @app.get("/dev-ui")
+    async def redirect_dev_ui():
+        return RedirectResponse("/dev-ui/")
+
+    app.mount("/dev-ui", StaticFiles(directory=_adk_browser_dir, html=True), name="adk_dev_ui")
 
 
 if __name__ == "__main__":

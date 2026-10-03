@@ -194,9 +194,10 @@ class DialecticDebateEngine:
                 "statement": (
                     "I challenge Agent TM's mule indictment. Hardware telemetry confirms the transaction originated "
                     "from the customer's verified personal iPhone (Device ID #D-8821), authenticated with TouchID/FaceID biometrics. "
-                    "However, interaction cadence shows abnormal typing velocity, late-night session initiation (02:18 UTC), "
+                    "Furthermore, TypeSafe Jev Reasoner evaluation (`assess_with_jev`) confirms elevated recipient risk (0.99) "
+                    "coupled with severe social engineering duress. Interaction cadence shows abnormal typing velocity, late-night session initiation (02:18 UTC), "
                     "and narrative references citing 'Safe Haven Liquidity Holding'. This is textbook APP Coercion (FR-03) "
-                    "where a genuine customer is actively manipulated under urgent psychological duress."
+                    "where a genuine customer is actively manipulated under urgent psychological manipulation."
                 ),
             })
             transcript.append({
@@ -212,8 +213,8 @@ class DialecticDebateEngine:
                 "round": "Round 4: Arbiter Final Decree",
                 "speaker": "Senior Tribunal Arbiter (Arbiter Agent)",
                 "statement": (
-                    f"TRIBUNAL RULING: Overriding Money Mule designation. Evidence establishes by clear preponderance "
-                    f"that {name} is an APP Scam Coerced Victim under severe social engineering manipulation. "
+                    f"TRIBUNAL RULING: Overriding Money Mule designation based on corroborated Jev Reasoner findings and biometric continuity. "
+                    f"Evidence establishes by clear preponderance that {name} is an APP Scam Coerced Victim under severe social engineering manipulation. "
                     "Action converted from Criminal Prosecution SAR to Emergency Protective Escrow Intercept."
                 ),
             })
@@ -231,8 +232,8 @@ class DialecticDebateEngine:
                 confidence_pct=94.2,
                 recommended_action="PROTECTIVE_ESCROW_HOLD_AND_VICTIM_INTERVENTION",
                 resolution_rationale=(
-                    "Biometric continuity and genuine device fingerprinting combined with late-night coercive pressure "
-                    "and zero beneficiary kickbacks definitively refute intentional mule status. Customer is a victim."
+                    "TypeSafe Jev Reasoner findings, biometric continuity, and genuine device fingerprinting combined with "
+                    "late-night coercive pressure and zero beneficiary kickbacks definitively refute intentional mule status. Customer is an innocent victim."
                 ),
             )
 

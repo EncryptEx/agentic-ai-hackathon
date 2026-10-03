@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valiant Bank - FRAML Live Stream</title>
+    <!-- Use Tailwind for layout, but custom CSS for the Valiant Bank look -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-body: #090d16;
+            --bg-surface: #101726;
+            --bg-card: #172033;
+            --bg-card-hover: #1e2b45;
+            --border-subtle: #24324d;
+            --border-focus: #3b82f6;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --tier-low: #10b981;
+            --tier-med: #f59e0b;
+            --tier-high: #ef4444;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand-icon {
+            font-size: 1.5rem;
+            margin-right: 0.75rem;
+        }
+
+        .brand h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .badge-live {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--tier-high);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            text-transform: uppercase;
+            animation: pulse-border 2s infinite;
+        }
+
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            padding: 1.5rem 2rem;
+        }
+
+        .kpi-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+
+        .kpi-label {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+        
+        .kpi-sub {
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+        }
+
+        .stream-container {
+            padding: 0 2rem 2rem 2rem;
+        }
+
+        .table-container {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background-color: var(--bg-card);
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 0.875rem;
+            font-family: var(--font-mono);
+        }
+
+        tr {
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        tr:hover {
+            background-color: var(--bg-card-hover);
+        }
+
+        .status-raw {
+            background: rgba(148, 163, 184, 0.15);
+            color: var(--text-muted);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .row-enter {
+            animation: flash 1s ease-out;
+        }
+
+        @keyframes flash {
+            0% { background-color: rgba(59, 130, 246, 0.2); }
+            100% { background-color: transparent; }
+        }
+
+        /* Modal Overrides */
+        #txn-modal .modal-bg {
+            background-color: var(--bg-body);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+        }
+        
+        #txn-modal .modal-header {
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        #txn-modal .section-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+        }
+
+        #txn-modal dt { color: var(--text-muted); }
+        #txn-modal dd { color: var(--text-main); font-family: var(--font-mono); }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="brand flex items-center">
+            <div class="brand-icon">🛡️</div>
+            <div>
+                <h1>VALIANT BANK FRAML PLATFORM <span class="badge-live">Live Stream</span></h1>
+                <p class="text-xs text-gray-500 mt-1">Raw Synthetic Transaction Ingestion Layer</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center">
+                <div id="status-indicator" class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                <span id="status-text" class="text-sm font-mono text-gray-400">Disconnected</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <label for="speed" class="text-sm text-gray-400 font-mono">Speed (ms):</label>
+                <input type="number" id="speed" value="500" class="w-20 rounded bg-gray-800 border-gray-700 text-white px-2 py-1 text-sm border font-mono" />
+                <button id="reconnect-btn" class="bg-blue-600 text-white px-4 py-1.5 rounded hover:bg-blue-700 text-sm transition font-medium">Reconnect</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Events Processed</div>
+                <div class="kpi-value" id="kpi-count">0</div>
+                <div class="kpi-sub">Total transactions received</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Total Volume (USD)</div>
+                <div class="kpi-value text-blue-400" id="kpi-volume">$0.00</div>
+                <div class="kpi-sub">Gross monetary flow</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Active Agents</div>
+                <div class="kpi-value text-purple-400">0</div>
+                <div class="kpi-sub">Awaiting Swarm Connection</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Connection String</div>
+                <div class="text-xs font-mono text-gray-400 mt-2 break-all" id="ws-url">ws://...</div>
+            </div>
+        </section>
+
+        <section class="stream-container">
+            <div class="table-container shadow-2xl">
+                <div class="overflow-x-auto max-h-[60vh]">
+                    <table>
+                        <thead class="sticky top-0 shadow-md">
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Txn ID</th>
+                                <th>Amount</th>
+                                <th>Type</th>
+                                <th>Counterparty</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transaction-body">
+                            <!-- Rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Transaction Detail Modal -->
+    <div id="txn-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center z-50 p-4">
+        <div class="modal-bg rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+            <div class="modal-header px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-bold flex items-center" id="modal-title">
+                    Transaction Details
+                </h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl font-bold focus:outline-none">&times;</button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-grow" id="modal-content">
+                <!-- Content injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let transactionCache = {};
+        let totalCount = 0;
+        let totalVolume = 0;
+
+        const tbody = document.getElementById("transaction-body");
+        const statusIndicator = document.getElementById("status-indicator");
+        const statusText = document.getElementById("status-text");
+        const urlDisplay = document.getElementById("ws-url");
+        
+        function connect() {
+            if (ws) {
+                ws.close();
+            }
+            
+            const speed = document.getElementById("speed").value || 500;
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const wsUrl = `${protocol}//${window.location.host}/ws/transactions?speed_ms=${speed}`;
+            urlDisplay.textContent = wsUrl;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                statusIndicator.classList.replace("bg-red-500", "bg-green-500");
+                statusIndicator.classList.replace("bg-yellow-500", "bg-green-500");
+                statusText.textContent = "Streaming";
+                tbody.innerHTML = "";
+                transactionCache = {};
+                totalCount = 0;
+                totalVolume = 0;
+                updateKPIs();
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.error || data.status) {
+                    if (data.status === "Stream completed.") {
+                        statusIndicator.classList.replace("bg-green-500", "bg-yellow-500");
+                        statusText.textContent = "EOF Reached";
+                    }
+                    return;
+                }
+                
+                // Update KPIs
+                totalCount++;
+                totalVolume += parseFloat(data.amount_usd || 0);
+                updateKPIs();
+
+                // Store in cache
+                transactionCache[data.transaction_id] = data;
+                
+                const row = document.createElement("tr");
+                row.className = `row-enter`;
+                row.onclick = () => showTransactionDetails(data.transaction_id);
+                
+                const amountFormatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: data.currency || 'USD' }).format(data.amount_usd);
+                
+                row.innerHTML = `
+                    <td class="text-gray-400">${data.timestamp.split('T')[1].substring(0,8)}</td>
+                    <td class="text-blue-400">${data.transaction_id}</td>
+                    <td class="text-white font-mono">${amountFormatted}</td>
+                    <td class="text-gray-300">${data.transaction_type}</td>
+                    <td class="text-gray-400">${data.counterparty_name || '-'}</td>
+                    <td><span class="status-raw">Pending Analysis</span></td>
+                `;
+                
+                tbody.insertBefore(row, tbody.firstChild);
+                
+                if (tbody.children.length > 50) {
+                    const lastRow = tbody.lastChild;
+                    const txnId = lastRow.cells[1].textContent;
+                    delete transactionCache[txnId];
+                    tbody.removeChild(lastRow);
+                }
+            };
+            
+            ws.onclose = () => {
+                statusIndicator.classList.replace("bg-green-500", "bg-red-500");
+                statusIndicator.classList.replace("bg-yellow-500", "bg-red-500");
+                statusText.textContent = "Disconnected";
+            };
+        }
+
+        function updateKPIs() {
+            document.getElementById("kpi-count").textContent = totalCount.toLocaleString();
+            document.getElementById("kpi-volume").textContent = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalVolume);
+        }
+
+        function showTransactionDetails(txnId) {
+            const data = transactionCache[txnId];
+            if (!data) return;
+            
+            document.getElementById('modal-title').innerHTML = `
+                <span class="mr-4 text-white">Event: <span class="text-blue-400">${txnId}</span></span>
+                <span class="status-raw border border-blue-500/30 text-blue-400 bg-blue-500/10">Awaiting Agent Swarm</span>
+            `;
+            
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
+            
+            const sections = [
+                { title: "Financial Details", keys: ["amount_usd", "currency", "transaction_type", "direction", "channel", "auth_status"] },
+                { title: "Customer & Device", keys: ["customer_id", "device_id", "ip_address", "ip_country", "is_card_present", "card_entry_mode"] },
+                { title: "Counterparty", keys: ["counterparty_name", "counterparty_category", "counterparty_country", "reference_narrative"] },
+                { title: "Risk Factors (Raw)", keys: ["is_new_payee", "payee_first_seen_hours", "is_suspicious_synthetic", "synthetic_typology_tag"] },
+            ];
+            
+            sections.forEach(sec => {
+                html += `<div class="section-card p-4">
+                    <h4 class="font-bold text-gray-300 border-b border-gray-700 pb-2 mb-3 text-sm tracking-wider uppercase">${sec.title}</h4>
+                    <dl class="space-y-2">`;
+                
+                sec.keys.forEach(k => {
+                    const val = data[k] !== undefined && data[k] !== "" ? data[k] : '<span class="text-gray-600 italic">N/A</span>';
+                    const label = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    
+                    html += `
+                        <div class="flex justify-between items-start">
+                            <dt class="text-xs w-1/2 pr-2">${label}:</dt>
+                            <dd class="text-xs w-1/2 break-words text-right">${val}</dd>
+                        </div>
+                    `;
+                });
+                
+                html += `</dl></div>`;
+            });
+            
+            // Raw JSON View
+            html += `
+                <div class="md:col-span-2 lg:col-span-3 section-card p-4 mt-2">
+                    <h4 class="font-bold text-gray-300 border-b border-gray-700 pb-2 mb-3 text-sm tracking-wider uppercase">Raw Event Payload</h4>
+                    <pre class="text-green-400 text-xs overflow-x-auto whitespace-pre-wrap font-mono bg-black p-4 rounded border border-gray-800"><code>${JSON.stringify(data, null, 2)}</code></pre>
+                </div>
+            `;
+            
+            html += '</div>';
+            
+            document.getElementById('modal-content').innerHTML = html;
+            document.getElementById('txn-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('txn-modal').classList.add('hidden');
+        }
+
+        document.getElementById("reconnect-btn").addEventListener("click", connect);
+
+        connect();
+    </script>
+</body>
+</html>

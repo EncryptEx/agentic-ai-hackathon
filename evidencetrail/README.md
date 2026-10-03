@@ -60,10 +60,10 @@ read-only in the Investigator tab. The command exits `0` when every scenario was
 
 ```bash
 # Linux/macOS cron: 06:00 on the 1st of each month
-0 6 1 * * cd /path/to/repo && python -m evidencetrail.consistency || echo "EvidenceTrail consistency check needs attention"
+0 6 1 * * cd /path/to/repo && python -m evidencetrail.consistency || echo "Consistency check needs attention"
 
 # Windows Task Scheduler
-schtasks /Create /SC MONTHLY /D 1 /ST 06:00 /TN EvidenceTrailConsistency /TR "cmd /c cd /d C:\path\to\repo && python -m evidencetrail.consistency"
+schtasks /Create /SC MONTHLY /D 1 /ST 06:00 /TN DecisionConsistencyCheck /TR "cmd /c cd /d C:\path\to\repo && python -m evidencetrail.consistency"
 ```
 
 Consistency is not correctness. Runs can agree and still be wrong, and five synthetic cases say nothing about fraud

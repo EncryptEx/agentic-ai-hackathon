@@ -1,10 +1,10 @@
-"""Hand an EvidenceTrail alert to the ADK specialist team for a customer-level investigation.
+"""Hand a transfer alert to the ADK specialist team for a customer-level investigation.
 
-EvidenceTrail decides at the level of one transfer; the ADK team (app/agent.py) investigates the
+The Investigator decides at the level of one transfer; the ADK team (app/agent.py) investigates the
 customer across KYC, transactions, fraud telemetry, ownership and FRAML risk. The hand-off only
 attaches the team's report to the alert. It never changes the simulated action.
 
-ADK and the host database are imported lazily so EvidenceTrail still runs without them.
+ADK and the host database are imported lazily so the Investigator still runs without them.
 """
 
 import asyncio
@@ -25,14 +25,14 @@ def customer_mismatch(alert, customer_id):
 
 
 def trigger_alert(alert, customer_id=None):
-    """Map an EvidenceTrail alert onto the trigger-alert shape the ADK prompt builder expects."""
+    """Map a transfer alert onto the trigger-alert shape the ADK prompt builder expects."""
     tx = alert["transaction"]
-    summary = (f"EvidenceTrail transfer alert {alert['alert_id']}: {alert['title']}. {alert['summary']} "
+    summary = (f"Transfer alert {alert['alert_id']}: {alert['title']}. {alert['summary']} "
                f"Transfer {tx['transaction_id']} of {tx['amount']} {tx['currency']} to recipient "
                f"{tx['recipient_id']}. Policy outcome: {alert['policy']['action']} "
                f"({alert['policy']['status']}).")
     if customer_mismatch(alert, customer_id):
-        summary += (f" IMPORTANT: transfer {tx['transaction_id']} belongs to EvidenceTrail scenario customer "
+        summary += (f" IMPORTANT: transfer {tx['transaction_id']} belongs to scenario customer "
                     f"{tx['customer_id']} and does NOT appear in {customer_id.upper().strip()}'s transaction history; "
                     f"{customer_id.upper().strip()} was chosen by an analyst for a customer-level review. Do not attribute "
                     "this transfer to that customer.")
@@ -90,4 +90,4 @@ async def execute(alert, customer_id, packet, prompt, runner, app_name):
             "completed_at": now_utc(),
             "note": ("Report written by the ADK specialist agents." if source == SOURCE_AGENTS else
                      "The ADK agents could not run, so this report was synthesized directly from the specialist "
-                     "data tools without an LLM.") + " It does not change the EvidenceTrail simulated action."}
+                     "data tools without an LLM.") + " It does not change the Investigator's simulated action."}

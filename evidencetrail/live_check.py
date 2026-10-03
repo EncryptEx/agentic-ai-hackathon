@@ -160,7 +160,7 @@ def run_checks(e2e=False, gemini=None, jev=None):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="EvidenceTrail live provider check")
+    parser = argparse.ArgumentParser(description="Live provider check")
     parser.add_argument("--e2e", action="store_true", help="also run all five scenarios end to end (spends quota)")
     args = parser.parse_args(argv)
     results = run_checks(e2e=args.e2e)

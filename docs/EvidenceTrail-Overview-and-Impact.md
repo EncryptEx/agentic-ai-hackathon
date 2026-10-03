@@ -34,7 +34,7 @@ Nothing here replaces the analyst. It removes the gathering and drafting, and le
 
 **Two agent teams, same idea.**
 
-- **EvidenceTrail team** (alert triage on a single transfer): an orchestrator plus three specialists
+- **Investigator team** (alert triage on a single transfer): an orchestrator plus three specialists
   (behaviour and device, recipient and network, risk judge). The orchestrator decides whom to consult; specialists call
   registered tools; every result gets a stable ID (EV-001, EV-002, ...) in a shared evidence store.
 - **ADK investigation suite** (full customer case file): five specialists (customer/KYC, transactions, fraud and

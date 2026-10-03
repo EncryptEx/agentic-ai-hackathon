@@ -241,7 +241,7 @@ def verdict_exit_code(report):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="EvidenceTrail decision-consistency report (live providers)")
+    parser = argparse.ArgumentParser(description="Decision-consistency report (live providers)")
     parser.add_argument("--repetitions", type=int, default=5, help="fresh runs per scenario (default 5)")
     parser.add_argument("--ablation", action="store_true", help="also compare rules / team without Jev / team with Jev")
     parser.add_argument("--scenario", action="append", choices=list(SCENARIOS), help="limit to scenarios (repeatable)")

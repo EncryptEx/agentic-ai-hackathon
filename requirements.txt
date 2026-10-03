@@ -12,5 +12,5 @@ pytest>=8.0.0
 pytest-asyncio>=0.23.0
 python-dotenv>=1.0.0
 
-# G-Eval for EvidenceTrail (pinned to the version verified against the official GEval API)
+# G-Eval for the investigation agents (pinned to the version verified against the official GEval API)
 deepeval==4.2.8

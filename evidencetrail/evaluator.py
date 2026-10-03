@@ -89,7 +89,7 @@ def build_inputs(run, case):
     }
 
 
-def evaluate(run, case, judge_factory=None):
+def evaluate(run, case, judge_factory=None, repeats=1):
     """Return the evaluation block for a run: deterministic checks plus G-Eval slots."""
     result = {"state": "completed", "rubric_version": RUBRIC_VERSION,
               "deterministic": deterministic_checks(run), "geval": {}, "judge": None,
@@ -118,17 +118,30 @@ def evaluate(run, case, judge_factory=None):
                             context=inputs["context"])
     params = [SingleTurnParams.INPUT, SingleTurnParams.ACTUAL_OUTPUT, SingleTurnParams.CONTEXT]
     for key, d in METRIC_DEFS.items():
-        try:
-            metric = GEval(name=d["label"], evaluation_steps=d["steps"], evaluation_params=params,
-                           model=judge, async_mode=False, threshold=0.5)
-            metric.measure(test_case)
-            result["geval"][key] = {"label": d["label"], "status": "scored", "score": metric.score,
-                                    "reason": metric.reason, "threshold": metric.threshold,
-                                    "passed": metric.is_successful(), "evaluation_steps": d["steps"]}
-        except Exception as e:  # one failing metric must not hide the others
-            result["geval"][key] = _unavailable(d["label"], f"judge error: {type(e).__name__}: {e}",
-                                                status="error")
+        passes, errors = [], []
+        for _ in range(repeats):  # repeated judge passes on the same trace expose judge variability
+            try:
+                metric = GEval(name=d["label"], evaluation_steps=d["steps"], evaluation_params=params,
+                               model=judge, async_mode=False, threshold=0.5)
+                metric.measure(test_case)
+                passes.append({"score": metric.score, "reason": metric.reason,
+                               "passed": metric.is_successful(), "threshold": metric.threshold})
+            except Exception as e:  # one failing pass or metric must not hide the others
+                errors.append(f"{type(e).__name__}: {e}")
+        if not passes:
+            result["geval"][key] = _unavailable(d["label"], "judge error: " + errors[0], status="error")
+            result["geval"][key]["passes_attempted"] = repeats
+            continue
+        scores = [p["score"] for p in passes]
+        mean = sum(scores) / len(scores)
+        result["geval"][key] = {
+            "label": d["label"], "status": "scored", "score": mean, "reason": passes[0]["reason"],
+            "threshold": passes[0]["threshold"], "passed": mean >= passes[0]["threshold"],
+            "evaluation_steps": d["steps"], "passes_attempted": repeats, "passes_successful": len(passes),
+            "scores": scores, "score_min": min(scores), "score_max": max(scores),
+            "pass_errors": errors}
     result["judge"].update(judge.metadata() if hasattr(judge, "metadata") else {})
+    result["judge_passes_requested"] = repeats
     return result
 
 

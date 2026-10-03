@@ -713,3 +713,8 @@ td {
 .inv-score.pass { color: var(--tier-low); }
 .inv-score.fail { color: var(--tier-med); }
 @media (max-width: 1100px) { .inv-grid { grid-template-columns: 1fr; } .inv-badges { margin-left: 0; } }
+.inv-table-wrap { overflow-x: auto; margin: 8px 0; }
+.inv-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.inv-table th, .inv-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+.inv-table th { color: var(--text-secondary); font-weight: 600; }
+.inv-actions select { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 7px 10px; font-size: 12px; }

@@ -9,11 +9,12 @@ import json
 import time
 
 from . import policy
-from .canon import now_utc, sha256
+from .canon import now_utc, redact, sha256
 from .config import (GENERATION_SETTINGS, JEV_SPEC_VERSION, MAX_TOOL_CALLS, POLICY_VERSION,
                      PROMPT_VERSION, RUN_TIMEOUT_S, SCENARIO_VERSION)
 from .evidence import EvidenceStore
 from .jev import ProviderUnavailable, build_state
+from .provenance import code_commit
 from .tools import (DATA_TOOLS, FINISH, JEV_TOOL, TOOL_DECLARATIONS, ToolError, execute_data_tool,
                     validate_arguments)
 from .trace import TraceRecorder
@@ -54,9 +55,16 @@ def _validate_finish(args):
     return args
 
 
-def run_header(case, run_mode, model):
+def registered_tools(enable_jev=True):
+    """Tool declarations the agent may use. The no-Jev ablation arm drops only assess_with_jev."""
+    return [d for d in TOOL_DECLARATIONS if enable_jev or d["name"] != JEV_TOOL]
+
+
+def run_header(case, run_mode, model, decls=None, arm="with_jev"):
     return {
-        "tool_snapshot_hash": sha256(TOOL_DECLARATIONS),
+        "tool_snapshot_hash": sha256(decls or TOOL_DECLARATIONS),
+        "arm": arm,
+        "code": code_commit(),
         "scenario_version": SCENARIO_VERSION,
         "scenario_snapshot_hash": sha256({"transaction": case["transaction"], "world": case["world"]}),
         "prompt_version": PROMPT_VERSION, "policy_version": POLICY_VERSION,
@@ -68,9 +76,16 @@ def run_header(case, run_mode, model):
     }
 
 
-def investigate(case, model, jev, run_id, run_mode="live", on_event=None):
-    """Run one investigation. Returns a dict with events, evidence, claims and the final decision."""
-    store = EvidenceStore()
+def investigate(case, model, jev, run_id, run_mode="live", on_event=None, enable_jev=True, store=None):
+    """Run one investigation. Returns a dict with events, evidence, claims and the final decision.
+
+    `store` may be supplied so callers can stream evidence while the run is in progress.
+    `enable_jev=False` unregisters only the Jev tool (ablation arm); prompt, budget and policy
+    stay identical.
+    """
+    store = store if store is not None else EvidenceStore()
+    decls = registered_tools(enable_jev)
+    registered = {d["name"] for d in decls}
     trace = TraceRecorder(run_id, case["case_id"], {"prompt_version": PROMPT_VERSION,
                                                     "policy_version": POLICY_VERSION})
     provider = getattr(model, "provider", "unknown")
@@ -111,14 +126,18 @@ def investigate(case, model, jev, run_id, run_mode="live", on_event=None):
             break
         t0 = time.monotonic()
         try:
-            turn = model.generate(SYSTEM_PROMPT, steps, TOOL_DECLARATIONS)
+            turn = model.generate(SYSTEM_PROMPT, steps, decls)
         except ProviderUnavailable as e:
             fail(f"Model provider unavailable: {e}", str(e))
             break
+        request_steps = redact(steps)  # exact redacted request, before this turn's output is appended
         rec(event_type="model_turn", actor="agent", provider=provider, requested_model=req_model,
             returned_model_version=turn.returned_model_version, generation_settings=gen,
             duration_ms=int((time.monotonic() - t0) * 1000), usage_if_available=turn.usage,
-            result_snapshot={"calls": turn.calls, "text": turn.text})
+            result_snapshot={"calls": turn.calls, "text": turn.text, "request_steps": request_steps,
+                             "request_hash": sha256({"system": PROMPT_VERSION, "input": request_steps,
+                                                     "tools": sha256(decls)}),
+                             "response_steps": redact(turn.steps)})
         steps.extend(turn.steps)
         if not turn.calls:
             if nudged:
@@ -152,13 +171,14 @@ def investigate(case, model, jev, run_id, run_mode="live", on_event=None):
                                           {"error": "tool budget exhausted; call finish_investigation"}))
                 continue
             tool_calls += 1
-            steps.append(_result_step(name, call_id, _run_tool(name, raw_args, case, store, jev, rec)))
+            steps.append(_result_step(name, call_id, _run_tool(name, raw_args, case, store, jev, rec,
+                                                               registered)))
         if final:
             break
     else:
         fail("Agent exceeded the step limit without finishing.")
 
-    return {"run_id": run_id, "case_id": case["case_id"], "run_header": run_header(case, run_mode, model),
+    return {"run_id": run_id, "case_id": case["case_id"], "run_header": run_header(case, run_mode, model, decls, "with_jev" if enable_jev else "no_jev"),
             "events": trace.events, "evidence": store.all(), "final": final, "failure": failure,
             "tool_call_count": tool_calls, "finished_at": now_utc()}
 
@@ -168,10 +188,12 @@ def _result_step(name, call_id, payload):
             "result": [{"type": "text", "text": json.dumps(payload, sort_keys=True)}]}
 
 
-def _run_tool(name, raw_args, case, store, jev, rec):
+def _run_tool(name, raw_args, case, store, jev, rec, registered):
     """Validate, execute, store as evidence, and return what the agent is allowed to see."""
     t0 = time.monotonic()
     try:
+        if name not in registered:
+            raise ToolError(f"tool '{name}' is not registered in this run")
         args = validate_arguments(name, raw_args, case)
         if name == JEV_TOOL:
             ev = _jev_evidence(args, store, jev)

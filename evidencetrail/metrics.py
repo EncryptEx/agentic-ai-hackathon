@@ -41,9 +41,30 @@ def summarize_runs(runs):
         "opposite_outcome_flag": counts["ALLOW"] > 0 and counts["REVIEW"] > 0,
         "tool_sequences": dict(sequences),
         "tool_call_counts": [r.get("tool_call_count") for r in finished],
+        "elapsed_ms": [r.get("elapsed_ms") for r in finished],
+        "error_counts": [_error_count(r) for r in finished],
+        "usage_totals": _usage_totals(finished),
+        "cost": "not computed: provider rates are not configured",
         "note": ("Agreement can be consistently wrong; five synthetic cases do not establish "
                  "precision, recall or calibration."),
     }
+
+
+def _error_count(run):
+    return sum(1 for e in run.get("events", []) if e["event_type"] in ("tool_error", "run_failed"))
+
+
+def _usage_totals(runs):
+    """Sum numeric usage fields the provider actually reported; empty if none were reported."""
+    totals = {}
+    for r in runs:
+        for e in r.get("events", []):
+            usage = e.get("usage_if_available")
+            if isinstance(usage, dict):
+                for k, v in usage.items():
+                    if isinstance(v, (int, float)) and not isinstance(v, bool):
+                        totals[k] = totals.get(k, 0) + v
+    return totals
 
 
 def deterministic_checks(run):

@@ -115,7 +115,9 @@ function renderControls() {
         busy ? "Investigating…" : (inv.run && inv.run.state === "failed" ? "Retry investigation" : "Start investigation"));
     const replay = el("button", { class: "page-btn", type: "button", disabled: !inv.run || isRunning(inv.run) || !(inv.run.events || []).length, onclick: startReplay },
         "▶ Replay recorded trace");
-    const kids = [el("label", { class: "inv-label" }, "Case"), select, start, replay, runBadges()];
+    const exportBtn = el("button", { class: "page-btn", type: "button", disabled: !inv.runId || !inv.run || isRunning(inv.run), onclick: exportTrace,
+        title: "Redacted JSON of the recorded audit trail" }, "⬇ Export trace");
+    const kids = [el("label", { class: "inv-label" }, "Case"), select, start, replay, exportBtn, runBadges()];
     if (inv.error) kids.push(el("div", { class: "inv-error", role: "alert" }, inv.error));
     box.replaceChildren(...kids);
 }
@@ -131,6 +133,15 @@ function runBadges() {
     if (mc) wrap.append(el("span", { class: "inv-tag" + (r.failure ? " bad" : "") }, r.failure ? "Provider unavailable" : `${r.run_header.run_mode}: ${mc.provider} / ${mc.requested_model || "n/a"}`));
     if (r.recorded_audit_trail_verified === true) wrap.append(el("span", { class: "inv-tag" }, "Recorded audit trail – hash chain verified"));
     return wrap;
+}
+
+async function exportTrace() {
+    try {
+        const data = await invApi(`/api/investigations/${inv.runId}/export`);
+        const url = URL.createObjectURL(new Blob([json(data)], { type: "application/json" }));
+        const a = el("a", { href: url, download: `evidencetrail-${inv.runId}.json` });
+        document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    } catch (e) { inv.error = `Export failed: ${e.message}`; renderControls(); }
 }
 
 function resetRun() {
@@ -384,15 +395,23 @@ function renderQuality() {
     box.replaceChildren(el("h3", {}, "Explanation quality"));
     const r = inv.run, done = r && !isRunning(r) && r.final;
     const evalState = r && r.evaluation;
-    box.append(el("button", { class: "page-btn", type: "button", disabled: !done || (evalState && evalState.state === "running"), onclick: runEvaluation },
-        evalState && evalState.state === "running" ? "Evaluating…" : (evalState ? "Re-run evaluation" : "Evaluate explanation")));
-    if (!evalState) { box.append(el("p", { class: "inv-muted" }, "Not evaluated yet. Scores come from G-Eval (a model-based judge), measured after the decision.")); return; }
-    if (evalState.state === "running") { box.append(el("p", { class: "inv-muted" }, "Evaluation running…")); return; }
+    const evalRunning = evalState && evalState.state === "running";
+    const passes = el("select", { id: "inv-judge-passes", disabled: !done || evalRunning, "aria-label": "Judge passes" },
+        [1, 3, 5].map(n => el("option", { value: n, selected: n === (inv.judgePasses || 1) }, n === 1 ? "1 judge pass" : `${n} judge passes`)));
+    passes.addEventListener("change", e => { inv.judgePasses = Number(e.target.value); });
+    box.append(el("div", { class: "inv-actions" },
+        el("button", { class: "page-btn", type: "button", disabled: !done || evalRunning, onclick: runEvaluation },
+            evalRunning ? "Evaluating…" : (evalState ? "Re-run evaluation" : "Evaluate explanation")), passes));
+    if (!evalState) { box.append(el("p", { class: "inv-muted" }, "Not evaluated yet. Scores come from G-Eval (a model-based judge), measured after the decision. Several judge passes show how much the judge itself varies.")); return; }
+    if (evalRunning) { box.append(el("p", { class: "inv-muted" }, "Evaluation running…")); return; }
     if (evalState.state === "failed") { box.append(el("div", { class: "inv-error", role: "alert" }, evalState.error)); return; }
     Object.values(evalState.geval).forEach(m => {
         const row = el("div", { class: "inv-metric" }, el("strong", {}, m.label));
-        if (m.status === "scored") row.append(el("span", { class: "inv-score" + (m.passed ? " pass" : " fail") }, m.score.toFixed(2)), el("div", { class: "inv-muted" }, m.reason));
-        else row.append(el("span", { class: "inv-tag bad" }, m.status === "error" ? "Judge error" : "Unavailable"), el("div", { class: "inv-muted" }, m.reason));
+        if (m.status === "scored") {
+            row.append(el("span", { class: "inv-score" + (m.passed ? " pass" : " fail") }, m.score.toFixed(2)));
+            if (m.passes_attempted > 1) row.append(el("span", { class: "inv-muted" }, ` mean of ${m.passes_successful}/${m.passes_attempted} passes (range ${m.score_min.toFixed(2)}–${m.score_max.toFixed(2)})`));
+            row.append(el("div", { class: "inv-muted" }, m.reason));
+        } else row.append(el("span", { class: "inv-tag bad" }, m.status === "error" ? "Judge error" : "Unavailable"), el("div", { class: "inv-muted" }, m.reason));
         box.append(row);
     });
     const d = evalState.deterministic;
@@ -402,11 +421,12 @@ function renderQuality() {
         ["Tool calls", d.tool_call_count], ["Errors", d.error_count]]),
         el("details", { class: "inv-details" }, el("summary", {}, "Technical details"),
             el("pre", { class: "inv-pre" }, json({ rubric_version: evalState.rubric_version, judge: evalState.judge, note: evalState.judge_note,
+                scores: Object.fromEntries(Object.entries(evalState.geval).map(([k, m]) => [k, m.scores])),
                 steps: Object.fromEntries(Object.entries(evalState.geval).map(([k, m]) => [k, m.evaluation_steps])) }))));
 }
 
 async function runEvaluation() {
-    try { await invApi(`/api/investigations/${inv.runId}/evaluate`, {}); inv.run = await invApi(`/api/investigations/${inv.runId}`); pollRun(); }
+    try { await invApi(`/api/investigations/${inv.runId}/evaluate`, { repeats: inv.judgePasses || 1 }); inv.run = await invApi(`/api/investigations/${inv.runId}`); pollRun(); }
     catch (e) { inv.error = `Evaluation failed to start: ${e.message}`; }
     renderAll();
 }
@@ -417,16 +437,29 @@ function renderConsistency() {
     if (!box) return;
     box.replaceChildren(el("h3", {}, "Decision consistency"));
     const busy = inv.exp && inv.exp.state === "running";
-    const reps = el("select", { id: "inv-reps", disabled: busy }, [3, 5, 10].map(n => el("option", { value: n, selected: n === 5 }, `${n} fresh runs`)));
+    const mode = el("select", { id: "inv-mode", disabled: busy, "aria-label": "Experiment mode" },
+        el("option", { value: "end_to_end" }, "End-to-end investigations"), el("option", { value: "fixed_evidence" }, "Fixed evidence"));
+    const reps = el("select", { id: "inv-reps", disabled: busy, "aria-label": "Repetitions" }, [3, 5, 10, 20].map(n => el("option", { value: n, selected: n === 5 }, `${n} fresh runs`)));
     const hasLinks = ((inv.run && inv.run.evidence) || []).some(e => e.type === "relationship_graph" && (e.payload.links || []).length);
-    box.append(el("div", { class: "inv-actions" }, reps,
-        el("button", { class: "page-btn", type: "button", disabled: busy || !inv.caseId || (inv.run && isRunning(inv.run)), onclick: () => startExperiment("repeat") }, "Run repeats"),
+    const noRun = inv.run && isRunning(inv.run);
+    box.append(el("div", { class: "inv-actions" }, mode, reps,
+        el("button", { class: "page-btn", type: "button", disabled: busy || !inv.caseId || noRun, onclick: () => startExperiment("repeat") }, "Run repeats"),
         el("button", { class: "page-btn", type: "button", disabled: busy || !hasLinks, title: hasLinks ? "" : "Needs a run that found network links",
-            onclick: () => startExperiment("counterfactual") }, "Evidence-change experiment")),
-        el("p", { class: "inv-muted" }, "Repeats are fresh model runs (never recorded replay). Agreement can be consistently wrong."));
+            onclick: () => startExperiment("counterfactual") }, "Evidence-change experiment"),
+        el("button", { class: "page-btn", type: "button", disabled: busy || noRun, title: "All five cases: rules vs Gemini without Jev vs Gemini with Jev",
+            onclick: () => startExperiment("ablation") }, "Compare approaches")),
+        el("p", { class: "inv-muted" }, "Repeats are fresh model calls (never recorded replay). “Fixed evidence” freezes one evidence bundle and asks Gemini and Jev independently several times. Agreement can be consistently wrong."));
     if (!inv.exp) return;
+    if (inv.exp.error) { box.append(el("div", { class: "inv-error", role: "alert" }, inv.exp.error)); return; }
+    if (inv.expKind === "fixed_evidence") return renderFixedEvidence(box);
+    if (inv.expKind === "ablation") return renderAblation(box);
+    renderRepeatSummary(box);
+}
+
+function renderRepeatSummary(box) {
     const s = inv.exp.summary || {};
     if (s.attempted_runs == null) { box.append(el("p", { class: "inv-muted" }, "Starting runs…")); return; }
+    const elapsed = (s.elapsed_ms || []).filter(x => x != null);
     box.append(el("h4", {}, inv.expKind === "counterfactual" ? "Evidence-change experiment: network links removed" : "Repeated fresh runs"),
         el("span", { class: "inv-tag fresh" }, inv.exp.label || "Fresh runs"),
         kv([["Attempted / finished / successful", `${s.attempted_runs} / ${s.finished_runs} / ${s.successful_runs}`],
@@ -434,22 +467,70 @@ function renderConsistency() {
             ["Allow / Context check / Review", s.action_counts ? `${s.action_counts.ALLOW} / ${s.action_counts.CONTEXT_CHECK} / ${s.action_counts.REVIEW}` : "–"],
             ["Most common action", s.modal && s.modal.modal_action ? `${ACTION_TEXT[s.modal.modal_action]} (${s.modal.agreement} successful runs)` : "–"],
             ["Pairwise agreement", s.pairwise_agreement == null ? "n/a (needs 2+ successful runs)" : s.pairwise_agreement.toFixed(3)],
-            ["Both Allow and Review seen", s.opposite_outcome_flag ? "yes – inconsistent" : "no"]]),
-        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), el("pre", { class: "inv-pre" }, json({ tool_sequences: s.tool_sequences, tool_call_counts: s.tool_call_counts, run_ids: inv.exp.run_ids, configuration: inv.exp.configuration }))),
+            ["Both Allow and Review seen", s.opposite_outcome_flag ? "yes – inconsistent" : "no"],
+            ["Time per run", elapsed.length ? `${Math.min(...elapsed)}–${Math.max(...elapsed)} ms` : "–"]]),
+        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), el("pre", { class: "inv-pre" }, json({ tool_sequences: s.tool_sequences, tool_call_counts: s.tool_call_counts, error_counts: s.error_counts, usage_totals: s.usage_totals, cost: s.cost, run_ids: inv.exp.run_ids, configuration: inv.exp.configuration }))),
         el("p", { class: "inv-muted" }, inv.expKind === "counterfactual"
             ? "A change shows sensitivity under this intervention. It does not prove causal correctness or that every risk reduction should flip an action."
             : (s.note || "")));
 }
 
+function renderFixedEvidence(box) {
+    const e = inv.exp;
+    if (e.state === "running") { box.append(el("p", { class: "inv-muted" }, `Running fixed-evidence calls… ${e.progress || 0}/${e.repetitions}`)); return; }
+    const r = e.result, d = r.decision, j = r.jev;
+    box.append(el("h4", {}, "Fixed evidence: one frozen bundle"), el("span", { class: "inv-tag fresh" }, e.label),
+        el("p", { class: "inv-muted" }, `Bundle ${r.bundle.evidence_ids.join(", ")} · hash ${r.bundle.bundle_hash.slice(0, 12)}…`),
+        el("h4", {}, "Gemini decision"),
+        kv([["Attempted / successful", `${d.attempted} / ${d.successful}`], ["Errors or incomplete", d.incomplete_or_error],
+            ["Allow / Context check / Review", `${d.action_counts.ALLOW} / ${d.action_counts.CONTEXT_CHECK} / ${d.action_counts.REVIEW}`],
+            ["Most common action", d.modal.modal_action ? `${ACTION_TEXT[d.modal.modal_action]} (${d.modal.agreement})` : "–"],
+            ["Pairwise agreement", d.pairwise_agreement == null ? "n/a" : d.pairwise_agreement.toFixed(3)]]),
+        el("h4", {}, "Jev assessment (separate)"),
+        kv([["Attempted / successful", `${j.attempted} / ${j.successful}`], ["Errors", j.errors]]),
+        kv(Object.entries(j.per_question).map(([q, v]) => [q.replaceAll("_", " "), v.counts ? Object.entries(v.counts).map(([k, n]) => `${k} ×${n}`).join(", ") : (v.mean != null ? `mean ${v.mean.toFixed(2)} (range ${v.min}–${v.max})` : "–")])),
+        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), el("pre", { class: "inv-pre" }, json({ decision_runs: d.runs, jev_runs: j.runs }))),
+        el("p", { class: "inv-muted" }, r.note));
+}
+
+function renderAblation(box) {
+    const e = inv.exp, s = e.summary;
+    if (!s || !s.arms) { box.append(el("p", { class: "inv-muted" }, "Starting runs…")); return; }
+    const names = { rules: "Rules only", no_jev: "Gemini without Jev", with_jev: "Gemini with Jev" };
+    box.append(el("h4", {}, "Approach comparison"), el("span", { class: "inv-tag fresh" }, e.state === "running" ? "Running…" : (e.label || "")));
+    const table = el("table", { class: "inv-table" }, el("thead", {}, el("tr", {}, el("th", {}, "Case"), Object.keys(names).map(k => el("th", {}, names[k])))));
+    const body = el("tbody");
+    e.case_ids.forEach(cid => {
+        const sc = (inv.scenarios.find(x => x.case_id === cid) || {}).name || cid;
+        const rules = s.arms.rules.cases[cid];
+        const cell = arm => {
+            const c = s.arms[arm].cases[cid], x = c.summary;
+            return `${x.action_counts.ALLOW}/${x.action_counts.CONTEXT_CHECK}/${x.action_counts.REVIEW}` + (x.failed_or_incomplete_runs ? ` · ${x.failed_or_incomplete_runs} incomplete/failed` : "") + ` · ${c.matched_runs}/${c.eligible_runs} match`;
+        };
+        body.append(el("tr", {}, el("td", {}, sc),
+            el("td", {}, `${ACTION_TEXT[rules.action]}${rules.status === "INCOMPLETE" ? " (incomplete)" : ""} · ${rules.match ? "match" : "no match"}`),
+            el("td", {}, cell("no_jev")), el("td", {}, cell("with_jev"))));
+    });
+    table.append(body);
+    const tot = arm => `${s.arms[arm].matched_runs}/${s.arms[arm].eligible_runs} matched (${s.arms[arm].attempted_runs} attempted; provider failures excluded)`;
+    box.append(el("div", { class: "inv-table-wrap" }, table),
+        kv([["Rules only", `${s.arms.rules.matched}/${s.arms.rules.eligible} cases matched`], ["Gemini without Jev", tot("no_jev")], ["Gemini with Jev", tot("with_jev")]]),
+        el("p", { class: "inv-muted" }, "Cells show Allow/Context check/Review counts across fresh runs, then how many successful runs matched the illustrative policy label. " + s.note));
+}
+
 async function startExperiment(kind) {
     const repetitions = Number(document.getElementById("inv-reps").value);
+    const mode = document.getElementById("inv-mode").value;
     try {
-        const body = kind === "repeat" ? { caseId: inv.caseId, mode: "end_to_end", repetitions } : { caseId: inv.caseId, patch: { remove_network_links: true }, repetitions };
+        let body, expKind = kind;
+        if (kind === "repeat") { body = { caseId: inv.caseId, mode, repetitions }; if (mode === "fixed_evidence") expKind = "fixed_evidence"; }
+        else if (kind === "counterfactual") body = { caseId: inv.caseId, patch: { remove_network_links: true }, repetitions };
+        else body = { repetitions: Math.min(repetitions, 10) };
         const d = await invApi(`/api/experiments/${kind}`, body);
-        inv.expKind = kind; inv.exp = { state: "running", summary: {}, label: "Fresh runs" };
+        inv.expKind = expKind; inv.exp = { state: "running", summary: {}, label: "Fresh runs", repetitions, progress: 0 };
         clearInterval(inv.expTimer);
         const tick = async () => {
-            try { inv.exp = await invApi(`/api/experiments/${d.experimentId}`); if (inv.exp.state === "completed") clearInterval(inv.expTimer); }
+            try { inv.exp = await invApi(`/api/experiments/${d.experimentId}`); if (inv.exp.state !== "running") clearInterval(inv.expTimer); }
             catch (e) { inv.error = e.message; clearInterval(inv.expTimer); }
             renderConsistency(); renderControls();
         };

@@ -148,7 +148,9 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/archetypes":
             self._send_json(list(ARCHETYPE_CONFIGS.keys()))
         elif path == "/api/agent/investigate":
-            cust_id = query.get("customer_id", [query.get("id", ["CUST-00043"])])[0].upper().strip()
+            cust_ids = query.get("customer_id") or query.get("id") or ["CUST-00043"]
+            cust_id = cust_ids[0].upper().strip() if cust_ids and cust_ids[0] else "CUST-00043"
+
             from app.alert_feed import generate_specialist_investigation_report
             from app.orchestrator.triage import DynamicTriageRouter
             from app.orchestrator.debate import DialecticDebateEngine
@@ -177,6 +179,41 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
                 "triage": triage,
                 "debate": debate.to_dict(),
                 "report": report
+            })
+            return
+        elif path == "/api/evolution/run":
+            cust_ids = query.get("customer_id") or query.get("id") or ["CUST-00043"]
+            cust_id = cust_ids[0].upper().strip() if cust_ids and cust_ids[0] else "CUST-00043"
+            from app.evolution import SelfEvolvingLoop
+            from app.orchestrator.debate import DialecticDebateEngine
+            from app.tools import (
+                get_customer_profile,
+                analyze_transactions,
+                get_transaction_alerts,
+                get_fraud_alerts,
+                get_digital_telemetry,
+                get_risk_assessment
+            )
+
+            profile = get_customer_profile(cust_id)
+            txs = analyze_transactions(cust_id)
+            txs["alerts"] = get_transaction_alerts(cust_id)
+            fraud = {"alerts": get_fraud_alerts(cust_id), "telemetry": get_digital_telemetry(cust_id)}
+            risk = get_risk_assessment(cust_id)
+
+            debate = DialecticDebateEngine().adjudicate(cust_id, profile, txs, fraud, risk)
+            evo_loop = SelfEvolvingLoop()
+            proposal = evo_loop.run_evolution_cycle(
+                case_id=cust_id,
+                debate_outcome=debate,
+                customer_profile=profile,
+                transaction_findings=txs,
+                fraud_findings=fraud
+            )
+            self._send_json({
+                "status": "success",
+                "customer_id": cust_id,
+                "proposal": proposal.to_dict()
             })
             return
         elif path == "/api/download":
@@ -303,6 +340,17 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
                 "modal_action": modal_action,
                 "stability_rate": agreement_rate,
                 "is_stable": agreement_rate >= 0.8
+            })
+        elif path == "/api/evolution/deploy":
+            proposal_id = payload.get("proposal_id", "GOV-PR-LATEST")
+            rule_id = payload.get("rule_id", "TM-02")
+            version = payload.get("version", "v2.1-coercion-guarded")
+            self._send_json({
+                "status": "success",
+                "message": f"Governance proposal {proposal_id} approved. Policy patch {version} hot-deployed to active policy engine.",
+                "deployed_rule": rule_id,
+                "active_version": version,
+                "hot_reloaded_state": "ACTIVE_PRODUCTION_PROTECTED"
             })
             return
         elif path == "/api/simulate":

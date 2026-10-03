@@ -413,9 +413,9 @@ def handle_investigate(args):
 
     if final_text:
         if HAS_RICH:
-            console.print(Panel(final_text, title="[bold green]Final 12-Section Multi-Agent Case Dossier (with Arbiter Ruling)[/bold green]"))
+            console.print(Panel(final_text, title="[bold green]Final 13-Section Multi-Agent Case Dossier (with Arbiter Ruling & Self-Evolution Loop)[/bold green]"))
         else:
-            print("\n=== FINAL 12-SECTION MULTI-AGENT CASE DOSSIER (WITH ARBITER RULING) ===")
+            print("\n=== FINAL 13-SECTION MULTI-AGENT CASE DOSSIER (WITH ARBITER RULING & SELF-EVOLUTION LOOP) ===")
             print(final_text)
     else:
         print("Investigation completed. No text output returned.")

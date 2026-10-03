@@ -17,8 +17,9 @@
 from __future__ import annotations
 
 import contextlib
-from datetime import datetime
+from datetime import datetime, timezone
 import json
+import logging
 import os
 import csv
 import asyncio
@@ -73,6 +74,14 @@ from models.transaction import Transaction, TransactionDirection, TransactionTyp
 from storage.database import DatabaseManager
 
 load_dotenv()
+# app.agent removes this flag when an AI Studio API key is configured. Loading
+# .env again in this module used to restore it before Gemini's lazy client was
+# created, causing approved workflows to call Vertex with an API key and fail
+# with API_KEY_SERVICE_BLOCKED. Keep provider selection consistent with agent.py.
+if (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")) and os.getenv(
+    "GOOGLE_GENAI_USE_VERTEXAI"
+):
+    os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)
 allow_origins = (
     os.getenv("ALLOW_ORIGINS", "").split(",") if os.getenv("ALLOW_ORIGINS") else ["*"]
 )
@@ -97,6 +106,39 @@ from app.live_agent.database import DatabaseInformationService
 
 ACTIVE_AGENT_RUNS: Dict[str, AgentRun] = {}
 RUNS: Dict[str, Dict[str, Any]] = {}
+REALTIME_INVESTIGATIONS: Dict[str, Dict[str, Any]] = {}
+_REALTIME_INVESTIGATION_TASKS: set[asyncio.Task] = set()
+_TRIAGE_RESULTS: Dict[str, Dict[str, Any]] = {}
+_TRIAGE_INFLIGHT: Dict[str, asyncio.Task] = {}
+logger = logging.getLogger(__name__)
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _realtime_trigger_alert(case: Dict[str, Any], row: dict) -> Dict[str, Any]:
+    """Describe the Jev escalation to ADK using only recorded transaction and review facts."""
+    raw_severity = (case.get("jev") or {}).get("severity")
+    try:
+        level = int(round(float(raw_severity)))
+    except (TypeError, ValueError):
+        level = 1
+    severity = {0: "LOW", 1: "MEDIUM", 2: "HIGH"}.get(max(0, min(2, level)), "MEDIUM")
+    validation = case.get("human_validation") or {}
+    amount = row.get("amount_usd", row.get("amount", "unknown"))
+    currency = row.get("currency", "USD")
+    return {
+        "rule_id": "JEV-REALTIME",
+        "rule_name": "Jev suspicious transaction triage",
+        "severity": severity,
+        "summary": (
+            f"Jev returned SUSPICIOUS for synthetic transaction {case.get('tx_id')} "
+            f"({amount} {currency}); this is a model judgment, not proof of fraud. "
+            f"Human investigator {validation.get('investigator', 'unknown')} approved the escalation "
+            "for the complete ADK investigation workflow."
+        ),
+    }
 
 
 class ConnectionManager:
@@ -120,15 +162,22 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-async def run_investigation_for_realtime(customer_id: str, row: dict, runner, adk_app_name: str, websocket: WebSocket):
+async def run_investigation_for_realtime(
+    customer_id: str,
+    row: dict,
+    runner,
+    adk_app_name: str,
+    case_id: str,
+):
     from google.genai import types
     from app.alert_feed import AlertDispatcher
     
     tx_id = row.get("transaction_id", customer_id)
     
     try:
-        await websocket.send_text(json.dumps({
+        await manager.broadcast(json.dumps({
             "msg_type": "investigation_started",
+            "case_id": case_id,
             "customer_id": customer_id,
             "tx_id": tx_id,
             "row": row
@@ -139,11 +188,20 @@ async def run_investigation_for_realtime(customer_id: str, row: dict, runner, ad
     dispatcher = AlertDispatcher()
     try:
         packet = dispatcher.prepare_case_packet(customer_id)
-        prompt = dispatcher.generate_investigation_prompt(customer_id, packet.get("trigger_alert"))
+        case = REALTIME_INVESTIGATIONS.get(case_id) or {"tx_id": tx_id}
+        trigger_alert = _realtime_trigger_alert(case, row)
+        prompt = dispatcher.generate_investigation_prompt(
+            customer_id,
+            trigger_alert,
+        )
     except Exception as e:
         try:
-            await websocket.send_text(json.dumps({
+            case = REALTIME_INVESTIGATIONS.get(case_id)
+            if case:
+                case.update({"status": "failed", "error": str(e), "completed_at": _utc_now()})
+            await manager.broadcast(json.dumps({
                 "msg_type": "investigation_error",
+                "case_id": case_id,
                 "customer_id": customer_id,
                 "tx_id": tx_id,
                 "error": str(e)
@@ -153,6 +211,8 @@ async def run_investigation_for_realtime(customer_id: str, row: dict, runner, ad
         return
 
     final_report = ""
+    report_source = "adk_agents"
+    adk_error = None
     if runner and runner.session_service:
         try:
             session = await runner.session_service.create_session(
@@ -173,17 +233,36 @@ async def run_investigation_for_realtime(customer_id: str, row: dict, runner, ad
                         if hasattr(part, "text") and part.text:
                             final_report = part.text
         except Exception as e:
+            logger.exception("ADK realtime investigation failed for %s", case_id)
+            adk_error = type(e).__name__
             try:
                 from app.alert_feed import generate_specialist_investigation_report
-                final_report = generate_specialist_investigation_report(customer_id)
+                final_report = generate_specialist_investigation_report(customer_id, trigger_alert)
+                report_source = "specialist_tools_fallback"
             except Exception as ex:
                 final_report = f"LLM error: {e}. Fallback also failed: {ex}"
+                report_source = "failed"
+                adk_error = f"{type(e).__name__}; fallback={type(ex).__name__}"
     else:
+        adk_error = "NoRunner"
         try:
             from app.alert_feed import generate_specialist_investigation_report
-            final_report = generate_specialist_investigation_report(customer_id)
+            final_report = generate_specialist_investigation_report(customer_id, trigger_alert)
+            report_source = "specialist_tools_fallback"
         except Exception as ex:
             final_report = f"Runner not configured. Fallback also failed: {ex}"
+            report_source = "failed"
+            adk_error = f"NoRunner; fallback={type(ex).__name__}"
+
+    if report_source == "adk_agents" and not final_report.strip():
+        adk_error = "EmptyADKReport"
+        try:
+            from app.alert_feed import generate_specialist_investigation_report
+            final_report = generate_specialist_investigation_report(customer_id, trigger_alert)
+            report_source = "specialist_tools_fallback"
+        except Exception as ex:
+            report_source = "failed"
+            adk_error = f"EmptyADKReport; fallback={type(ex).__name__}"
 
     from storage.database import DatabaseManager
     db = DatabaseManager()
@@ -205,9 +284,24 @@ async def run_investigation_for_realtime(customer_id: str, row: dict, runner, ad
     if score >= 75: verdict = "BLOCK"
     elif score >= 50: verdict = "REVIEW"
 
+    case = REALTIME_INVESTIGATIONS.get(case_id)
+    if case:
+        case.update({
+            "status": "completed",
+            "report": final_report,
+            "score": score,
+            "tier": tier,
+            "typologies": typologies,
+            "verdict": verdict,
+            "workflow_source": report_source,
+            "adk_error": adk_error,
+            "completed_at": _utc_now(),
+        })
+
     try:
-        await websocket.send_text(json.dumps({
+        await manager.broadcast(json.dumps({
             "msg_type": "investigation_finished",
+            "case_id": case_id,
             "customer_id": customer_id,
             "tx_id": tx_id,
             "row": row,
@@ -215,52 +309,129 @@ async def run_investigation_for_realtime(customer_id: str, row: dict, runner, ad
             "score": score,
             "tier": tier,
             "typologies": typologies,
-            "verdict": verdict
+            "verdict": verdict,
+            "workflow_source": report_source,
+            "adk_error": adk_error,
+            "case": case,
         }))
     except Exception:
         pass
 
-async def triage_transaction(row: dict, runner, adk_app_name: str, websocket: WebSocket):
+
+async def _run_approved_realtime_investigation(
+    customer_id: str,
+    row: dict,
+    runner,
+    adk_app_name: str,
+    case_id: str,
+):
+    """Keep unexpected workflow failures visible instead of leaving a case stuck as running."""
+    try:
+        await run_investigation_for_realtime(customer_id, row, runner, adk_app_name, case_id)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        case = REALTIME_INVESTIGATIONS.get(case_id)
+        if case:
+            case.update({"status": "failed", "error": type(exc).__name__, "completed_at": _utc_now()})
+        await manager.broadcast(json.dumps({
+            "msg_type": "investigation_error",
+            "case_id": case_id,
+            "customer_id": customer_id,
+            "tx_id": row.get("transaction_id", customer_id),
+            "error": type(exc).__name__,
+            "case": case,
+        }))
+
+
+async def _assess_transaction_with_jev(row: dict) -> Dict[str, Any]:
+    """Run Jev once per transaction, even when several dashboard tabs are connected."""
     from evidencetrail.jev import JevClient, ALERT_QUESTIONS, ProviderUnavailable
+
     jev_client = JevClient()
     if not jev_client.available():
-        return
-        
+        return {"status": "unavailable", "reason": "TYPESAFE_API_KEY is not configured"}
+
     state = f"type=transaction source=realtime payload={json.dumps(row)}"
-    tx_id = row.get("transaction_id", row.get("customer_id"))
     try:
         res = await asyncio.to_thread(jev_client.assess, state, ALERT_QUESTIONS)
         suspicion = res.get("normalized", {}).get("suspicion")
         severity = res.get("normalized", {}).get("severity", 0)
-        
-        # For the PoC, we forcibly flag high-value or specific transactions so they appear in the UI
+        return {
+            "status": "ok",
+            "suspicion": suspicion,
+            "severity": severity,
+            "raw": res,
+        }
+    except ProviderUnavailable as exc:
+        return {"status": "unavailable", "reason": str(exc)}
+
+
+async def triage_transaction(row: dict, runner, adk_app_name: str, websocket: WebSocket):
+    """Triage a streamed transaction and queue suspicious cases for human approval.
+
+    This function deliberately never starts the ADK workflow. Only the investigator
+    decision endpoint below is allowed to cross that human-in-the-loop gate.
+    """
+    tx_id = str(row.get("transaction_id") or row.get("customer_id") or uuid.uuid4().hex)
+    result = _TRIAGE_RESULTS.get(tx_id)
+    if result is None:
+        task = _TRIAGE_INFLIGHT.get(tx_id)
+        if task is None:
+            task = asyncio.create_task(_assess_transaction_with_jev(row))
+            _TRIAGE_INFLIGHT[tx_id] = task
         try:
-            amt = float(row.get("amount_usd", row.get("amount", 0)))
-            if amt > 8000:
-                suspicion = "SUSPICIOUS"
-                severity = max(severity, 0.85)
-                res["normalized"]["suspicion"] = suspicion
-                res["normalized"]["severity"] = severity
-        except Exception:
-            pass
-            
+            result = await task
+            _TRIAGE_RESULTS[tx_id] = result
+        finally:
+            if _TRIAGE_INFLIGHT.get(tx_id) is task:
+                _TRIAGE_INFLIGHT.pop(tx_id, None)
+
+    if result.get("status") != "ok":
         try:
             await websocket.send_text(json.dumps({
-                "msg_type": "jev_triage",
-                "customer_id": row["customer_id"],
+                "msg_type": "jev_triage_unavailable",
                 "tx_id": tx_id,
-                "row": row,
-                "suspicion": suspicion,
-                "severity": severity,
-                "raw": res
+                "customer_id": row.get("customer_id"),
+                "reason": result.get("reason", "Jev unavailable"),
             }))
         except Exception:
             pass
-        
-        if suspicion == "SUSPICIOUS":
-            asyncio.create_task(run_investigation_for_realtime(row["customer_id"], row, runner, adk_app_name, websocket))
-            
-    except ProviderUnavailable:
+        return
+
+    payload = {
+        "msg_type": "jev_triage",
+        "customer_id": row.get("customer_id"),
+        "tx_id": tx_id,
+        "row": row,
+        "suspicion": result.get("suspicion"),
+        "severity": result.get("severity"),
+        "raw": result.get("raw"),
+    }
+
+    if result.get("suspicion") == "SUSPICIOUS":
+        case = REALTIME_INVESTIGATIONS.get(tx_id)
+        if case is None:
+            case = {
+                "case_id": tx_id,
+                "tx_id": tx_id,
+                "customer_id": row.get("customer_id"),
+                "row": row,
+                "status": "pending_validation",
+                "jev": {
+                    "suspicion": result.get("suspicion"),
+                    "severity": result.get("severity"),
+                    "model": (result.get("raw") or {}).get("model"),
+                },
+                "created_at": _utc_now(),
+                "synthetic": True,
+            }
+            REALTIME_INVESTIGATIONS[tx_id] = case
+        payload["case"] = case
+
+    try:
+        await websocket.send_text(json.dumps(payload))
+    except Exception:
         pass
 
 
@@ -810,6 +981,89 @@ async def get_investigation_detail(investigation_id: str):
     if not log:
         raise HTTPException(status_code=404, detail="Investigation not found")
     return log
+
+
+class RealtimeInvestigationDecision(BaseModel):
+    decision: str
+    investigator: str
+    notes: Optional[str] = None
+
+
+@app.get("/api/realtime/investigations")
+async def list_realtime_investigations():
+    """Return Jev-flagged transactions waiting for, or processed by, a human investigator."""
+    cases = sorted(
+        REALTIME_INVESTIGATIONS.values(),
+        key=lambda item: item.get("created_at", ""),
+        reverse=True,
+    )
+    return {"total": len(cases), "investigations": cases}
+
+
+@app.get("/api/realtime/investigations/{case_id}")
+async def get_realtime_investigation(case_id: str):
+    case = REALTIME_INVESTIGATIONS.get(case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Realtime investigation not found")
+    return case
+
+
+@app.post("/api/realtime/investigations/{case_id}/decision", status_code=202)
+async def decide_realtime_investigation(
+    case_id: str,
+    decision: RealtimeInvestigationDecision,
+    request: Request,
+):
+    """Apply the mandatory human gate; approval starts the complete ADK workflow once."""
+    case = REALTIME_INVESTIGATIONS.get(case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Realtime investigation not found")
+
+    action = decision.decision.upper().strip()
+    investigator = decision.investigator.strip()
+    if action not in {"APPROVE", "REJECT"}:
+        raise HTTPException(status_code=400, detail="decision must be APPROVE or REJECT")
+    if not investigator:
+        raise HTTPException(status_code=400, detail="investigator is required for the audit trail")
+
+    current = case.get("status")
+    if current != "pending_validation":
+        same_decision = (
+            (action == "APPROVE" and current in {"approved", "running", "completed", "failed"})
+            or (action == "REJECT" and current == "rejected")
+        )
+        if same_decision:
+            return case
+        raise HTTPException(status_code=409, detail=f"Case is already {current}")
+
+    case["human_validation"] = {
+        "decision": action,
+        "investigator": investigator,
+        "notes": (decision.notes or "").strip()[:1000],
+        "validated_at": _utc_now(),
+    }
+
+    if action == "REJECT":
+        case["status"] = "rejected"
+        await manager.broadcast(json.dumps({
+            "msg_type": "investigation_rejected",
+            "case_id": case_id,
+            "tx_id": case.get("tx_id"),
+            "customer_id": case.get("customer_id"),
+            "case": case,
+        }))
+        return case
+
+    case["status"] = "running"
+    case["started_at"] = _utc_now()
+    runner = getattr(request.app.state, "runner", None)
+    adk_app_name = getattr(request.app.state, "agent_app_name", "app")
+    task = asyncio.create_task(_run_approved_realtime_investigation(
+        case["customer_id"], case["row"], runner, adk_app_name, case_id
+    ))
+    _REALTIME_INVESTIGATION_TASKS.add(task)
+    task.add_done_callback(_REALTIME_INVESTIGATION_TASKS.discard)
+    return case
 
 
 # --------------------------------------------------------------------------

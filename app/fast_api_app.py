@@ -81,10 +81,21 @@ otel_to_cloud = False
 AGENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXPORTS_DIR = os.path.join(AGENT_DIR, "exports")
 VISUALIZATION_PATH = os.path.join(AGENT_DIR, "web", "visualization.html")
-SENTINEL_PATH = os.path.join(AGENT_DIR, "web", "sentinel.html")
+SENTINEL_PATH = os.path.join(AGENT_DIR, "web", "sentinel.html") if os.path.exists(os.path.join(AGENT_DIR, "web", "sentinel.html")) else (os.path.join(AGENT_DIR, "web", "Financialcrime.html") if os.path.exists(os.path.join(AGENT_DIR, "web", "Financialcrime.html")) else os.path.join(AGENT_DIR, "Financialcrime.html"))
 REALTIME_PATH = os.path.join(AGENT_DIR, "web", "realtime.html")
 UNIFIED_PATH = os.path.join(AGENT_DIR, "web", "dashboard.html")
+LIVE_STREAM_HTML_PATH = os.path.join(AGENT_DIR, "web", "live_stream.html")
 TRANSACTIONS_CSV = os.path.join(EXPORTS_DIR, "transactions.csv")
+
+# Sentinel Live Stream & Autonomous Agent Interrogation Layer
+import uuid
+from app.live_agent.scenarios import SCENARIOS, LiveStreamEngine
+from app.live_agent.agent import AgentRun
+from app.live_agent.policy import PolicyEngine
+from app.live_agent.database import DatabaseInformationService
+
+ACTIVE_AGENT_RUNS: Dict[str, AgentRun] = {}
+RUNS: Dict[str, Dict[str, Any]] = {}
 
 
 class ConnectionManager:
@@ -796,6 +807,201 @@ async def serve_sentinel():
         with open(SENTINEL_PATH, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     return HTMLResponse("<h1>Sentinel file missing</h1>", status_code=404)
+
+
+# --------------------------------------------------------------------------
+# Sentinel Real-Time Live Streaming & Autonomous Agent Interrogation Routes
+# --------------------------------------------------------------------------
+
+@app.get("/live-stream", response_class=HTMLResponse)
+async def serve_live_stream():
+    """Sentinel Real-Time Live Streaming & Autonomous Agent Interrogation Console."""
+    if os.path.exists(LIVE_STREAM_HTML_PATH):
+        with open(LIVE_STREAM_HTML_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Sentinel Live Stream file missing</h1>", status_code=404)
+
+
+@app.get("/api/scenarios")
+async def get_stream_scenarios():
+    """Returns available suspicious scenarios for dynamic injection."""
+    summary_list = []
+    for cid, s in SCENARIOS.items():
+        summary_list.append({
+            "id": s["id"],
+            "title": s["title"],
+            "subtitle": s["subtitle"],
+            "expected_action": s["expected_action"],
+            "transaction": s["transaction"],
+            "customer": {
+                "name": s["customer"]["name"],
+                "typical_min": s["customer"]["typical_min"],
+                "typical_max": s["customer"]["typical_max"]
+            }
+        })
+    return summary_list
+
+
+@app.get("/api/stream")
+async def get_stream_window():
+    """Sliding window of live Tier-0 screened transactions."""
+    return LiveStreamEngine.get_latest_stream()
+
+
+@app.get("/api/stream/next")
+async def get_stream_next():
+    """Generates next live routine transaction into the waterfall stream."""
+    return LiveStreamEngine.generate_routine_tx()
+
+
+@app.post("/api/stream/inject")
+async def inject_stream_tx(payload: Dict[str, Any]):
+    """Injects a high-risk case transaction into the live stream."""
+    case_id = payload.get("caseId") or payload.get("case_id", "case-3")
+    try:
+        tx = LiveStreamEngine.inject_case_tx(case_id)
+        return {"status": "injected", "transaction": tx}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/database/questions")
+async def get_database_questions():
+    """Returns diagnostic inquiry questions from SQLite investigation_question_bank."""
+    return DatabaseInformationService.get_all_questions()
+
+
+@app.get("/api/database/customer")
+async def get_database_customer(id: str = ""):
+    """Retrieves KYC customer profile from Sentinel SQLite database."""
+    profile = DatabaseInformationService.get_customer_profile(id) if id else None
+    if not profile:
+        profile = {
+            "customer_id": id or "CUST-3912",
+            "full_name": "Elin Nygren" if "3912" in (id or "") else ("Alice Lindqvist" if "1042" in (id or "") else "Johan Holm"),
+            "risk_score": 0.18,
+            "risk_level": "LOW_BASELINE",
+            "annual_income_sek": 468000,
+            "monthly_turnover_baseline": 24500,
+            "kyc_verified_date": "2021-04-14",
+            "residential_address": "Karlavägen 42, Stockholm",
+            "primary_device_id": "DEV-112 (Apple iPhone 15 Pro)",
+            "bankid_auth_level": "High Assurance Level 3 (Biometric)",
+            "historical_alert_count": 0
+        }
+    return {"status": "found", "customer": profile}
+
+
+@app.post("/api/investigations")
+async def create_investigation(payload: Dict[str, Any], request: Request):
+    """Launches an autonomous agent investigation with multi-tool evidence collection."""
+    case_id = payload.get("case_id", "case-3")
+    if case_id not in SCENARIOS:
+        raise HTTPException(status_code=400, detail=f"Unknown case_id: {case_id}")
+    run_id = f"run-{case_id}-{datetime.utcnow().strftime('%H%M%S')}-{uuid.uuid4().hex[:4]}"
+    agent_run = AgentRun(
+        run_id=run_id,
+        case_id=case_id,
+        scenario=SCENARIOS[case_id],
+        patches=payload.get("patches", {}),
+        api_key=request.headers.get("X-Gemini-Api-Key") or payload.get("api_key", "")
+    )
+    ACTIVE_AGENT_RUNS[run_id] = agent_run
+    result = agent_run.run_investigation()
+    RUNS[run_id] = result
+    return result
+
+
+@app.post("/api/inquiry/submit")
+async def submit_customer_inquiry(payload: Dict[str, Any]):
+    """Processes customer interrogation testimony, feeds back to Jev Reasoner, updates policy to ESCROW FREEZE."""
+    run_id = payload.get("run_id")
+    question_id = payload.get("question_id")
+    selected_option = payload.get("selected_option", {})
+    
+    agent_run = ACTIVE_AGENT_RUNS.get(run_id)
+    if not agent_run:
+        target_case = payload.get("case_id", "case-3")
+        agent_run = AgentRun(
+            run_id=run_id or f"run-{target_case}-live",
+            case_id=target_case,
+            scenario=SCENARIOS.get(target_case, SCENARIOS["case-3"])
+        )
+        agent_run.run_investigation()
+        ACTIVE_AGENT_RUNS[agent_run.run_id] = agent_run
+    
+    # 1. Record customer statement as non-repudiable audit evidence #E07
+    ev_res = agent_run.env.record_customer_inquiry_response(question_id, selected_option)
+    new_eid = ev_res["evidence_id"]
+    
+    # 2. Audit log to SQLite database
+    DatabaseInformationService.log_customer_inquiry(
+        case_id=agent_run.case_id,
+        tx_id=agent_run.scenario["transaction"]["id"],
+        question_id=question_id,
+        option_key=selected_option.get("key", "UNKNOWN"),
+        statement=selected_option.get("statement", ""),
+        impact=selected_option.get("risk_verdict", "CONFIRMED_COERCION"),
+        evidence_id=new_eid
+    )
+    
+    # 3. Feed customer testimony back to Jev Reasoner for conclusive synthesis
+    all_eids = [e["evidence_id"] for e in agent_run.evidence_store.get_all()]
+    jev_step = agent_run.execute_tool(
+        "assess_with_jev",
+        {"evidence_ids": all_eids},
+        f"Re-synthesizing decision with recorded customer testimony {new_eid}",
+        input_evidence_ids=all_eids
+    )
+    
+    agent_run.claims.append({
+        "claim_id": f"C0{len(agent_run.claims) + 1}",
+        "text": f"Customer statement recorded: {selected_option.get('statement')}",
+        "supporting_evidence_ids": [new_eid]
+    })
+    
+    agent_run.finalize_investigation()
+    updated_dict = agent_run.to_dict()
+    updated_dict["inquiry_resolution"] = {
+        "status": "PROCESSED",
+        "selected_option": selected_option,
+        "jev_judgment": jev_step["data"],
+        "evidence_id": new_eid,
+        "conclusive_dossier": jev_step["data"].get("dossier_brief")
+    }
+    RUNS[agent_run.run_id] = updated_dict
+    return updated_dict
+
+
+@app.post("/api/repeatability")
+async def test_repeatability(payload: Dict[str, Any]):
+    """Decision stability across repeated fresh agent inferences."""
+    case_id = payload.get("case_id", "case-3")
+    num_runs = int(payload.get("runs", 5))
+    if case_id not in SCENARIOS:
+        raise HTTPException(status_code=400, detail=f"Unknown case_id: {case_id}")
+    actions = []
+    for i in range(num_runs):
+        run_res = AgentRun(
+            run_id=f"rep-{i+1}-{uuid.uuid4().hex[:4]}",
+            case_id=case_id,
+            scenario=SCENARIOS[case_id]
+        ).run_investigation()
+        actions.append(run_res["policy_decision"]["action"])
+    counts = {}
+    for a in actions:
+        counts[a] = counts.get(a, 0) + 1
+    modal_action = max(counts, key=counts.get)
+    agreement_rate = counts[modal_action] / num_runs
+    return {
+        "case_id": case_id,
+        "total_runs": num_runs,
+        "actions": actions,
+        "distribution": counts,
+        "modal_action": modal_action,
+        "stability_rate": agreement_rate,
+        "is_stable": agreement_rate >= 0.8
+    }
 
 
 @app.get("/realtime", response_class=HTMLResponse)

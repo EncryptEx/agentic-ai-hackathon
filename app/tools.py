@@ -201,6 +201,75 @@ def get_transactions(customer_id: str) -> list[dict[str, Any]]:
     )
 
 
+def get_transaction_evidence(customer_id: str, focus: str = "aml", limit: int = 40,
+                             offset: int = 0) -> dict[str, Any]:
+    """Get a bounded, prioritized page of exact synthetic transaction records.
+
+    Args:
+        customer_id: Customer under investigation.
+        focus: "aml" or "fraud", to prioritize relevant records.
+        limit: Page size (1-100, default 40).
+        offset: Next page offset from the previous result; zero starts a review.
+
+    Returns:
+        Full-population counts and totals, exact records and explicit omissions.
+        This page is not the full history. Retrieve further pages or use
+        get_transactions when missing detail is material; never treat omitted
+        records as clean evidence. No records are removed from the database.
+    """
+    if focus not in ("aml", "fraud") or not 1 <= limit <= 100 or offset < 0:
+        return {"error": "Use focus aml/fraud, limit 1-100 and a nonnegative offset."}
+    transactions = get_transactions(customer_id)
+    alerts = get_transaction_alerts(customer_id) if focus == "aml" else get_fraud_alerts(customer_id)
+    supporting = {tx_id for alert in alerts
+                  for tx_id in (alert.get("supporting_transaction_ids") or [])}
+
+    def priority(tx):
+        amount = abs(float(tx.get("amount_usd") or 0))
+        if tx["transaction_id"] in supporting:
+            rank = 0
+        elif focus == "fraud" and ("DECLINED" in (tx.get("auth_status") or "") or tx.get("is_new_payee")):
+            rank = 1
+        elif focus == "aml" and (tx.get("counterparty_country") in FATF_BLACKLIST | FATF_GREYLIST
+                                 or ("CASH" in (tx.get("kind") or "") and 7500 <= amount < 10000)):
+            rank = 1
+        else:
+            rank = 2
+        return rank, -amount, tx.get("timestamp") or "", tx["transaction_id"]
+
+    ordered = sorted(transactions, key=priority)
+    # Reserve some first-page space for ordinary small/early/late payments so
+    # the selection does not exclusively surface incriminating-looking records.
+    if ordered:
+        routine = [tx for tx in transactions if priority(tx)[0] == 2]
+        context = (routine[:3] + routine[-3:] + sorted(
+            routine, key=lambda tx: abs(float(tx.get("amount_usd") or 0)))[:3])
+        reserved = {tx["transaction_id"] for tx in context}
+        primary = [tx for tx in ordered if tx["transaction_id"] not in reserved]
+        unique_context = {tx["transaction_id"]: tx for tx in context}
+        split = max(0, limit - len(unique_context))
+        ordered = primary[:split] + list(unique_context.values()) + primary[split:]
+    page = ordered[offset:offset + limit]
+    total = len(transactions)
+    timestamps = [tx.get("timestamp") for tx in transactions if tx.get("timestamp")]
+    return {
+        "customer_id": customer_id, "focus": focus, "total_count": total,
+        "window_start": min(timestamps) if timestamps else None,
+        "window_end": max(timestamps) if timestamps else None,
+        "total_amount_usd": round(sum(float(tx.get("amount_usd") or 0) for tx in transactions), 2),
+        "inbound_amount_usd": round(sum(float(tx.get("amount_usd") or 0) for tx in transactions
+                                       if tx.get("direction") == "INBOUND"), 2),
+        "outbound_amount_usd": round(sum(float(tx.get("amount_usd") or 0) for tx in transactions
+                                        if tx.get("direction") == "OUTBOUND"), 2),
+        "transactions": page, "returned_count": len(page), "offset": offset,
+        "omitted_count": total - len(page),
+        "next_offset": offset + len(page) if offset + len(page) < total else None,
+        "selection": "Alert-linked and focus-relevant records, then largest amounts; first page includes routine context.",
+        "coverage_warning": "This is a selected page, not a complete history. Omitted records are unreviewed, not clean. "
+                            "Use next_offset or get_transactions for material gaps. Totals cover the full population.",
+    }
+
+
 def get_expected_activity(customer_id: str) -> dict[str, Any]:
     """Get the expected monthly activity profile for a customer.
 
@@ -661,6 +730,7 @@ CUSTOMER_TOOLS = [
 ]
 
 TRANSACTION_TOOLS = [
+    get_transaction_evidence,
     get_transactions,
     analyze_transactions,
     get_expected_activity,
@@ -668,6 +738,7 @@ TRANSACTION_TOOLS = [
 ]
 
 FRAUD_TOOLS = [
+    get_transaction_evidence,
     get_fraud_alerts,
     get_digital_telemetry,
     get_transactions,

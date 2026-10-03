@@ -151,9 +151,17 @@ async def run_investigation_for_realtime(customer_id: str, row: dict, runner, ad
                         if hasattr(part, "text") and part.text:
                             final_report = part.text
         except Exception as e:
-            final_report = f"LLM error: {e}"
+            try:
+                from app.alert_feed import generate_specialist_investigation_report
+                final_report = generate_specialist_investigation_report(customer_id)
+            except Exception as ex:
+                final_report = f"LLM error: {e}. Fallback also failed: {ex}"
     else:
-        final_report = "Runner not configured."
+        try:
+            from app.alert_feed import generate_specialist_investigation_report
+            final_report = generate_specialist_investigation_report(customer_id)
+        except Exception as ex:
+            final_report = f"Runner not configured. Fallback also failed: {ex}"
 
     await manager.broadcast(json.dumps({
         "msg_type": "investigation_finished",

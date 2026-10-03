@@ -42,4 +42,34 @@ FRAUD_RULES_CONFIG: Dict[str, Any] = {
     "SYNTHETIC_ID_VOIP_PHONE_PENALTY": 30.0,
     "SYNTHETIC_ID_ADDRESS_MISMATCH_PENALTY": 25.0,
     "SYNTHETIC_ID_SCORE_THRESHOLD": 60.0,
+
+    # FR-06: SIM Swap / Credential Reset & Outbound Wire Drain
+    "SIM_SWAP_DRAIN_MIN_USD": 3000.0,
+    "SIM_SWAP_MAX_HOURS_POST_RESET": 24.0,
+    "SIM_SWAP_RISK_SCORE": 91.0,
+
+    # FR-07: Friendly Fraud / Chargeback Abuse & First-Party Merchant Claims
+    "FRIENDLY_FRAUD_MIN_DISPUTES": 2,
+    "FRIENDLY_FRAUD_MIN_AMOUNT_USD": 1200.0,
+    "FRIENDLY_FRAUD_RISK_SCORE": 78.0,
+
+    # FR-08: BIN Attack & High-Velocity Automated Card Testing
+    "BIN_ATTACK_MIN_DECLINES": 3,
+    "BIN_ATTACK_WINDOW_MINUTES": 30,
+    "BIN_ATTACK_RISK_SCORE": 89.0,
+
+    # FR-09: Business Email Compromise (BEC) / Executive Impersonation
+    "BEC_MIN_AMOUNT_USD": 10000.0,
+    "BEC_RISK_SCORE": 93.0,
+
+    # FR-10: Adversary-in-the-Middle (AitM) Phishing Session Hijack
+    "AITM_SESSION_WINDOW_MINUTES": 60,
+    "AITM_MIN_DRAIN_USD": 2000.0,
+    "AITM_RISK_SCORE": 94.0,
+
+    # FR-11: Counterfeit Overpayment / Fake Refund Scam
+    "OVERPAYMENT_MIN_DEPOSIT_USD": 5000.0,
+    "OVERPAYMENT_REFUND_RATIO": 0.60,
+    "OVERPAYMENT_WINDOW_HOURS": 72,
+    "OVERPAYMENT_RISK_SCORE": 86.0,
 }

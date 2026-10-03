@@ -44,12 +44,12 @@
             <div class="kpi-card fraud">
                 <div class="kpi-label">Active Fraud Alerts</div>
                 <div class="kpi-value" id="kpi-total-fraud">0</div>
-                <div class="kpi-sub">ATO, Card Testing, APP, Bust-Out</div>
+                <div class="kpi-sub">ATO, Card Testing, SIM Swap, BEC & AitM</div>
             </div>
             <div class="kpi-card high">
                 <div class="kpi-label">Active AML Alerts</div>
                 <div class="kpi-value" id="kpi-total-aml">0</div>
-                <div class="kpi-sub">Structuring, Mules, Corridors</div>
+                <div class="kpi-sub">Structuring, Mules, TBML, Mixers & Corridors</div>
             </div>
             <div class="kpi-card crit">
                 <div class="kpi-label">Critical & High Risk</div>
@@ -173,7 +173,7 @@
         <div id="tab-fraud" class="tab-content" style="display: none;">
             <div style="margin-bottom: 20px;">
                 <h2 style="font-size: 18px; margin-bottom: 4px;">Fraud Typology Attack Pathways & Automated Interventions</h2>
-                <p style="color: var(--text-secondary); font-size: 13px;">Review the telemetry patterns and attack mechanics detected by real-time fraud engines.</p>
+                <p style="color: var(--text-secondary); font-size: 13px;">Review the telemetry patterns and attack mechanics detected by real-time fraud engines. Click any typology to test it live in the simulator.</p>
             </div>
 
             <!-- Fraud 1: ATO -->
@@ -183,7 +183,10 @@
                         <span class="badge badge-CRITICAL">Typology FR-01</span>
                         <h3 style="font-size: 16px; margin-top: 4px;">Account Takeover (ATO) & Impossible Travel Velocity</h3>
                     </div>
-                    <span style="color: #ef4444; font-size: 12px; font-weight: 700;">Immediate Session Revocation</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="color: #ef4444; font-size: 12px; font-weight: 700;">Immediate Session Revocation</span>
+                        <button class="btn-pick-test" data-pick="ATO">▶ Pick & Test in Simulator</button>
+                    </div>
                 </div>
                 <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
                     Credential stuffing or SIM-swap leads to unauthorized web session from a foreign proxy. An impossible travel velocity (>900 km/h) is recorded within 40 minutes of a legitimate customer session.
@@ -216,7 +219,10 @@
                         <span class="badge badge-HIGH">Typology FR-02</span>
                         <h3 style="font-size: 16px; margin-top: 4px;">Card Testing / Micro-Authorization Probing Attack</h3>
                     </div>
-                    <span style="color: #f97316; font-size: 12px; font-weight: 700;">Botnet PAN Validation</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="color: #f97316; font-size: 12px; font-weight: 700;">Botnet PAN Validation</span>
+                        <button class="btn-pick-test" data-pick="CARD_TEST">▶ Pick & Test in Simulator</button>
+                    </div>
                 </div>
                 <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
                     Botnet tests stolen card numbers via sub-$2.00 micro-charges on automated digital subscription merchants, then executes a four-figure CNP purchase within minutes.
@@ -242,14 +248,53 @@
                 </div>
             </div>
 
-            <!-- Fraud 3: First-Party Bust-Out -->
+            <!-- Fraud 3: APP Scam -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-HIGH">Typology FR-03</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">Authorized Push Payment (APP) / Investment & Impersonation Scam</h3>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="color: #f59e0b; font-size: 12px; font-weight: 700;">Urgent Social Engineering</span>
+                        <button class="btn-pick-test" data-pick="APP_SCAM">▶ Pick & Test in Simulator</button>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Victim is manipulated via fraudulent high-yield investment advisory to initiate fast push payments to brand new unverified overseas entities with deceptive reference narratives.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node">
+                        <div class="flow-node-title">Social Engineering</div>
+                        <div class="flow-node-val" style="color: #f59e0b;">Guaranteed Yield</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Telegram/WhatsApp Boiler</div>
+                    </div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #f59e0b;">
+                        <div class="flow-node-title">Victim Authorized Outflow</div>
+                        <div class="flow-node-val" style="color: #ef4444;">$16,300.00 P2P Wire</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">New Payee (0.5 hrs seen)</div>
+                    </div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Destination Mule</div>
+                        <div class="flow-node-val" style="color: #ef4444;">VIP Arbitrage Pool</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">Funds Irretrievable</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud 4: First-Party Bust-Out -->
             <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <div>
                         <span class="badge badge-CRITICAL">Typology FR-04</span>
                         <h3 style="font-size: 16px; margin-top: 4px;">First-Party Bust-Out & Deposit Kiting Fraud</h3>
                     </div>
-                    <span style="color: #ef4444; font-size: 12px; font-weight: 700;">ACH Settlement Race Condition</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="color: #ef4444; font-size: 12px; font-weight: 700;">ACH Settlement Race Condition</span>
+                        <button class="btn-pick-test" data-pick="BUSTOUT">▶ Pick & Test in Simulator</button>
+                    </div>
                 </div>
                 <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
                     Fraudster deposits unverified external ACH funds, then races against the 48-hour clearing window to extract cash at ATMs and outbound P2P transfers before the ACH deposit bounces.
@@ -275,35 +320,218 @@
                 </div>
             </div>
 
-            <!-- Fraud 4: Synthetic ID -->
-            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px;">
+            <!-- Fraud 5: SIM Swap -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <div>
-                        <span class="badge badge-HIGH">Typology FR-05</span>
-                        <h3 style="font-size: 16px; margin-top: 4px;">Synthetic Identity Fraud & Burner Contact Screening</h3>
+                        <span class="badge badge-CRITICAL">Typology FR-06</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">SIM Swap & Credential Reset Outbound Drain</h3>
                     </div>
-                    <span style="color: var(--fraud-magenta); font-size: 12px; font-weight: 700;">Fabricated Digital Footprint</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="color: #ef4444; font-size: 12px; font-weight: 700;">Carrier Port Intercept</span>
+                        <button class="btn-pick-test" data-pick="SIM_SWAP">▶ Pick & Test in Simulator</button>
+                    </div>
                 </div>
                 <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
-                    Applicant combines real SSN elements with fabricated names, disposable temporary email domains, and virtual VoIP burner numbers to construct an artificial credit file.
+                    Attacker conducts social-engineering port-out at victim's telecom carrier, receives OTP SMS, resets online banking password, registers an attacker device and sweeps funds out within 30 minutes.
                 </p>
                 <div class="typology-flow">
-                    <div class="flow-node" style="border-color: var(--fraud-magenta);">
-                        <div class="flow-node-title">Burner Domain</div>
-                        <div class="flow-node-val">throwawayinbox.com</div>
-                        <div style="font-size: 10px; color: var(--fraud-magenta);">Disposable Temp Mail</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Carrier Port-Out (T=0)</div>
+                        <div class="flow-node-val" style="color: #ef4444;">IMSI Changed</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">MFA Reset Captured</div>
                     </div>
-                    <div class="flow-arrow">+</div>
-                    <div class="flow-node" style="border-color: var(--fraud-magenta);">
-                        <div class="flow-node-title">Virtual VoIP Line</div>
-                        <div class="flow-node-val">+1-555-PBX-VOIP</div>
-                        <div style="font-size: 10px; color: var(--fraud-magenta);">No Carrier SIM Identity</div>
+                    <div class="flow-arrow">➔ 15m later ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Device Enrollment</div>
+                        <div class="flow-node-val">Rogue Handset</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">DEV-ROGUE-88A</div>
                     </div>
                     <div class="flow-arrow">➔</div>
                     <div class="flow-node" style="border-color: #ef4444;">
-                        <div class="flow-node-title">Synthetic Algorithm</div>
-                        <div class="flow-node-val" style="color: #ef4444;">Risk Index: 88.5/100</div>
-                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">CIF Freeze Required</div>
+                        <div class="flow-node-title">Immediate Wire Evac</div>
+                        <div class="flow-node-val" style="color: #ef4444;">-$8,950.00 Wire</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">Account Zeroed</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud 6: Friendly Fraud -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-HIGH">Typology FR-07</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">Friendly Fraud / Systematic Chargeback & Merchant Abuse</h3>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="color: #f97316; font-size: 12px; font-weight: 700;">First-Party Dispute Abuse</span>
+                        <button class="btn-pick-test" data-pick="FRIENDLY_FRAUD">▶ Pick & Test in Simulator</button>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Cardholder places repeated four-figure orders from verified primary device and domestic residence with 3D Secure verification, then systematically files "goods not received" claims to keep merchandise and obtain refund credits.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node">
+                        <div class="flow-node-title">3DS Verified Orders</div>
+                        <div class="flow-node-val" style="color: #10b981;">3x Orders ($2,860)</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Trusted Home IP & Device</div>
+                    </div>
+                    <div class="flow-arrow">➔ 10d later ➔</div>
+                    <div class="flow-node" style="border-color: #f97316;">
+                        <div class="flow-node-title">False Claims Filed</div>
+                        <div class="flow-node-val" style="color: #f97316;">3x Disputes</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">"Unauthorized / Not Delivered"</div>
+                    </div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">FRAML Intervention</div>
+                        <div class="flow-node-val" style="color: #ef4444;">Chargeback Clawback</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">Account Closure Rec</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud 7: BIN Attack -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology FR-08</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">Automated BIN Attack & Card Testing Velocity</h3>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="color: #ef4444; font-size: 12px; font-weight: 700;">Brute-Force Gateway Attack</span>
+                        <button class="btn-pick-test" data-pick="BIN_ATTACK">▶ Pick & Test in Simulator</button>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Botnet executes programmatic brute-force enumeration of expiration dates and CVVs across merchant payment gateways, registering high decline velocity followed by successful auth.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">CVV Guess #1</div>
+                        <div class="flow-node-val" style="color: #ef4444;">$1.99 Declined</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Invalid CVV / FastPay</div>
+                    </div>
+                    <div class="flow-arrow">+</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Expiry Guess #2</div>
+                        <div class="flow-node-val" style="color: #ef4444;">$2.49 Declined</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Card Expired Error</div>
+                    </div>
+                    <div class="flow-arrow">➔ 9m later ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Valid Hit Drained</div>
+                        <div class="flow-node-val" style="color: #ef4444;">$850.00 Auth</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">Card Frozen by FRAML</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud 8: Executive BEC -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology FR-09</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">Business Email Compromise (BEC) & Executive Impersonation</h3>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="color: #ef4444; font-size: 12px; font-weight: 700;">Executive Wire Diversion</span>
+                        <button class="btn-pick-test" data-pick="BEC">▶ Pick & Test in Simulator</button>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Adversary intercepts corporate executive communication, instructs finance/payroll to route a large wire to an offshore nominee account under "strictly confidential acquisition" pretenses.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Spoofed Email</div>
+                        <div class="flow-node-val" style="color: #ef4444;">"Strictly Confidential"</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">CEO Authorization Cover</div>
+                    </div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Diversion Request</div>
+                        <div class="flow-node-val">Revised Wire Routing</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Offshore Nominee Beneficiary</div>
+                    </div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">High-Value Wire</div>
+                        <div class="flow-node-val" style="color: #ef4444;">-$64,500.00 SWIFT</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">Out-of-Band Callback Req</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud 9: AitM Phishing -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology FR-10</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">Adversary-in-the-Middle (AitM) Phishing Session Hijack</h3>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="color: #ef4444; font-size: 12px; font-weight: 700;">Session Token Exfiltration</span>
+                        <button class="btn-pick-test" data-pick="AITM">▶ Pick & Test in Simulator</button>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Victim enters credentials into a transparent reverse-proxy phishing kit. Adversary intercepts the authenticated session cookie, replaying it from a hosting VPN to bypass MFA and drain funds.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node">
+                        <div class="flow-node-title">Phishing Proxy (T=0)</div>
+                        <div class="flow-node-val" style="color: #f59e0b;">Cookie Exfiltrated</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">MFA Token Bypassed</div>
+                    </div>
+                    <div class="flow-arrow">➔ 25m later ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">VPN Token Replay</div>
+                        <div class="flow-node-val" style="color: #ef4444;">Hosting ASN IP</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Cloned Headers / IP Mismatch</div>
+                    </div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Balance Swept</div>
+                        <div class="flow-node-val" style="color: #ef4444;">-$7,800.00 Wire</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">Session Token Revoked</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud 10: Overpayment Scam -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-HIGH">Typology FR-11</span>
+                        <h3 style="font-size: 16px; margin-top: 4px;">Counterfeit Overpayment & Urgent Refund Scam</h3>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="color: #f97316; font-size: 12px; font-weight: 700;">Counterfeit Cheque Kiting</span>
+                        <button class="btn-pick-test" data-pick="OVERPAYMENT">▶ Pick & Test in Simulator</button>
+                    </div>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Victim receives a fraudulent check or ACH deposit exceeding expected amount, then is pressured into immediately wiring the "excess" to an offshore agent before the bank detects the counterfeit instrument.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node">
+                        <div class="flow-node-title">Bogus Check (T=0)</div>
+                        <div class="flow-node-val" style="color: #3b82f6;">+$16,800 Deposit</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Unverified Clearing Window</div>
+                    </div>
+                    <div class="flow-arrow">➔ 16h later ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Urgent Refund Wire</div>
+                        <div class="flow-node-val" style="color: #ef4444;">-$12,400 Outbound</div>
+                        <div style="font-size: 10px; color: var(--text-muted);">Third-Party Courier Agent</div>
+                    </div>
+                    <div class="flow-arrow">➔ 48h later ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;">
+                        <div class="flow-node-title">Deposit Reversal</div>
+                        <div class="flow-node-val" style="color: #ef4444;">Check Bounced Unpaid</div>
+                        <div style="font-size: 10px; color: #ef4444; font-weight: 700;">Victim Incurred Deficit</div>
                     </div>
                 </div>
             </div>
@@ -313,15 +541,20 @@
         <div id="tab-aml" class="tab-content" style="display: none;">
             <div style="margin-bottom: 20px;">
                 <h2 style="font-size: 18px; margin-bottom: 4px;">Anti-Money Laundering (AML) Typologies</h2>
-                <p style="color: var(--text-secondary); font-size: 13px;">Review transaction laundering pathways flagged under Bank Secrecy Act / FATF standards.</p>
+                <p style="color: var(--text-secondary); font-size: 13px;">Review transaction laundering pathways flagged under Bank Secrecy Act / FATF standards. Click any typology to test it live in the simulator.</p>
             </div>
 
-            <!-- Structuring -->
+            <!-- AML 1: Structuring -->
             <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
-                <span class="badge badge-HIGH">Typology TM-01</span>
-                <h3 style="font-size: 16px; margin: 4px 0 10px 0;">Currency Transaction Reporting (CTR) Structuring / Smurfing</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-HIGH">Typology TM-01</span>
+                        <h3 style="font-size: 16px; margin: 4px 0 6px 0;">Currency Transaction Reporting (CTR) Structuring / Smurfing</h3>
+                    </div>
+                    <button class="btn-pick-test" data-pick="STRUCTURING">▶ Pick & Test in Simulator</button>
+                </div>
                 <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
-                    Depositing multiple cash tranches in the $8,500–$9,900 range within 14 days to evade the $10,000 threshold.
+                    Depositing multiple cash tranches in the $8,500–$9,900 range within 14 days to evade the mandatory $10,000 CTR filing threshold.
                 </p>
                 <div class="typology-flow">
                     <div class="flow-node"><div class="flow-node-title">Deposit 1</div><div class="flow-node-val">$9,450 Cash</div></div>
@@ -334,10 +567,15 @@
                 </div>
             </div>
 
-            <!-- Mule -->
-            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px;">
-                <span class="badge badge-CRITICAL">Typology TM-02</span>
-                <h3 style="font-size: 16px; margin: 4px 0 10px 0;">Rapid Movement of Funds / Pass-Through Mule Account</h3>
+            <!-- AML 2: Mule -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology TM-02</span>
+                        <h3 style="font-size: 16px; margin: 4px 0 6px 0;">Rapid Movement of Funds / Pass-Through Mule Account</h3>
+                    </div>
+                    <button class="btn-pick-test" data-pick="MULE">▶ Pick & Test in Simulator</button>
+                </div>
                 <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
                     Large inbound corporate wire followed by immediate disbursement (>85% of funds) within 48 hours to crypto exchanges.
                 </p>
@@ -349,13 +587,229 @@
                     <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Crypto Outflow (T+22h)</div><div class="flow-node-val" style="color: #ef4444;">-$29,997.08 (93.8%)</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">Binance P2P</div></div>
                 </div>
             </div>
+
+            <!-- AML 3: Sanctions Corridor -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology TM-05</span>
+                        <h3 style="font-size: 16px; margin: 4px 0 6px 0;">FATF Blacklist / High-Risk Sanctions Wire Activity</h3>
+                    </div>
+                    <button class="btn-pick-test" data-pick="BLACKLIST">▶ Pick & Test in Simulator</button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Direct cross-border financial wire corridors with institutions or entities based in FATF Call-for-Action blacklisted jurisdictions (Iran, North Korea, Syria).
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node"><div class="flow-node-title">Retail Account</div><div class="flow-node-val">Domestic Account</div></div>
+                    <div class="flow-arrow">➔ SWIFT ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Blacklist Corridor</div><div class="flow-node-val" style="color: #ef4444;">Tehran Mercantile</div><div style="font-size: 10px; color: #ef4444;">Country: IR</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Regulatory Action</div><div class="flow-node-val" style="color: #ef4444;">Immediate Freeze</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">OFAC Blocking Order</div></div>
+                </div>
+            </div>
+
+            <!-- AML 4: Dormancy Break -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-HIGH">Typology TM-06</span>
+                        <h3 style="font-size: 16px; margin: 4px 0 6px 0;">Dormant Account Reactivation Surge</h3>
+                    </div>
+                    <button class="btn-pick-test" data-pick="DORMANCY">▶ Pick & Test in Simulator</button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Account remains completely dormant for 60+ days, then suddenly reactivates with consecutive high-velocity five-figure wires without profile justification.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node"><div class="flow-node-title">Inactivity Window</div><div class="flow-node-val" style="color: var(--text-muted);">90 Days Silent</div></div>
+                    <div class="flow-arrow">➔ Surge ➔</div>
+                    <div class="flow-node" style="border-color: #f97316;"><div class="flow-node-title">Burst Wire Inflow</div><div class="flow-node-val" style="color: #f97316;">+$22,000.00</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">EDD Triggered</div><div class="flow-node-val" style="color: #ef4444;">Source of Funds Req</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">SAR Candidate</div></div>
+                </div>
+            </div>
+
+            <!-- AML 5: TBML -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology TM-08</span>
+                        <h3 style="font-size: 16px; margin: 4px 0 6px 0;">Trade-Based Money Laundering (TBML) & Over/Under-Invoicing</h3>
+                    </div>
+                    <button class="btn-pick-test" data-pick="TBML">▶ Pick & Test in Simulator</button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    High-value commercial trade payments referencing bills of lading and raw cargo consignments routed through retail personal accounts to move illicit capital internationally.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node"><div class="flow-node-title">Inbound Invoice (T=0)</div><div class="flow-node-val" style="color: #10b981;">+$75,000.00 Wire</div><div style="font-size: 10px; color: var(--text-muted);">UAE Trade Consignment</div></div>
+                    <div class="flow-arrow">➔ 3d later ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Transshipment Fee</div><div class="flow-node-val" style="color: #ef4444;">-$66,000.00 Wire</div><div style="font-size: 10px; color: var(--text-muted);">HK Shipping Forwarder</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">TBML Flagged</div><div class="flow-node-val" style="color: #ef4444;">Customs Mismatch</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">Commercial Abuse</div></div>
+                </div>
+            </div>
+
+            <!-- AML 6: Fan-Out Layering -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology TM-09</span>
+                        <h3 style="font-size: 16px; margin: 4px 0 6px 0;">Fan-Out Layering / High-Velocity Fund Distribution</h3>
+                    </div>
+                    <button class="btn-pick-test" data-pick="FAN_OUT">▶ Pick & Test in Simulator</button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    A large lump-sum deposit is immediately fragmented into 5+ separate outbound transfers to disparate peer accounts, crypto onramps, and payment rails to obfuscate audit trail.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node"><div class="flow-node-title">Lump Inflow</div><div class="flow-node-val" style="color: #3b82f6;">+$36,000.00 Wire</div></div>
+                    <div class="flow-arrow">➔ 24h burst ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">5x Dispersed Payees</div><div class="flow-node-val" style="color: #ef4444;">5x ~$7,000 Out</div><div style="font-size: 10px; color: var(--text-muted);">P2P, Crypto & Offshore</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Audit Trail Broken</div><div class="flow-node-val" style="color: #ef4444;">Multi-Hop Layering</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">Critical SAR</div></div>
+                </div>
+            </div>
+
+            <!-- AML 7: Cuckoo Smurfing -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-HIGH">Typology TM-10</span>
+                        <h3 style="font-size: 16px; margin: 4px 0 6px 0;">Cuckoo Smurfing & Hawala Remittance Matching</h3>
+                    </div>
+                    <button class="btn-pick-test" data-pick="CUCKOO">▶ Pick & Test in Simulator</button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Account receives multiple unrelated cash and peer credits from unconnected individuals at disparate bank branches, used as unwitting Hawala alternative remittance destination.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node"><div class="flow-node-title">Unrelated Remitter 1</div><div class="flow-node-val">$4,800 Cash</div></div>
+                    <div class="flow-arrow">+</div>
+                    <div class="flow-node"><div class="flow-node-title">Unrelated Remitter 2</div><div class="flow-node-val">$4,200 Wire</div></div>
+                    <div class="flow-arrow">+</div>
+                    <div class="flow-node"><div class="flow-node-title">Unrelated Remitter 3</div><div class="flow-node-val">$4,600 Cash</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Total Hawala Pool</div><div class="flow-node-val" style="color: #ef4444;">$18,500.00</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">Underground Remit</div></div>
+                </div>
+            </div>
+
+            <!-- AML 8: Crypto Mixer -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology TM-11</span>
+                        <h3 style="font-size: 16px; margin: 4px 0 6px 0;">Crypto Mixer, Tumbler & Anonymity Protocol Interaction</h3>
+                    </div>
+                    <button class="btn-pick-test" data-pick="MIXER">▶ Pick & Test in Simulator</button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Direct financial interaction with sanctioned zero-knowledge virtual asset obfuscation protocols (Tornado Cash, Wasabi, Sinbad) to scrub transaction history and source-of-funds.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node"><div class="flow-node-title">Account Outflow</div><div class="flow-node-val" style="color: #ef4444;">-$18,500.00 Wire</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Sanctioned Mixer</div><div class="flow-node-val" style="color: #ef4444;">Tornado Cash Pool</div><div style="font-size: 10px; color: #ef4444;">OFAC SDN Listed</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Obfuscated Return Hop</div><div class="flow-node-val" style="color: #ef4444;">+$17,800 Cleaned</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">Mandatory Freeze</div></div>
+                </div>
+            </div>
+
+            <!-- AML 9: Human Trafficking -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-CRITICAL">Typology TM-12</span>
+                        <h3 style="font-size: 16px; margin: 4px 0 6px 0;">Human Trafficking & Modern Slavery Labor Exploitation Red Flags</h3>
+                    </div>
+                    <button class="btn-pick-test" data-pick="TRAFFICKING">▶ Pick & Test in Simulator</button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Centralized wage skimming from multiple workers into a single supervisor funnel account, paired with late-night ATM cash extractions and transit lodging payments.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node"><div class="flow-node-title">Centralized Wages</div><div class="flow-node-val" style="color: #3b82f6;">3x Worker Wages</div><div style="font-size: 10px; color: var(--text-muted);">P2P Skimmed ($2,550)</div></div>
+                    <div class="flow-arrow">➔ 02:40 AM ➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Late-Night ATM Drains</div><div class="flow-node-val" style="color: #ef4444;">3x $800 Cash Out</div><div style="font-size: 10px; color: var(--text-muted);">Transit Plaza Terminal</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">FinCEN Advisory Hit</div><div class="flow-node-val" style="color: #ef4444;">Trafficking Red Flag</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">Expedited SAR</div></div>
+                </div>
+            </div>
+
+            <!-- AML 10: Loan Wash -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 22px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div>
+                        <span class="badge badge-HIGH">Typology TM-13</span>
+                        <h3 style="font-size: 16px; margin: 4px 0 6px 0;">Loan Collateral Laundering & Rapid Early Liquidation</h3>
+                    </div>
+                    <button class="btn-pick-test" data-pick="LOAN_WASH">▶ Pick & Test in Simulator</button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Customer secures term loan disbursement and liquidates the debt in full within 10 days using unverified third-party cash or offshore funds, transforming dirty funds into legitimate bank loan payoff.
+                </p>
+                <div class="typology-flow">
+                    <div class="flow-node"><div class="flow-node-title">Loan Disbursed (T=0)</div><div class="flow-node-val" style="color: #10b981;">+$40,000 Principal</div></div>
+                    <div class="flow-arrow">➔ 10d later ➔</div>
+                    <div class="flow-node" style="border-color: #f97316;"><div class="flow-node-title">Early Liquidation</div><div class="flow-node-val" style="color: #f97316;">-$40,150 Payoff</div><div style="font-size: 10px; color: var(--text-muted);">Unverified Offshore Funds</div></div>
+                    <div class="flow-arrow">➔</div>
+                    <div class="flow-node" style="border-color: #ef4444;"><div class="flow-node-title">Collateral Cleaned</div><div class="flow-node-val" style="color: #ef4444;">Clean Bank Paper</div><div style="font-size: 10px; color: #ef4444; font-weight: 700;">Laundering Wash</div></div>
+                </div>
+            </div>
         </div>
 
         <!-- TAB 5: LIVE RISK SIMULATOR -->
         <div id="tab-simulator" class="tab-content" style="display: none;">
             <div style="margin-bottom: 20px;">
                 <h2 style="font-size: 18px; margin-bottom: 4px;">Live FRAML Risk Engine Simulator</h2>
-                <p style="color: var(--text-secondary); font-size: 13px;">Test the multi-pillar scoring model by varying KYC demographics, watchlist findings, products, and injecting suspicious transaction typologies.</p>
+                <p style="color: var(--text-secondary); font-size: 13px;">Test the multi-pillar scoring model by varying KYC demographics, watchlist findings, products, and injecting suspicious transaction typologies. Click any quick-pick preset to auto-populate relevant customer and transaction data.</p>
+            </div>
+
+            <!-- Quick-Pick Typology Presets Panel -->
+            <div class="quick-pick-panel">
+                <div class="quick-pick-title">
+                    <span>⚡ Quick-Pick Typology Preset:</span>
+                    <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">Select any typology to automatically populate realistic suspect KYC profile data, risk indicators, and suspicious transaction streams</span>
+                </div>
+                
+                <div class="chip-group-label">🛡️ Fraud Typologies</div>
+                <div class="chip-container">
+                    <button type="button" class="typology-chip fraud active" data-pick="ATO">FR-01 ATO & Travel</button>
+                    <button type="button" class="typology-chip fraud" data-pick="CARD_TEST">FR-02 Card Testing</button>
+                    <button type="button" class="typology-chip fraud" data-pick="APP_SCAM">FR-03 APP Scam</button>
+                    <button type="button" class="typology-chip fraud" data-pick="BUSTOUT">FR-04 Bust-Out</button>
+                    <button type="button" class="typology-chip fraud" data-pick="SIM_SWAP">FR-06 SIM Swap</button>
+                    <button type="button" class="typology-chip fraud" data-pick="FRIENDLY_FRAUD">FR-07 Friendly Fraud</button>
+                    <button type="button" class="typology-chip fraud" data-pick="BIN_ATTACK">FR-08 BIN Attack</button>
+                    <button type="button" class="typology-chip fraud" data-pick="BEC">FR-09 Executive BEC</button>
+                    <button type="button" class="typology-chip fraud" data-pick="AITM">FR-10 AitM Phishing</button>
+                    <button type="button" class="typology-chip fraud" data-pick="OVERPAYMENT">FR-11 Overpayment</button>
+                </div>
+
+                <div class="chip-group-label" style="margin-top: 14px;">⚖️ Anti-Money Laundering (AML) Typologies</div>
+                <div class="chip-container">
+                    <button type="button" class="typology-chip aml" data-pick="STRUCTURING">TM-01 CTR Structuring</button>
+                    <button type="button" class="typology-chip aml" data-pick="MULE">TM-02 Money Mule</button>
+                    <button type="button" class="typology-chip aml" data-pick="BLACKLIST">TM-05 Sanctions Corridor</button>
+                    <button type="button" class="typology-chip aml" data-pick="DORMANCY">TM-06 Dormancy Reactivation</button>
+                    <button type="button" class="typology-chip aml" data-pick="TBML">TM-08 TBML Invoicing</button>
+                    <button type="button" class="typology-chip aml" data-pick="FAN_OUT">TM-09 Fan-Out Layering</button>
+                    <button type="button" class="typology-chip aml" data-pick="CUCKOO">TM-10 Cuckoo Smurfing</button>
+                    <button type="button" class="typology-chip aml" data-pick="MIXER">TM-11 Crypto Mixer</button>
+                    <button type="button" class="typology-chip aml" data-pick="TRAFFICKING">TM-12 Human Trafficking</button>
+                    <button type="button" class="typology-chip aml" data-pick="LOAN_WASH">TM-13 Loan Collateral Wash</button>
+                    <button type="button" class="typology-chip" data-pick="NONE">🟢 Clean Baseline</button>
+                </div>
+            </div>
+
+            <!-- Active Preset Banner -->
+            <div id="preset-banner" class="preset-banner">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: var(--text-primary);" id="preset-banner-title">Active Preset: FR-01 Account Takeover (ATO) & Impossible Travel Velocity</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;" id="preset-banner-desc">Form auto-populated with realistic UK corporate accountant profile, followed by foreign proxy drain telemetry.</div>
+                </div>
+                <span class="badge badge-CRITICAL" id="preset-banner-badge">CRITICAL FRAUD</span>
             </div>
 
             <div class="form-grid">
@@ -373,10 +827,14 @@
                         <option value="US">US - United States (Low Risk)</option>
                         <option value="GB">GB - United Kingdom (Low Risk)</option>
                         <option value="DE">DE - Germany (Low Risk)</option>
+                        <option value="FR">FR - France (Low Risk)</option>
+                        <option value="ES">ES - Spain (Low Risk)</option>
+                        <option value="SG">SG - Singapore (Low Risk)</option>
+                        <option value="AE">AE - United Arab Emirates (Medium Risk)</option>
                         <option value="NG">NG - Nigeria (FATF Greylist)</option>
                         <option value="KY">KY - Cayman Islands (Offshore Secrecy)</option>
                         <option value="VG">VG - British Virgin Islands (Offshore)</option>
-                        <option value="SY">SY - Syria (FATF Greylist)</option>
+                        <option value="SY">SY - Syria (FATF Greylist / Sanction)</option>
                         <option value="IR">IR - Iran (FATF Call for Action / Blacklist)</option>
                         <option value="KP">KP - North Korea (FATF Blacklist)</option>
                     </select>
@@ -387,6 +845,8 @@
                         <option value="US">US - United States</option>
                         <option value="GB">GB - United Kingdom</option>
                         <option value="DE">DE - Germany</option>
+                        <option value="FR">FR - France</option>
+                        <option value="ES">ES - Spain</option>
                         <option value="SG">SG - Singapore</option>
                         <option value="AE">AE - United Arab Emirates</option>
                         <option value="KY">KY - Cayman Islands</option>
@@ -398,7 +858,10 @@
                         <option value="SOFTWARE_ENGINEER">Software Engineer (Low Risk)</option>
                         <option value="PHYSICIAN_DOCTOR">Physician / Doctor (Low Risk)</option>
                         <option value="ACCOUNTANT_CERTIFIED">Certified Accountant (Low Risk)</option>
+                        <option value="CORPORATE_EXECUTIVE">Corporate Executive / Director (Corporate Risk)</option>
                         <option value="STUDENT">University Student (Mule Target)</option>
+                        <option value="RETIRED_PENSIONER">Retired Pensioner (Elderly Scam Target)</option>
+                        <option value="RETAIL_EMPLOYEE">Retail Employee (Entry Level)</option>
                         <option value="USED_CAR_DEALER">Used Car Dealer (Medium Risk Cash)</option>
                         <option value="NIGHTCLUB_RESTAURANT_OWNER">Nightclub / Hospitality Owner (Cash Intensive)</option>
                         <option value="IMPORT_EXPORT_TRADER">Import / Export Trader (Trade Risk)</option>
@@ -426,6 +889,7 @@
                         <option value="PERSONAL_SAVINGS">Personal Savings & Wealth Accumulation</option>
                         <option value="CROSS_BORDER_REMITTANCES">Cross-Border Family Remittances (Medium Risk)</option>
                         <option value="INVESTMENT_WEALTH_GROWTH">Investment & Wealth Growth</option>
+                        <option value="RETIREMENT_PENSION">Retirement Pension Disbursement</option>
                         <option value="CRYPTO_ASSET_TRADING">Crypto Asset Trading & Arbitrage (High Risk)</option>
                     </select>
                 </div>
@@ -467,14 +931,33 @@
                 <div class="form-group">
                     <label>Inject Financial Crime Typology (AML or Fraud)</label>
                     <select id="sim-scenario">
-                        <option value="NONE">Normal Baseline Transactions Only</option>
-                        <option value="ATO">Account Takeover (Foreign Proxy Drain from Unknown Device)</option>
-                        <option value="CARD_TEST">Card Testing (2 micro-probes followed by $3,450 drain attempt)</option>
-                        <option value="APP_SCAM">Authorized Push Payment Scam ($16,300 to new payee)</option>
-                        <option value="BUSTOUT">First-Party Bust-Out (ACH deposit + 4 instant ATM cash outs)</option>
-                        <option value="STRUCTURING">Structuring / Smurfing (4 cash deposits @ $9,400-$9,800)</option>
-                        <option value="MULE">Money Mule ($35k wire in, 95% drained to Crypto in 24h)</option>
-                        <option value="BLACKLIST">FATF Blacklist Wire ($48k transfer with Iran)</option>
+                        <optgroup label="Baseline">
+                            <option value="NONE">Clean Baseline (Normal Transactions Only)</option>
+                        </optgroup>
+                        <optgroup label="Fraud Typologies">
+                            <option value="ATO" selected>FR-01: Account Takeover (ATO & Impossible Travel)</option>
+                            <option value="CARD_TEST">FR-02: Card Testing (Micro-probes followed by CNP drain)</option>
+                            <option value="APP_SCAM">FR-03: Authorized Push Payment Scam (Urgent investment outflow)</option>
+                            <option value="BUSTOUT">FR-04: First-Party Bust-Out / Deposit Kiting (ACH + ATM drains)</option>
+                            <option value="SIM_SWAP">FR-06: SIM Swap & Credential Reset Outbound Drain</option>
+                            <option value="FRIENDLY_FRAUD">FR-07: Friendly Fraud / Chargeback Abuse & False Claims</option>
+                            <option value="BIN_ATTACK">FR-08: Automated BIN Attack & Card Testing Velocity</option>
+                            <option value="BEC">FR-09: Executive Impersonation / BEC Wire Diversion</option>
+                            <option value="AITM">FR-10: AitM Reverse-Proxy Phishing Session Hijack</option>
+                            <option value="OVERPAYMENT">FR-11: Counterfeit Overpayment & Urgent Refund Scam</option>
+                        </optgroup>
+                        <optgroup label="AML Typologies">
+                            <option value="STRUCTURING">TM-01: CTR Structuring / Smurfing (Cash deposits under $10k)</option>
+                            <option value="MULE">TM-02: Money Mule / Rapid Movement of Funds to Crypto</option>
+                            <option value="BLACKLIST">TM-05: FATF Blacklist / High-Risk Sanctions Wire Activity</option>
+                            <option value="DORMANCY">TM-06: Dormant Account Reactivation Surge</option>
+                            <option value="TBML">TM-08: Trade-Based Money Laundering (TBML) Over-Invoicing</option>
+                            <option value="FAN_OUT">TM-09: Fan-Out Layering / High-Velocity Fund Distribution</option>
+                            <option value="CUCKOO">TM-10: Cuckoo Smurfing / Hawala Third-Party Remittance</option>
+                            <option value="MIXER">TM-11: Crypto Mixer & Privacy Protocol Interaction</option>
+                            <option value="TRAFFICKING">TM-12: Human Trafficking & Labor Exploitation Red Flags</option>
+                            <option value="LOAN_WASH">TM-13: Loan Collateral Laundering & Rapid Liquidation</option>
+                        </optgroup>
                     </select>
                 </div>
                 <div class="form-group" style="grid-column: span 2;" id="sim-products">

@@ -1,38 +1,41 @@
-"""Command-line interface for KYC & Transaction Monitoring Synthetic Platform."""
+"""Unified Command-Line Interface for KYC, AML, Fraud (FRAML) & Agent Investigations."""
 
 import argparse
-import sys
-import os
+import asyncio
 import json
+import os
+import sys
 from typing import Optional
 
 try:
     from rich.console import Console
-    from rich.table import Table
     from rich.panel import Panel
-    from rich.text import Text
     from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+    from rich.text import Text
     console = Console()
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
 
+from engine.risk_engine import RiskEngine
 from generator.customer_generator import CustomerGenerator
 from generator.transaction_generator import TransactionGenerator
-from engine.risk_engine import RiskEngine
 from storage.database import DatabaseManager
+
 
 def print_banner():
     banner = """
 ========================================================================
-   SYNTHETIC BANKING KYC, AML & FRAUD RISK PLATFORM (FRAML)
-             Retail / Individual Customer Risk Engine
+   FINANCIAL CRIME INVESTIGATION PLATFORM (FRAML + AI AGENTS)
+      Multi-Pillar KYC, AML & Fraud Detection + Autonomous ADK Agents
 ========================================================================
     """
     if HAS_RICH:
         console.print(f"[bold cyan]{banner}[/bold cyan]")
     else:
         print(banner)
+
 
 def get_tier_color(tier: str) -> str:
     if tier == "CRITICAL":
@@ -44,8 +47,9 @@ def get_tier_color(tier: str) -> str:
     else:
         return "bold green"
 
+
 def handle_generate(args):
-    """Generates synthetic cohort, evaluates risk, saves to DB, and exports CSVs."""
+    """Generates synthetic cohort, evaluates 5-pillar risk, saves to DB, and exports CSVs."""
     print_banner()
     count = args.count
     days = args.days
@@ -63,14 +67,14 @@ def handle_generate(args):
 
     # 1. Generate Customers
     customers = cg.generate_batch(count=count)
-    
-    # 2. Generate Transactions & Evaluate
+
+    # 2. Generate Transactions & Evaluate Multi-Pillar Risk
     tx_map = {}
     assessments = []
 
     if HAS_RICH:
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
-            task = progress.add_task("[cyan]Processing transactions and running risk engine...", total=count)
+            task = progress.add_task("[cyan]Processing transactions, AML rules, and Fraud detection...", total=count)
             for c in customers:
                 c_txs = tg.generate_customer_transactions(c, days_history=days)
                 tx_map[c.customer_id] = c_txs
@@ -84,15 +88,22 @@ def handle_generate(args):
             assessment = engine.evaluate_customer(c, c_txs)
             assessments.append(assessment)
 
-    # 3. Save to Database
+    # 3. Save to Unified Database
     db.save_batch(customers, tx_map, assessments)
     total_txs = sum(len(t) for t in tx_map.values())
-    total_alerts = sum(len(a.alerts) for a in assessments)
+    total_aml_alts = sum(len(a.alerts) for a in assessments)
+    total_fr_alts = sum(len(a.fraud_alerts) for a in assessments)
 
     if HAS_RICH:
-        console.print(f"\n[green]✓ Successfully persisted {len(customers)} customers, {total_txs} transactions, and {total_alerts} AML alerts to SQLite database.[/green]")
+        console.print(
+            f"\n[green]✓ Successfully persisted {len(customers)} customers, {total_txs} transactions, "
+            f"{total_aml_alts} AML alerts, and {total_fr_alts} Fraud alerts to SQLite database.[/green]"
+        )
     else:
-        print(f"\nSuccessfully persisted {len(customers)} customers, {total_txs} transactions, and {total_alerts} AML alerts.")
+        print(
+            f"\nSuccessfully persisted {len(customers)} customers, {total_txs} transactions, "
+            f"{total_aml_alts} AML alerts, and {total_fr_alts} Fraud alerts."
+        )
 
     # 4. Export CSVs
     if args.export:
@@ -104,6 +115,7 @@ def handle_generate(args):
 
     # 5. Display Summary
     handle_summary(args)
+
 
 def handle_summary(args):
     """Displays portfolio summary metrics."""
@@ -177,7 +189,7 @@ def handle_summary(args):
             total_alts = int(c.get("alert_count") or 0) + int(c.get("fraud_alert_count") or 0)
             lead_table.add_row(
                 c["customer_id"],
-                f"{c['first_name']} {c['last_name']}",
+                f"{c.get('first_name', '')} {c.get('last_name', '')}".strip() or c.get("name", ""),
                 c["archetype"],
                 f"[{sev_color}]{c['risk_tier']}[/{sev_color}]",
                 f"{comp_s:.1f}",
@@ -194,6 +206,7 @@ def handle_summary(args):
         print(f"Total Alerts: {summary['total_alerts']}")
         print("Tiers:", summary["tier_distribution"])
 
+
 def handle_inspect(args):
     """Inspects complete KYC & Transaction 360 profile for a single customer."""
     cust_id = args.customer_id.upper().strip()
@@ -201,188 +214,262 @@ def handle_inspect(args):
     data = db.get_customer_360(cust_id)
 
     if not data:
-        print(f"Customer {cust_id} not found in database.")
+        print(f"Customer '{cust_id}' not found.")
         return
 
-    cust = data["customer"]
-    assessment = data["assessment"]
-    alerts = data["alerts"]
-    transactions = data["transactions"]
-
-    tier = assessment["risk_tier"]
-    score = assessment["composite_score"]
-    tier_color = get_tier_color(tier)
+    c = data["customer"]
+    a = data["assessment"]
+    alerts = data.get("alerts", [])
+    fraud_alerts = data.get("fraud_alerts", [])
+    txs = data.get("transactions", [])
 
     if HAS_RICH:
-        # Header Panel
-        header_text = Text()
-        header_text.append(f"CUSTOMER 360 DOSSIER: {cust['first_name']} {cust['last_name']} ({cust['customer_id']})\n", style="bold white")
-        header_text.append(f"Risk Rating: {tier} | Composite Score: {score:.1f}/100\n", style=tier_color)
-        header_text.append(f"Recommended Governance Action: {assessment['recommended_action']}", style="italic cyan")
-        console.print(Panel(header_text, border_style=tier_color.split()[-1]))
+        tier_color = get_tier_color(a.get("risk_tier", "LOW"))
+        console.print(f"\n[bold underline]CUSTOMER 360 DOSSIER: {cust_id} — {c.get('first_name', '')} {c.get('last_name', '')}[/bold underline]")
 
-        # KYC & Identity Details Table
-        kyc_table = Table(title="KYC Demographics & Watchlist Screening", show_header=False, box=None)
-        kyc_table.add_column("Field", style="bold cyan", width=24)
-        kyc_table.add_column("Value", width=60)
+        kyc_info = f"""
+[bold]Demographics & Citizenship:[/bold] {c.get('citizenship')} (Resident: {c.get('residence_country')}) | Age: {c.get('age')}
+[bold]Occupation & Industry:[/bold] {c.get('occupation')} ({c.get('industry')}) @ {c.get('employer_name') or 'N/A'}
+[bold]Wealth Profile:[/bold] Annual Income: ${c.get('annual_income_usd', 0):,.2f} | Net Worth: ${c.get('net_worth_usd', 0):,.2f}
+[bold]Expected Activity:[/bold] Declared Monthly: ${c.get('declared_expected_monthly_turnover_usd', 0):,.2f} | Max Single: ${c.get('declared_expected_max_single_tx_usd', 0):,.2f}
+[bold]Watchlist Status:[/bold] PEP: {c.get('pep_status')} | Sanctions: {c.get('sanction_status')} | Adverse Media: {c.get('adverse_media')}
+[bold]Digital Telemetry:[/bold] Domain: {c.get('email_domain_type')} | Phone Line: {c.get('phone_line_type')} | Synthetic ID Score: {c.get('synthetic_identity_score', 0):.1f}
+        """
+        console.print(Panel(kyc_info.strip(), title="Identity & KYC Customer Due Diligence (CDD)"))
 
-        kyc_table.add_row("Citizenship:", f"{cust['citizenship']} (Dual: {cust.get('dual_citizenship') or 'None'})")
-        kyc_table.add_row("Country of Residence:", f"{cust['residence_country']} (Tax: {cust['tax_residence_country']})")
-        kyc_table.add_row("Address:", f"{cust['address_line']}, {cust['address_city']} {cust['address_postal_code']}")
-        kyc_table.add_row("Age / Date of Birth:", f"{cust['age']} years ({cust['date_of_birth']})")
-        kyc_table.add_row("Occupation / Industry:", f"{cust['occupation']} ({cust['industry']})")
-        kyc_table.add_row("Employer:", cust['employer_name'] or "N/A (Self-employed / Retired)")
-        kyc_table.add_row("Declared Annual Income:", f"${cust['annual_income_usd']:,.2f} USD")
-        kyc_table.add_row("Declared Net Worth:", f"${cust['net_worth_usd']:,.2f} USD")
-        kyc_table.add_row("Source of Funds / Wealth:", f"{cust['source_of_funds']} | {cust['source_of_wealth']}")
-        kyc_table.add_row("Declared Expected Turnover:", f"${cust['declared_expected_monthly_turnover_usd']:,.2f}/mo (Max single: ${cust['declared_expected_max_single_tx_usd']:,.2f})")
-        kyc_table.add_row("Account Purpose & Nature:", cust['declared_purpose_nature'])
-        kyc_table.add_row("Onboarding Channel:", f"{cust['onboarding_channel']} (Date: {cust['onboarding_date']})")
-        kyc_table.add_row("Products Held:", ", ".join(cust['products_held']))
-        kyc_table.add_row("PEP Screening Status:", f"[{'red' if cust['pep_status'] != 'NONE' else 'green'}]{cust['pep_status']}[/] ({cust['pep_details'] or 'Clean'})")
-        kyc_table.add_row("Adverse Media:", f"[{'red' if cust['adverse_media'] != 'NONE' else 'green'}]{cust['adverse_media']}[/] ({cust['adverse_media_details'] or 'Clean'})")
-        kyc_table.add_row("Sanctions Status:", f"[{'red' if cust['sanction_status'] == 'CONFIRMED_HIT' else 'green'}]{cust['sanction_status']}[/] ({cust['sanction_details'] or 'Clean'})")
-        
-        # Digital Identity & Fraud Telemetry
-        kyc_table.add_row("Email & Domain:", f"{cust.get('email_address') or 'N/A'} (Domain: {cust.get('email_domain_type') or 'STANDARD'})")
-        kyc_table.add_row("Phone & Line Type:", f"{cust.get('phone_number') or 'N/A'} ({cust.get('phone_line_type') or 'MOBILE'})")
-        kyc_table.add_row("Primary Device ID:", cust.get('device_primary_id') or 'N/A')
-        kyc_table.add_row("Registered IP / Geo:", f"{cust.get('primary_ip_address') or 'N/A'} ({cust.get('primary_ip_country') or 'N/A'})")
-        synth_score = cust.get('synthetic_identity_score') or 0.0
-        synth_style = "red" if synth_score > 60 else "green"
-        kyc_table.add_row("Synthetic Identity Risk:", f"[{synth_style}]{synth_score:.1f} / 100[/]")
-        kyc_table.add_row("Synthetic Archetype:", cust['archetype'])
+        score_info = f"""
+[bold]Composite FRAML Score:[/bold] [{tier_color}]{a.get('composite_score', 0):.1f} / 100 ({a.get('risk_tier')})[/{tier_color}]
+• AML Sub-Score: {a.get('aml_score', 0):.1f} / 100 | Fraud Sub-Score: {a.get('fraud_score', 0):.1f} / 100
+• Pillar 1 (KYC Demographics): {a.get('kyc_raw_score', 0):.1f} (wt: {a.get('kyc_weighted_score', 0):.1f})
+• Pillar 2 (Purpose & Wealth): {a.get('purpose_raw_score', 0):.1f} (wt: {a.get('purpose_weighted_score', 0):.1f})
+• Pillar 3 (Products & Channels): {a.get('product_raw_score', 0):.1f} (wt: {a.get('product_weighted_score', 0):.1f})
+• Pillar 4 (AML Transaction Monitoring): {a.get('behavioral_raw_score', 0):.1f} (wt: {a.get('behavioral_weighted_score', 0):.1f})
+• Pillar 5 (Fraud & Digital Telemetry): {a.get('fraud_raw_score', 0):.1f} (wt: {a.get('fraud_weighted_score', 0):.1f})
+[bold]Recommended Action:[/bold] {a.get('recommended_action')}
+        """
+        console.print(Panel(score_info.strip(), title="5-Pillar Risk Engine Assessment"))
 
-        console.print(Panel(kyc_table, title="[bold]Demographic, KYC & Digital Footprint File[/bold]", border_style="blue"))
-
-        # Risk Pillars Table (FRAML)
-        pillar_table = Table(title="FRAML Multi-Pillar Risk Engine Breakdown", show_header=True, header_style="bold magenta")
-        pillar_table.add_column("Pillar Name", width=34)
-        pillar_table.add_column("Weight", justify="center", width=10)
-        pillar_table.add_column("Raw Score (0-100)", justify="right", width=18)
-        pillar_table.add_column("Weighted Score", justify="right", width=16)
-
-        pillar_table.add_row("1. Customer KYC & Demographics", "20%", f"{assessment['kyc_raw_score']:.1f}", f"{assessment['kyc_weighted_score']:.2f}")
-        pillar_table.add_row("2. Purpose & Nature of Relationship", "10%", f"{assessment['purpose_raw_score']:.1f}", f"{assessment['purpose_weighted_score']:.2f}")
-        pillar_table.add_row("3. Products & Onboarding Channels", "10%", f"{assessment['product_raw_score']:.1f}", f"{assessment['product_weighted_score']:.2f}")
-        pillar_table.add_row("4. AML Transaction Monitoring", "30%", f"{assessment['behavioral_raw_score']:.1f}", f"{assessment['behavioral_weighted_score']:.2f}")
-        fraud_raw = assessment.get('fraud_raw_score', 0.0) or 0.0
-        fraud_wt = assessment.get('fraud_weighted_score', 0.0) or 0.0
-        pillar_table.add_row("5. Fraud Risk & Digital Footprint", "30%", f"{fraud_raw:.1f}", f"{fraud_wt:.2f}")
-        pillar_table.add_row("[bold]Composite Score (FRAML)[/bold]", "100%", "", f"[bold {tier_color}]{assessment['composite_score']:.2f}[/]")
-
-        console.print(pillar_table)
-
-        # Fraud Alerts Section
-        fraud_alerts = data.get("fraud_alerts", [])
-        if fraud_alerts:
-            console.print(f"\n[bold magenta]TRIGGERED FRAUD ALERTS ({len(fraud_alerts)} ALERTS):[/bold magenta]")
-            for falt in fraud_alerts:
-                falt_color = get_tier_color(falt["severity"])
-                falt_text = Text()
-                falt_text.append(f"[{falt['rule_id']}] {falt['rule_name']} (Severity: {falt['severity']})\n", style=f"bold {falt_color}")
-                falt_text.append(f"Summary: {falt['summary']}\n", style="white")
-                if falt.get('supporting_transaction_ids'):
-                    falt_text.append(f"Supporting Transaction IDs: {', '.join(falt['supporting_transaction_ids'])}\n", style="dim cyan")
-                console.print(Panel(falt_text, border_style=falt_color.split()[-1]))
-        else:
-            console.print("\n[green]✓ Zero Fraud alerts detected.[/green]")
-
-        # AML Alerts Section
-        if alerts:
-            console.print(f"\n[bold yellow]TRIGGERED AML TRANSACTION MONITORING ALERTS ({len(alerts)} ALERTS):[/bold yellow]")
-            for alt in alerts:
-                alt_color = get_tier_color(alt["severity"])
-                alert_text = Text()
-                alert_text.append(f"[{alt['rule_id']}] {alt['rule_name']} (Severity: {alt['severity']})\n", style=f"bold {alt_color}")
-                alert_text.append(f"Summary: {alt['summary']}\n", style="white")
-                if alt.get('supporting_transaction_ids'):
-                    alert_text.append(f"Supporting Transaction IDs: {', '.join(alt['supporting_transaction_ids'])}\n", style="dim cyan")
-                console.print(Panel(alert_text, border_style=alt_color.split()[-1]))
-        else:
-            console.print("\n[green]✓ Zero AML alerts triggered.[/green]")
-
-        # Action Checklist
-        console.print(f"\n[bold yellow]COMPLIANCE & EDD AUDIT ACTION CHECKLIST:[/bold yellow]")
-        for item in json.loads(assessment["action_checklist"]):
-            console.print(f"  [cyan]•[/cyan] {item}")
-
-        # Recent Transactions
-        console.print(f"\n[bold underline]TRANSACTION HISTORY ({len(transactions)} TOTAL)[/bold underline]")
-        tx_table = Table(show_header=True, header_style="bold cyan")
-        tx_table.add_column("Tx ID", width=14)
-        tx_table.add_column("Timestamp", width=19)
-        tx_table.add_column("Type", width=22)
-        tx_table.add_column("Dir", justify="center", width=8)
-        tx_table.add_column("Amount USD", justify="right", width=14)
-        tx_table.add_column("Counterparty", width=28)
-        tx_table.add_column("Channel", width=14)
-
-        for t in transactions[:12]:
-            amt_style = "green" if t["direction"] == "INBOUND" else "red"
-            susp_mark = " [red]*[/red]" if t["is_suspicious_synthetic"] else ""
-            tx_table.add_row(
-                f"{t['transaction_id']}{susp_mark}",
-                t["timestamp"][:19],
-                t["transaction_type"],
-                t["direction"],
-                f"[{amt_style}]${t['amount_usd']:,.2f}[/{amt_style}]",
-                f"{t['counterparty_name']} ({t['counterparty_country']})",
-                t["channel"]
-            )
-        console.print(tx_table)
-
+        all_alts = alerts + fraud_alerts
+        if all_alts:
+            alt_table = Table(title=f"Triggered Alerts ({len(all_alts)})", show_header=True)
+            alt_table.add_column("Type", width=8)
+            alt_table.add_column("Rule ID", width=10)
+            alt_table.add_column("Rule Name", width=34)
+            alt_table.add_column("Severity", width=10)
+            alt_table.add_column("Summary")
+            for alt in all_alts:
+                atype = alt.get("alert_type", "AML")
+                color = "cyan" if atype == "AML" else "magenta"
+                sev_color = get_tier_color(alt["severity"])
+                alt_table.add_row(
+                    f"[{color}]{atype}[/{color}]",
+                    alt["rule_id"],
+                    alt["rule_name"],
+                    f"[{sev_color}]{alt['severity']}[/{sev_color}]",
+                    alt.get("summary", "")[:70]
+                )
+            console.print(alt_table)
     else:
-        print(f"Customer Dossier: {cust['first_name']} {cust['last_name']} ({cust['customer_id']})")
-        print(f"Tier: {tier} | Composite Score: {score}")
-        print(f"Alerts: {len(alerts)}")
+        print(f"Customer {cust_id}: {c.get('name')}")
+        print(f"Tier: {a.get('risk_tier')}, Score: {a.get('composite_score')}")
+        print(f"Total Transactions: {len(txs)}")
+
+
+def handle_alerts(args):
+    """Displays open alert queue for triage."""
+    db = DatabaseManager()
+    alerts = db.get_open_alerts(severity=args.severity, alert_type=args.type, limit=args.limit)
+
+    if not alerts:
+        print("No open alerts matching criteria.")
+        return
+
+    if HAS_RICH:
+        table = Table(title=f"Alert Triage Queue (Top {len(alerts)})", show_header=True, header_style="bold yellow")
+        table.add_column("Alert ID", width=14)
+        table.add_column("Customer", width=22)
+        table.add_column("Type", justify="center", width=8)
+        table.add_column("Rule ID", width=10)
+        table.add_column("Severity", justify="center", width=10)
+        table.add_column("Impact", justify="right", width=8)
+        table.add_column("Summary")
+
+        for alt in alerts:
+            atype = alt.get("alert_type", "AML")
+            color = "cyan" if atype == "AML" else "magenta"
+            sev_color = get_tier_color(alt["severity"])
+            table.add_row(
+                alt["alert_id"],
+                f"{alt.get('customer_name', alt['customer_id'])} ({alt['customer_id']})",
+                f"[{color}]{atype}[/{color}]",
+                alt["rule_id"],
+                f"[{sev_color}]{alt['severity']}[/{sev_color}]",
+                f"+{alt.get('score_impact', 0):.1f}",
+                alt.get("summary", "")[:60]
+            )
+        console.print(table)
+    else:
+        for alt in alerts:
+            print(f"[{alt['severity']}] {alt['alert_id']} - {alt['customer_id']}: {alt['rule_name']}")
+
+
+def handle_investigate(args):
+    """Triggers autonomous Google ADK multi-agent investigation on a customer."""
+    cust_id = args.customer_id.upper().strip()
+    from app.alert_feed import AlertDispatcher
+    from app.agent import root_agent
+    from app.app_utils import services
+    from google.adk.runners import Runner
+
+    dispatcher = AlertDispatcher()
+    try:
+        packet = dispatcher.prepare_case_packet(cust_id, alert_id=args.alert_id)
+    except Exception as e:
+        print(f"Error preparing case: {e}")
+        return
+
+    prompt = dispatcher.generate_investigation_prompt(cust_id, packet.get("trigger_alert"))
+
+    if HAS_RICH:
+        trigger_rule = (packet.get("trigger_alert") or {}).get("rule_name", "Manual Risk Review")
+        console.print(Panel(
+            f"[bold cyan]Investigating Subject:[/bold cyan] {packet['customer_name']} ({cust_id})\n"
+            f"[bold cyan]Risk Rating:[/bold cyan] {packet['risk_tier']} (Score: {packet['composite_score']:.1f})\n"
+            f"[bold cyan]Trigger Alert:[/bold cyan] {trigger_rule}\n"
+            f"[bold cyan]Prompt:[/bold cyan] {prompt}",
+            title="[bold yellow]Triggering Autonomous ADK Agent Pipeline[/bold yellow]"
+        ))
+    else:
+        print(f"Investigating {cust_id}: {prompt}")
+
+    print("\nRunning specialist agents: customer_agent -> transaction_agent -> fraud_agent -> ownership_agent -> risk_agent -> consolidator_agent...")
+
+    # Initialize ADK Runner
+    from app.agent import app as adk_app
+    from app.alert_feed import generate_specialist_investigation_report
+    from google.genai import types
+
+    runner = Runner(
+        app=adk_app,
+        session_service=services.get_session_service(),
+        artifact_service=services.get_artifact_service(),
+        auto_create_session=True,
+    )
+
+    async def _run():
+        session = await runner.session_service.create_session(
+            app_name=adk_app.name,
+            user_id="compliance_officer"
+        )
+        new_message = types.Content(
+            role="user",
+            parts=[types.Part.from_text(text=prompt)]
+        )
+        events = []
+        async for event in runner.run_async(
+            user_id="compliance_officer",
+            session_id=session.id,
+            new_message=new_message,
+        ):
+            events.append(event)
+        return events
+
+    final_text = ""
+    try:
+        events = asyncio.run(_run())
+        for ev in events:
+            if hasattr(ev, "content") and ev.content and hasattr(ev.content, "parts"):
+                for p in ev.content.parts:
+                    if hasattr(p, "text") and p.text:
+                        final_text = p.text
+    except Exception as ex:
+        if "No API key" in str(ex) or "API_KEY" in str(ex):
+            if HAS_RICH:
+                console.print("[yellow]Notice: No GEMINI_API_KEY configured. Synthesizing full 11-section specialist investigation via forensic rules engine...[/yellow]")
+            else:
+                print("Notice: No GEMINI_API_KEY configured. Synthesizing full 11-section specialist investigation via forensic rules engine...")
+        else:
+            if HAS_RICH:
+                console.print(f"[yellow]ADK Runner notice: {ex}. Synthesizing 11-section report from forensic evidence...[/yellow]")
+            else:
+                print(f"ADK Runner notice: {ex}. Synthesizing 11-section report from forensic evidence...")
+        final_text = generate_specialist_investigation_report(cust_id, trigger_alert=packet.get("trigger_alert"))
+
+    if not final_text or not final_text.strip():
+        final_text = generate_specialist_investigation_report(cust_id, trigger_alert=packet.get("trigger_alert"))
+
+    if final_text:
+        if HAS_RICH:
+            console.print(Panel(final_text, title="[bold green]Final 11-Section Investigative Report[/bold green]"))
+        else:
+            print("\n=== FINAL INVESTIGATIVE REPORT ===")
+            print(final_text)
+    else:
+        print("Investigation completed. No text output returned.")
+
 
 def handle_serve(args):
-    """Launches local interactive compliance web server."""
+    """Launches the combined FastAPI server with web dashboard and ADK agent endpoints."""
+    import uvicorn
+    host = args.host
     port = args.port
-    from web.server import run_server
-    run_server(port=port)
+    print(f"Starting Financial Crime Platform Server on http://{host}:{port} ...")
+    uvicorn.run("app.fast_api_app:app", host=host, port=port, reload=args.reload)
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Synthetic Banking KYC & Transaction Monitoring Risk Platform")
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    parser = argparse.ArgumentParser(description="Financial Crime Investigation Platform (FRAML + ADK Agents)")
+    subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
-    # generate command
-    p_gen = subparsers.add_parser("generate", help="Generate synthetic individual customer cohort and run risk scoring")
-    p_gen.add_argument("--count", type=int, default=100, help="Number of individual customers to generate (default: 100)")
-    p_gen.add_argument("--days", type=int, default=90, help="Days of transaction history to simulate (default: 90)")
-    p_gen.add_argument("--seed", type=int, default=42, help="Random seed for deterministic generation (default: 42)")
-    p_gen.add_argument("--export", action="store_true", default=True, help="Export CSV tables to ./exports/ (default: True)")
+    # Generate
+    gen_parser = subparsers.add_parser("generate", help="Generate synthetic banking cohort and run 5-pillar risk engine")
+    gen_parser.add_argument("--count", type=int, default=100, help="Number of individual customers (default: 100)")
+    gen_parser.add_argument("--days", type=int, default=90, help="Transaction history window in days (default: 90)")
+    gen_parser.add_argument("--seed", type=int, default=42, help="Random generator seed (default: 42)")
+    gen_parser.add_argument("--export", action="store_true", default=True, help="Export CSV tables to exports/ folder")
 
-    # inspect command
-    p_insp = subparsers.add_parser("inspect", help="Inspect complete Customer 360 file and risk score")
-    p_insp.add_argument("customer_id", type=str, help="Customer ID to inspect (e.g. CUST-00001)")
+    # Portfolio / Summary
+    subparsers.add_parser("portfolio", help="View portfolio risk distribution and alert typologies")
+    subparsers.add_parser("summary", help="Alias for portfolio")
 
-    # summary command
-    subparsers.add_parser("summary", help="Display portfolio risk distribution and alert statistics")
+    # Inspect
+    inspect_parser = subparsers.add_parser("inspect", help="Inspect Customer 360 profile, KYC CDD, and alerts")
+    inspect_parser.add_argument("customer_id", help="Customer ID (e.g., CUST-00015)")
 
-    # export command
-    subparsers.add_parser("export", help="Export existing SQLite database to CSV tables")
+    # Alerts
+    alerts_parser = subparsers.add_parser("alerts", help="View open alert triage queue")
+    alerts_parser.add_argument("--severity", choices=["CRITICAL", "HIGH", "MEDIUM", "LOW", "ALL"], default="ALL")
+    alerts_parser.add_argument("--type", choices=["AML", "FRAUD", "ALL"], default="ALL")
+    alerts_parser.add_argument("--limit", type=int, default=25, help="Number of alerts to display (default: 25)")
 
-    # serve command
-    p_srv = subparsers.add_parser("serve", help="Launch interactive compliance web dashboard")
-    p_srv.add_argument("--port", type=int, default=8088, help="Port to serve dashboard on (default: 8088)")
+    # Investigate
+    inv_parser = subparsers.add_parser("investigate", help="Run autonomous ADK multi-agent investigation on a customer")
+    inv_parser.add_argument("customer_id", help="Customer ID (e.g., CUST-00015)")
+    inv_parser.add_argument("--alert-id", help="Optional triggering alert ID")
+
+    # Serve
+    serve_parser = subparsers.add_parser("serve", help="Launch web dashboard and FastAPI agent server")
+    serve_parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
+    serve_parser.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000)")
+    serve_parser.add_argument("--reload", action="store_true", help="Enable live code reload")
 
     args = parser.parse_args()
 
     if args.command == "generate":
         handle_generate(args)
+    elif args.command in ("portfolio", "summary"):
+        handle_summary(args)
     elif args.command == "inspect":
         handle_inspect(args)
-    elif args.command == "summary":
-        handle_summary(args)
-    elif args.command == "export":
-        db = DatabaseManager()
-        db.export_to_csv("exports")
+    elif args.command == "alerts":
+        handle_alerts(args)
+    elif args.command == "investigate":
+        handle_investigate(args)
     elif args.command == "serve":
         handle_serve(args)
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()

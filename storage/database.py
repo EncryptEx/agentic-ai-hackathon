@@ -9,12 +9,42 @@ from models.customer import CustomerProfile
 from models.transaction import Transaction
 from models.risk_score import CustomerRiskAssessment
 
+DEFAULT_DB_PATH = os.environ.get(
+    "FIN_CRIME_DB_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "kyc_aml.db")
+)
+
+COUNTRY_RISK_SEEDS = [
+    ("Democratic People's Republic of Korea", "KP", "critical", 100.0, "FATF Blacklist / Call for Action; proliferation financing."),
+    ("Iran", "IR", "critical", 98.0, "FATF Blacklist / Comprehensive sanctions."),
+    ("Myanmar", "MM", "critical", 95.0, "FATF Blacklist / Severe AML/CFT deficiencies."),
+    ("Syria", "SY", "high", 85.0, "FATF Greylist / Ongoing conflict & TF risk."),
+    ("Haiti", "HT", "high", 80.0, "FATF Greylist / Strategic AML/CFT deficiencies."),
+    ("Yemen", "YE", "high", 80.0, "FATF Greylist / Conflict zone & TF exposure."),
+    ("South Sudan", "SS", "high", 78.0, "FATF Greylist / Elevated corruption risk."),
+    ("Panama", "PA", "high", 72.0, "Secrecy jurisdiction; limited beneficial-ownership transparency."),
+    ("Cayman Islands", "KY", "high", 70.0, "Secrecy jurisdiction; offshore corporate veil."),
+    ("British Virgin Islands", "VG", "high", 70.0, "Offshore secrecy / high corporate veil risk."),
+    ("Bahamas", "BS", "high", 65.0, "Offshore financial secrecy haven."),
+    ("Nigeria", "NG", "high", 68.0, "Elevated corruption and fraud exposure; limited AML enforcement."),
+    ("Malta", "MT", "medium", 45.0, "EU member; layered corporate structures common."),
+    ("Cyprus", "CY", "medium", 45.0, "EU member; historically used for holding structures."),
+    ("Estonia", "EE", "medium", 40.0, "EU member; historically used for shell-company formation."),
+    ("United Arab Emirates", "AE", "medium", 45.0, "Free-trade zones; variable beneficial-ownership transparency."),
+    ("Italy", "IT", "low", 20.0, "EU member; standard AML framework."),
+    ("Poland", "PL", "low", 20.0, "EU member; standard AML framework."),
+    ("Switzerland", "CH", "low", 15.0, "Strong AML framework & banking oversight."),
+    ("United States", "US", "low", 15.0, "FATF member / comprehensive AML framework."),
+    ("United Kingdom", "GB", "low", 15.0, "FATF member / comprehensive AML framework."),
+    ("Germany", "DE", "low", 15.0, "FATF member / robust regulatory supervision."),
+]
+
 class DatabaseManager:
     """Manages SQLite persistence and tabular exports for KYC, AML, & Fraud data."""
 
-    def __init__(self, db_path: str = "data/kyc_aml.db"):
+    def __init__(self, db_path: str = DEFAULT_DB_PATH):
         self.db_path = db_path
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
         self._init_tables()
 
     def _get_connection(self) -> sqlite3.Connection:
@@ -150,6 +180,45 @@ class DatabaseManager:
                 summary TEXT,
                 trigger_details TEXT,
                 supporting_transaction_ids TEXT,
+                status TEXT DEFAULT 'OPEN',
+                investigation_notes TEXT,
+                FOREIGN KEY (customer_id) REFERENCES customers (customer_id)
+            )
+            """)
+
+            # Ownership Table
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ownership (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_id TEXT NOT NULL,
+                entity TEXT NOT NULL,
+                country TEXT,
+                stake REAL,
+                role TEXT NOT NULL,
+                note TEXT,
+                FOREIGN KEY (customer_id) REFERENCES customers (customer_id)
+            )
+            """)
+
+            # Country Risk Table
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS country_risk (
+                country TEXT PRIMARY KEY,
+                country_code TEXT,
+                rating TEXT NOT NULL,
+                risk_score REAL,
+                rationale TEXT
+            )
+            """)
+
+            # Expected Activity Table
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS expected_activity (
+                customer_id TEXT PRIMARY KEY,
+                expected_monthly_volume REAL,
+                expected_monthly_count INTEGER,
+                description TEXT,
+                max_single_tx_usd REAL,
                 FOREIGN KEY (customer_id) REFERENCES customers (customer_id)
             )
             """)
@@ -161,6 +230,13 @@ class DatabaseManager:
                 except sqlite3.OperationalError:
                     pass
 
+            try_add_col("customers", "name", "TEXT")
+            try_add_col("customers", "type", "TEXT DEFAULT 'individual'")
+            try_add_col("customers", "country", "TEXT")
+            try_add_col("customers", "onboarded", "TEXT")
+            try_add_col("customers", "risk_rating", "TEXT")
+            try_add_col("customers", "pep", "INTEGER DEFAULT 0")
+            try_add_col("customers", "notes", "TEXT")
             try_add_col("customers", "email_address", "TEXT")
             try_add_col("customers", "email_domain_type", "TEXT")
             try_add_col("customers", "phone_number", "TEXT")
@@ -171,6 +247,10 @@ class DatabaseManager:
             try_add_col("customers", "synthetic_identity_score", "REAL")
             try_add_col("customers", "synthetic_id_indicators", "TEXT")
 
+            try_add_col("transactions", "date", "TEXT")
+            try_add_col("transactions", "kind", "TEXT")
+            try_add_col("transactions", "amount", "REAL")
+            try_add_col("transactions", "description", "TEXT")
             try_add_col("transactions", "device_id", "TEXT")
             try_add_col("transactions", "ip_address", "TEXT")
             try_add_col("transactions", "ip_country", "TEXT")
@@ -190,6 +270,18 @@ class DatabaseManager:
             try_add_col("risk_assessments", "fraud_score", "REAL")
 
             try_add_col("alerts", "alert_type", "TEXT")
+            try_add_col("alerts", "status", "TEXT DEFAULT 'OPEN'")
+            try_add_col("alerts", "investigation_notes", "TEXT")
+
+            # Pre-seed country risk
+            cursor.execute("SELECT COUNT(*) FROM country_risk")
+            if cursor.fetchone()[0] == 0:
+                for c_name, c_code, c_rating, c_score, c_rat in COUNTRY_RISK_SEEDS:
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO country_risk (country, country_code, rating, risk_score, rationale) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (c_name, c_code, c_rating, c_score, c_rat)
+                    )
 
             conn.commit()
 
@@ -216,10 +308,30 @@ class DatabaseManager:
 
             # Insert Customers
             for c in customers:
+                full_name = f"{c.first_name} {c.last_name}".strip()
+                res_country = c.residence_country or c.citizenship or "US"
+                is_pep = 1 if c.pep_status.value in ("DOMESTIC_PEP", "FOREIGN_PEP", "PEP_ASSOCIATE") else 0
+                matching_assess = next((a for a in assessments if a.customer_id == c.customer_id), None)
+                risk_rating = matching_assess.risk_tier.value.lower() if matching_assess else "low"
+
                 cursor.execute("""
-                INSERT OR REPLACE INTO customers VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                INSERT OR REPLACE INTO customers (
+                    customer_id, first_name, last_name, date_of_birth, age,
+                    citizenship, dual_citizenship, residence_country, tax_residence_country,
+                    address_city, address_postal_code, address_line,
+                    occupation, occupation_risk_key, industry, employer_name,
+                    source_of_funds, source_of_wealth, annual_income_usd, net_worth_usd,
+                    declared_expected_monthly_turnover_usd, declared_expected_max_single_tx_usd,
+                    declared_purpose_nature, onboarding_channel, onboarding_date,
+                    products_held, pep_status, pep_details,
+                    adverse_media, adverse_media_details, sanction_status,
+                    sanction_details, email_address, email_domain_type, phone_number, phone_line_type,
+                    device_primary_id, primary_ip_address, primary_ip_country,
+                    synthetic_identity_score, synthetic_id_indicators, archetype,
+                    name, type, country, onboarded, risk_rating, pep, notes
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                 )
                 """, (
                     c.customer_id, c.first_name, c.last_name, c.date_of_birth, c.age,
@@ -235,16 +347,62 @@ class DatabaseManager:
                     c.email_address, c.email_domain_type, c.phone_number, c.phone_line_type,
                     c.device_primary_id, c.primary_ip_address, c.primary_ip_country,
                     c.synthetic_identity_score, json.dumps(c.synthetic_id_indicators),
-                    c.archetype
+                    c.archetype,
+                    full_name, "individual", res_country, c.onboarding_date, risk_rating, is_pep,
+                    f"Archetype: {c.archetype}. Purpose: {c.declared_purpose_nature}."
                 ))
+
+                # Expected Activity
+                cursor.execute("""
+                INSERT OR REPLACE INTO expected_activity VALUES (?, ?, ?, ?, ?)
+                """, (
+                    c.customer_id,
+                    float(c.declared_expected_monthly_turnover_usd or 5000.0),
+                    12,
+                    c.declared_purpose_nature or "Personal retail account operations",
+                    float(c.declared_expected_max_single_tx_usd or 2500.0)
+                ))
+
+                # Ownership structure (Beneficial owner and Employer)
+                cursor.execute("DELETE FROM ownership WHERE customer_id = ?", (c.customer_id,))
+                cursor.execute("""
+                INSERT INTO ownership (customer_id, entity, country, stake, role, note)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    c.customer_id, full_name, c.citizenship or res_country, 1.00,
+                    "shareholder", "Individual retail account holder and 100% beneficial owner"
+                ))
+                if c.employer_name:
+                    cursor.execute("""
+                    INSERT INTO ownership (customer_id, entity, country, stake, role, note)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        c.customer_id, c.employer_name, res_country, None,
+                        "employer", f"Employer ({c.occupation}, {c.industry})"
+                    ))
 
             # Insert Transactions
             for cust_id, tx_list in transactions_map.items():
                 for t in tx_list:
+                    ts = t.timestamp or "2025-06-01T12:00:00"
+                    dt = ts[:10]
+                    desc = t.reference_narrative or t.counterparty_name or "Transaction"
+
                     cursor.execute("""
-                    INSERT OR REPLACE INTO transactions VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    INSERT OR REPLACE INTO transactions (
+                        transaction_id, customer_id, timestamp, transaction_type,
+                        direction, amount_usd, currency, counterparty_name,
+                        counterparty_country, counterparty_account, counterparty_category,
+                        channel, reference_narrative,
+                        device_id, ip_address, ip_country,
+                        is_card_present, card_entry_mode, auth_status,
+                        is_new_payee, payee_first_seen_hours,
+                        is_suspicious_synthetic, synthetic_typology_tag,
+                        is_fraud_synthetic, fraud_typology_tag,
+                        date, kind, amount, description
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?
                     )
                     """, (
                         t.transaction_id, t.customer_id, t.timestamp, t.transaction_type.value,
@@ -256,7 +414,8 @@ class DatabaseManager:
                         t.card_entry_mode, t.auth_status,
                         1 if t.is_new_payee else 0, t.payee_first_seen_hours,
                         1 if t.is_suspicious_synthetic else 0, t.synthetic_typology_tag,
-                        1 if t.is_fraud_synthetic else 0, t.fraud_typology_tag
+                        1 if t.is_fraud_synthetic else 0, t.fraud_typology_tag,
+                        dt, t.transaction_type.value.lower(), t.amount_usd, desc
                     ))
 
             # Insert Assessments and Alerts
@@ -282,8 +441,12 @@ class DatabaseManager:
                 # Insert AML Alerts
                 for alt in a.alerts:
                     cursor.execute("""
-                    INSERT OR REPLACE INTO alerts VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    INSERT OR REPLACE INTO alerts (
+                        alert_id, customer_id, alert_type, rule_id, rule_name,
+                        severity, score_impact, summary, trigger_details,
+                        supporting_transaction_ids, status
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN'
                     )
                     """, (
                         alt.alert_id, a.customer_id, "AML", alt.rule_id, alt.rule_name,
@@ -295,8 +458,12 @@ class DatabaseManager:
                 # Insert Fraud Alerts
                 for fa in a.fraud_alerts:
                     cursor.execute("""
-                    INSERT OR REPLACE INTO alerts VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    INSERT OR REPLACE INTO alerts (
+                        alert_id, customer_id, alert_type, rule_id, rule_name,
+                        severity, score_impact, summary, trigger_details,
+                        supporting_transaction_ids, status
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN'
                     )
                     """, (
                         fa.alert_id, a.customer_id, "FRAUD", fa.rule_id, fa.rule_name,
@@ -500,6 +667,48 @@ class DatabaseManager:
 
             where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
             cursor.execute(f"SELECT * FROM alerts {where_clause} ORDER BY score_impact DESC", params)
+            alerts = []
+            for r in cursor.fetchall():
+                d = dict(r)
+                d["trigger_details"] = json.loads(d["trigger_details"]) if d.get("trigger_details") else {}
+                d["supporting_transaction_ids"] = json.loads(d["supporting_transaction_ids"]) if d.get("supporting_transaction_ids") else []
+                alerts.append(d)
+            return alerts
+
+    def get_open_alerts(
+        self,
+        severity: Optional[str] = None,
+        alert_type: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Returns open alerts joined with customer details as an alert triage feed for agents."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            conditions = ["(a.status = 'OPEN' OR a.status IS NULL)"]
+            params: list[Any] = []
+
+            if severity and severity.upper() != "ALL":
+                conditions.append("a.severity = ?")
+                params.append(severity.upper())
+
+            if alert_type and alert_type.upper() != "ALL":
+                conditions.append("a.alert_type = ?")
+                params.append(alert_type.upper())
+
+            where_clause = f"WHERE {' AND '.join(conditions)}"
+            query = f"""
+            SELECT a.*, c.first_name, c.last_name, c.name as customer_name,
+                   c.archetype, c.residence_country, c.risk_rating
+            FROM alerts a
+            JOIN customers c ON a.customer_id = c.customer_id
+            {where_clause}
+            ORDER BY
+                CASE a.severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END,
+                a.score_impact DESC
+            LIMIT ?
+            """
+            params.append(limit)
+            cursor.execute(query, tuple(params))
             alerts = []
             for r in cursor.fetchall():
                 d = dict(r)

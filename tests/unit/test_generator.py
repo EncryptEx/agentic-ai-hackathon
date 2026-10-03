@@ -77,5 +77,25 @@ class TestGenerators(unittest.TestCase):
         self.assertGreaterEqual(len(mule_inflows), 1)
         self.assertGreaterEqual(len(mule_outflows), 1)
 
+        # SIM Swap archetype
+        cust_sim = self.cg.generate_customer("CUST-SIM", archetype_name="SIM_SWAP_VICTIM")
+        txs_sim = self.tg.generate_customer_transactions(cust_sim, days_history=90)
+        self.assertTrue(any(t.fraud_typology_tag == "SIM_SWAP_DRAIN" for t in txs_sim))
+
+        # TBML archetype
+        cust_tbml = self.cg.generate_customer("CUST-TBML", archetype_name="TBML_FRONT_OPERATOR")
+        txs_tbml = self.tg.generate_customer_transactions(cust_tbml, days_history=90)
+        self.assertTrue(any(t.synthetic_typology_tag == "TBML_OVER_INVOICING" for t in txs_tbml))
+
+        # Crypto Mixer archetype
+        cust_mixer = self.cg.generate_customer("CUST-MIX", archetype_name="CRYPTO_MIXER_OPERATOR")
+        txs_mixer = self.tg.generate_customer_transactions(cust_mixer, days_history=90)
+        self.assertTrue(any(t.synthetic_typology_tag == "CRYPTO_MIXER_HOP" for t in txs_mixer))
+
+        # BEC Executive archetype
+        cust_bec = self.cg.generate_customer("CUST-BEC", archetype_name="BEC_EXECUTIVE_TARGET")
+        txs_bec = self.tg.generate_customer_transactions(cust_bec, days_history=90)
+        self.assertTrue(any(t.fraud_typology_tag == "BEC_PAYROLL_IMPERSONATION" for t in txs_bec))
+
 if __name__ == "__main__":
     unittest.main()

@@ -45,6 +45,12 @@ class TransactionMonitoringDetector:
         alerts.extend(self._detect_high_risk_corridors(customer, tx_sorted))
         alerts.extend(self._detect_dormancy_break(customer, tx_sorted))
         alerts.extend(self._detect_round_amount_clusters(customer, tx_sorted))
+        alerts.extend(self._detect_trade_based_money_laundering(customer, tx_sorted))
+        alerts.extend(self._detect_fan_out_layering(customer, tx_sorted))
+        alerts.extend(self._detect_cuckoo_smurfing(customer, tx_sorted))
+        alerts.extend(self._detect_crypto_mixer_hops(customer, tx_sorted))
+        alerts.extend(self._detect_human_trafficking_indicators(customer, tx_sorted))
+        alerts.extend(self._detect_loan_collateral_wash(customer, tx_sorted))
 
         # Calculate behavioral raw score from alerts
         score_impacts = [a.score_impact for a in alerts]
@@ -450,5 +456,314 @@ class TransactionMonitoringDetector:
                     },
                     supporting_transaction_ids=[t.transaction_id for t in round_txs]
                 ))
+
+        return alerts
+
+    def _detect_trade_based_money_laundering(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[AMLAlert]:
+        """Detects Trade-Based Money Laundering (TBML) & Over/Under-Invoicing (TM-08)."""
+        alerts = []
+        min_invoice = self.config.get("TBML_MIN_INVOICE_AMOUNT_USD", 25000.0)
+        tbml_keywords = [
+            "commercial invoice", "consignment", "bill of lading", "freight customs",
+            "raw material shipment", "bulk textile", "electronics container", "re-export settlement"
+        ]
+
+        tbml_txs = []
+        for t in transactions:
+            is_tag = t.synthetic_typology_tag == "TBML_OVER_INVOICING"
+            narrative_lower = (t.reference_narrative or "").lower()
+            has_tbml_signal = any(kw in narrative_lower for kw in tbml_keywords)
+
+            # High value cross-border commercial wire inconsistent with retail banking
+            is_high_wire = (
+                t.transaction_type in [TransactionType.INTERNATIONAL_WIRE_IN, TransactionType.INTERNATIONAL_WIRE_OUT] and
+                t.amount_usd >= min_invoice
+            )
+            if is_tag or (is_high_wire and has_tbml_signal):
+                tbml_txs.append(t)
+
+        if len(tbml_txs) >= self.config.get("TBML_MIN_TRANSACTIONS", 2) or any(t.synthetic_typology_tag == "TBML_OVER_INVOICING" for t in tbml_txs):
+            if tbml_txs:
+                total_tbml = sum(t.amount_usd for t in tbml_txs)
+                alerts.append(AMLAlert(
+                    alert_id=f"ALT-TBML-{customer.customer_id}",
+                    rule_id="TM-08",
+                    rule_name="Trade-Based Money Laundering (TBML) & Over/Under-Invoicing",
+                    severity=AlertSeverity.HIGH if total_tbml < 100000.0 else AlertSeverity.CRITICAL,
+                    score_impact=self.config.get("TBML_RISK_SCORE", 88.0),
+                    summary=(
+                        f"Detected {len(tbml_txs)} high-value international trade wire(s) totaling ${total_tbml:,.2f} "
+                        f"referencing commercial shipping/freight invoices ({', '.join(set(t.counterparty_country for t in tbml_txs))}). "
+                        f"Retail banking account utilized for substantial cross-border commercial cargo settlements."
+                    ),
+                    trigger_details={
+                        "count": len(tbml_txs),
+                        "total_amount_usd": total_tbml,
+                        "counterparties": [t.counterparty_name for t in tbml_txs],
+                        "countries": list(set(t.counterparty_country for t in tbml_txs))
+                    },
+                    supporting_transaction_ids=[t.transaction_id for t in tbml_txs]
+                ))
+
+        return alerts
+
+    def _detect_fan_out_layering(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[AMLAlert]:
+        """Detects Fan-Out Layering / High-Velocity Fund Distribution (TM-09)."""
+        alerts = []
+        min_inflow = self.config.get("FAN_OUT_MIN_INFLOW_USD", 15000.0)
+        min_splits = self.config.get("FAN_OUT_MIN_SPLITS", 4)
+        window_hours = self.config.get("FAN_OUT_WINDOW_HOURS", 36)
+
+        # Inbound credits
+        inbound_txs = [
+            t for t in transactions
+            if t.direction == TransactionDirection.INBOUND and t.amount_usd >= min_inflow
+        ]
+
+        for in_tx in inbound_txs:
+            t_in = datetime.fromisoformat(in_tx.timestamp)
+            max_out_time = t_in + timedelta(hours=window_hours)
+
+            out_splits = [
+                t for t in transactions
+                if t.direction == TransactionDirection.OUTBOUND
+                and t_in <= datetime.fromisoformat(t.timestamp) <= max_out_time
+            ]
+
+            is_tag = any(t.synthetic_typology_tag == "FAN_OUT_LAYERING" for t in out_splits)
+            if (len(out_splits) >= min_splits or is_tag) and out_splits:
+                total_out = sum(t.amount_usd for t in out_splits)
+                if (total_out / in_tx.amount_usd) >= 0.75 or is_tag:
+                    alerts.append(AMLAlert(
+                        alert_id=f"ALT-FANOUT-{in_tx.transaction_id}",
+                        rule_id="TM-09",
+                        rule_name="Fan-Out Layering / High-Velocity Fund Distribution",
+                        severity=AlertSeverity.CRITICAL,
+                        score_impact=self.config.get("FAN_OUT_RISK_SCORE", 87.0),
+                        summary=(
+                            f"Single inbound credit of ${in_tx.amount_usd:,.2f} immediately fragmented and disbursed "
+                            f"across {len(out_splits)} distinct outbound transfers totaling ${total_out:,.2f} within {window_hours} hours. "
+                            f"Typology breaks audit trail across multiple channels/beneficiaries."
+                        ),
+                        trigger_details={
+                            "inflow_id": in_tx.transaction_id,
+                            "inflow_amount_usd": in_tx.amount_usd,
+                            "splits_count": len(out_splits),
+                            "total_outflow_usd": total_out,
+                            "payees": [t.counterparty_name for t in out_splits]
+                        },
+                        supporting_transaction_ids=[in_tx.transaction_id] + [t.transaction_id for t in out_splits]
+                    ))
+                    break
+
+        return alerts
+
+    def _detect_cuckoo_smurfing(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[AMLAlert]:
+        """Detects Cuckoo Smurfing / Hawala Alternate Remittance Deposits (TM-10)."""
+        alerts = []
+        min_deposits = self.config.get("CUCKOO_MIN_UNRELATED_DEPOSITS", 3)
+
+        # Look for multiple unrelated third party inbound transfers/deposits
+        inbound_deposits = [
+            t for t in transactions
+            if t.direction == TransactionDirection.INBOUND
+            and t.transaction_type in [TransactionType.DOMESTIC_WIRE_IN, TransactionType.ACH_DEPOSIT, TransactionType.CASH_DEPOSIT, TransactionType.P2P_TRANSFER_IN]
+            and t.counterparty_category in ["INDIVIDUAL", "PEER", "ATM_BRANCH", "OFFSHORE_CORP"]
+        ]
+
+        cuckoo_tagged = [t for t in inbound_deposits if t.synthetic_typology_tag == "CUCKOO_SMURFING"]
+
+        # Check for multiple distinct third-party payers within a 10-day window
+        if cuckoo_tagged or len(inbound_deposits) >= min_deposits:
+            target_list = cuckoo_tagged if cuckoo_tagged else inbound_deposits
+            unique_payers = set(t.counterparty_name for t in target_list)
+            if len(unique_payers) >= 3 or cuckoo_tagged:
+                total_in = sum(t.amount_usd for t in target_list)
+                if total_in >= 12000.0 or cuckoo_tagged:
+                    alerts.append(AMLAlert(
+                        alert_id=f"ALT-CUCKOO-{customer.customer_id}",
+                        rule_id="TM-10",
+                        rule_name="Cuckoo Smurfing & Hawala Third-Party Remittance Matching",
+                        severity=AlertSeverity.HIGH,
+                        score_impact=self.config.get("CUCKOO_RISK_SCORE", 86.0),
+                        summary=(
+                            f"Account received {len(target_list)} unrelated inbound transfers totaling ${total_in:,.2f} "
+                            f"from {len(unique_payers)} distinct third-party remitters without commercial justification. "
+                            f"Typology matches alternative remittance smurfing / Hawala integration."
+                        ),
+                        trigger_details={
+                            "deposit_count": len(target_list),
+                            "total_inbound_usd": total_in,
+                            "remitters": list(unique_payers)
+                        },
+                        supporting_transaction_ids=[t.transaction_id for t in target_list]
+                    ))
+
+        return alerts
+
+    def _detect_crypto_mixer_hops(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[AMLAlert]:
+        """Detects Crypto Mixers, Tumblers & Darknet Ramps (TM-11)."""
+        alerts = []
+        mixer_keywords = [
+            "tornado cash", "wasabi", "sinbad", "blender.io", "railgun",
+            "coinjoin", "mixer", "tumbler", "privacy pool", "unhosted anonymizer"
+        ]
+
+        mixer_txs = []
+        for t in transactions:
+            is_tag = t.synthetic_typology_tag == "CRYPTO_MIXER_HOP"
+            narrative_lower = (t.reference_narrative or "").lower()
+            cp_lower = (t.counterparty_name or "").lower()
+            has_mixer = any(kw in narrative_lower or kw in cp_lower for kw in mixer_keywords)
+
+            if is_tag or has_mixer or (t.counterparty_category == "CRYPTO_MIXER"):
+                mixer_txs.append(t)
+
+        if mixer_txs:
+            total_mixer = sum(t.amount_usd for t in mixer_txs)
+            alerts.append(AMLAlert(
+                alert_id=f"ALT-MIXER-{customer.customer_id}",
+                rule_id="TM-11",
+                rule_name="Crypto Mixer, Tumbler & Anonymity Protocol Interaction",
+                severity=AlertSeverity.CRITICAL,
+                score_impact=self.config.get("MIXER_RISK_SCORE", 96.0),
+                summary=(
+                    f"Direct financial interaction identified with sanctioned/anonymizing virtual asset mixer(s) "
+                    f"({', '.join(set(t.counterparty_name for t in mixer_txs))}) totaling ${total_mixer:,.2f}. "
+                    f"Severe money laundering indicator for source-of-funds obfuscation."
+                ),
+                trigger_details={
+                    "count": len(mixer_txs),
+                    "total_usd": total_mixer,
+                    "mixers": [t.counterparty_name for t in mixer_txs],
+                    "narratives": [t.reference_narrative for t in mixer_txs]
+                },
+                supporting_transaction_ids=[t.transaction_id for t in mixer_txs]
+            ))
+
+        return alerts
+
+    def _detect_human_trafficking_indicators(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[AMLAlert]:
+        """Detects Human Trafficking & Labor Exploitation Financial Red Flags (TM-12)."""
+        alerts = []
+        trafficking_keywords = [
+            "worker wage deduction", "hostel bunk", "transit lodging", "van shuttle group",
+            "recruitment fee deduction", "labor dormitory", "human trafficking", "centralized wage pooling"
+        ]
+
+        ht_txs = []
+        for t in transactions:
+            is_tag = t.synthetic_typology_tag == "HUMAN_TRAFFICKING_RED_FLAGS"
+            narrative_lower = (t.reference_narrative or "").lower()
+            has_ht_keywords = any(kw in narrative_lower for kw in trafficking_keywords)
+
+            # Funnel account: late night repetitive cash extractions in border/transit corridors
+            is_late_night_cash = (
+                t.transaction_type in [TransactionType.ATM_WITHDRAWAL, TransactionType.CASH_WITHDRAWAL] and
+                t.channel in ["ATM", "BRANCH_TELLER"]
+            )
+            if is_tag or has_ht_keywords or (is_late_night_cash and is_tag):
+                ht_txs.append(t)
+
+        if len(ht_txs) >= self.config.get("TRAFFICKING_REPETITIVE_MIN_TX", 3) or any(t.synthetic_typology_tag == "HUMAN_TRAFFICKING_RED_FLAGS" for t in ht_txs):
+            if ht_txs:
+                total_amt = sum(t.amount_usd for t in ht_txs)
+                alerts.append(AMLAlert(
+                    alert_id=f"ALT-HT-{customer.customer_id}",
+                    rule_id="TM-12",
+                    rule_name="Human Trafficking & Modern Slavery Labor Exploitation Red Flags",
+                    severity=AlertSeverity.CRITICAL,
+                    score_impact=self.config.get("TRAFFICKING_RISK_SCORE", 93.0),
+                    summary=(
+                        f"Financial telemetry exhibits {len(ht_txs)} indicators of human trafficking / labor exploitation: "
+                        f"centralized wage skimming, rapid cash depletion, and transit lodging payments totaling ${total_amt:,.2f}."
+                    ),
+                    trigger_details={
+                        "indicators_count": len(ht_txs),
+                        "total_volume_usd": total_amt,
+                        "counterparties": [t.counterparty_name for t in ht_txs]
+                    },
+                    supporting_transaction_ids=[t.transaction_id for t in ht_txs]
+                ))
+
+        return alerts
+
+    def _detect_loan_collateral_wash(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[AMLAlert]:
+        """Detects Loan Collateral Laundering & Rapid Liquidation Wash (TM-13)."""
+        alerts = []
+        min_loan = self.config.get("LOAN_WASH_MIN_AMOUNT_USD", 20000.0)
+
+        loan_keywords = ["loan disbursement", "credit line draw", "commercial advance"]
+        payoff_keywords = ["early payoff", "loan settlement full", "credit line liquidation", "collateral release"]
+
+        # Inbound loan
+        loan_in = [
+            t for t in transactions
+            if t.direction == TransactionDirection.INBOUND
+            and (t.synthetic_typology_tag == "LOAN_COLLATERAL_WASH" or any(kw in (t.reference_narrative or "").lower() for kw in loan_keywords))
+            and t.amount_usd >= min_loan
+        ]
+
+        for loan in loan_in:
+            t_loan = datetime.fromisoformat(loan.timestamp)
+            max_payoff_time = t_loan + timedelta(days=self.config.get("LOAN_WASH_MAX_DAYS_TO_PAYOFF", 30))
+
+            payoffs = [
+                t for t in transactions
+                if t.direction == TransactionDirection.OUTBOUND
+                and t_loan <= datetime.fromisoformat(t.timestamp) <= max_payoff_time
+                and (
+                    t.synthetic_typology_tag == "LOAN_COLLATERAL_WASH" or
+                    any(kw in (t.reference_narrative or "").lower() for kw in payoff_keywords) or
+                    t.amount_usd >= (loan.amount_usd * 0.90)
+                )
+            ]
+
+            if payoffs:
+                total_payoff = sum(t.amount_usd for t in payoffs)
+                alerts.append(AMLAlert(
+                    alert_id=f"ALT-LOAN-{loan.transaction_id}",
+                    rule_id="TM-13",
+                    rule_name="Loan Collateral Laundering & Rapid Early Liquidation",
+                    severity=AlertSeverity.HIGH,
+                    score_impact=self.config.get("LOAN_WASH_RISK_SCORE", 84.0),
+                    summary=(
+                        f"Loan disbursement of ${loan.amount_usd:,.2f} rapidly settled/liquidated within "
+                        f"{(datetime.fromisoformat(payoffs[0].timestamp) - t_loan).days} days via ${total_payoff:,.2f} "
+                        f"repayment from external unverified funds, effectively converting illicit cash into clean payoff credit."
+                    ),
+                    trigger_details={
+                        "loan_id": loan.transaction_id,
+                        "loan_amount_usd": loan.amount_usd,
+                        "payoff_total_usd": total_payoff,
+                        "days_to_payoff": (datetime.fromisoformat(payoffs[0].timestamp) - t_loan).days
+                    },
+                    supporting_transaction_ids=[loan.transaction_id] + [t.transaction_id for t in payoffs]
+                ))
+                break
 
         return alerts

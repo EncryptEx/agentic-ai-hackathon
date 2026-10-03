@@ -132,6 +132,90 @@ class RiskEngine:
             override_applied = True
             override_reason = f"ADVERSE MEDIA OVERRIDE: Confirmed public derogatory news for {customer.adverse_media.value}."
 
+        # AML Override 7: Crypto Mixer / Tumbler Sanitization
+        has_mixer = any(a.rule_id == "TM-11" for a in alerts)
+        if has_mixer and composite_score < 94.0:
+            composite_score = 96.0
+            override_applied = True
+            override_reason = "STATUTORY AML OVERRIDE: Interaction with sanctioned virtual asset mixer / tumbler (Tornado Cash/Sinbad)."
+
+        # AML Override 8: Human Trafficking & Labor Exploitation Indicators
+        has_ht = any(a.rule_id == "TM-12" for a in alerts)
+        if has_ht and composite_score < 91.0:
+            composite_score = 93.0
+            override_applied = True
+            override_reason = "TYPOLOGY OVERRIDE: Severe human trafficking / modern slavery red flag cluster detected."
+
+        # Fraud Override 5: Business Email Compromise (BEC) Executive Impersonation
+        has_bec = any(fa.rule_id == "FR-09" for fa in fraud_alerts)
+        if has_bec and composite_score < 90.0:
+            composite_score = 92.5
+            override_applied = True
+            override_reason = "FRAUD OVERRIDE: High-value Business Email Compromise / Executive Impersonation identified."
+
+        # Fraud Override 6: AitM Reverse-Proxy Phishing Session Hijacking
+        has_aitm = any(fa.rule_id == "FR-10" for fa in fraud_alerts)
+        if has_aitm and composite_score < 89.0:
+            composite_score = 91.0
+            override_applied = True
+            override_reason = "FRAUD OVERRIDE: Adversary-in-the-Middle (AitM) phishing session token replay detected."
+
+        # Fraud Override 7: SIM Swap Credential Reset Drain
+        has_sim_swap = any(fa.rule_id == "FR-06" for fa in fraud_alerts)
+        if has_sim_swap and composite_score < 88.0:
+            composite_score = 90.0
+            override_applied = True
+            override_reason = "FRAUD OVERRIDE: Mobile carrier SIM swap & rapid balance drain detected."
+
+        # AML Override 9: Trade-Based Money Laundering (TBML)
+        has_tbml = any(a.rule_id == "TM-08" for a in alerts)
+        if has_tbml and composite_score < 84.0:
+            composite_score = 86.0
+            override_applied = True
+            override_reason = "TYPOLOGY OVERRIDE: Trade-Based Money Laundering / Over-invoicing commercial pattern."
+
+        # AML Override 10: Fan-Out Layering Distribution
+        has_fanout = any(a.rule_id == "TM-09" for a in alerts)
+        if has_fanout and composite_score < 83.0:
+            composite_score = 85.5
+            override_applied = True
+            override_reason = "TYPOLOGY OVERRIDE: High-velocity fan-out layering across disparate payees."
+
+        # Fraud Override 8: Automated BIN Attack Velocity
+        has_bin_attack = any(fa.rule_id == "FR-08" for fa in fraud_alerts)
+        if has_bin_attack and composite_score < 82.0:
+            composite_score = 84.0
+            override_applied = True
+            override_reason = "FRAUD OVERRIDE: Automated BIN attack & brute-force card testing velocity."
+
+        # AML Override 11: Cuckoo Smurfing / Hawala Integration
+        has_cuckoo = any(a.rule_id == "TM-10" for a in alerts)
+        if has_cuckoo and composite_score < 78.0:
+            composite_score = 81.0
+            override_applied = True
+            override_reason = "TYPOLOGY OVERRIDE: Cuckoo smurfing / Hawala third-party remittance aggregation."
+
+        # Fraud Override 9: Counterfeit Cheque Overpayment Scam
+        has_overpayment = any(fa.rule_id == "FR-11" for fa in fraud_alerts)
+        if has_overpayment and composite_score < 78.0:
+            composite_score = 80.5
+            override_applied = True
+            override_reason = "FRAUD OVERRIDE: Counterfeit deposit overpayment & urgent refund extraction."
+
+        # Fraud Override 10: Friendly Fraud / Chargeback Abuse
+        has_friendly_fraud = any(fa.rule_id == "FR-07" for fa in fraud_alerts)
+        if has_friendly_fraud and composite_score < 72.0:
+            composite_score = 75.0
+            override_applied = True
+            override_reason = "FRAUD OVERRIDE: Systematic chargeback & friendly fraud merchant abuse."
+
+        # AML Override 12: Loan Collateral Wash
+        has_loan_wash = any(a.rule_id == "TM-13" for a in alerts)
+        if has_loan_wash and composite_score < 74.0:
+            composite_score = 77.0
+            override_applied = True
+            override_reason = "TYPOLOGY OVERRIDE: Loan disbursement rapid liquidation & collateral wash."
+
         composite_score = min(100.0, max(0.0, round(composite_score, 2)))
 
         # 4. Map to Risk Tier

@@ -60,4 +60,33 @@ TM_RULES_CONFIG: Dict[str, Any] = {
     # Crypto Velocity / High-Frequency Crypto Ramps
     "CRYPTO_BURST_MIN_AMOUNT_USD": 15000.0,
     "CRYPTO_BURST_MIN_TX_COUNT": 3,
+
+    # TM-08: Trade-Based Money Laundering (TBML) & Over/Under-Invoicing
+    "TBML_MIN_INVOICE_AMOUNT_USD": 25000.0,
+    "TBML_MIN_TRANSACTIONS": 2,
+    "TBML_RISK_SCORE": 88.0,
+
+    # TM-09: Fan-Out Layering / High-Velocity Fund Distribution
+    "FAN_OUT_MIN_INFLOW_USD": 15000.0,
+    "FAN_OUT_MIN_SPLITS": 4,
+    "FAN_OUT_WINDOW_HOURS": 36,
+    "FAN_OUT_RISK_SCORE": 87.0,
+
+    # TM-10: Cuckoo Smurfing / Hawala Alternate Remittance
+    "CUCKOO_MIN_UNRELATED_DEPOSITS": 3,
+    "CUCKOO_MATCH_TOLERANCE": 0.15,
+    "CUCKOO_RISK_SCORE": 86.0,
+
+    # TM-11: Crypto Mixer, Tumbler & Darknet Obfuscation
+    "MIXER_MIN_AMOUNT_USD": 1000.0,
+    "MIXER_RISK_SCORE": 96.0,
+
+    # TM-12: Human Trafficking & Labor Exploitation Red Flags
+    "TRAFFICKING_REPETITIVE_MIN_TX": 4,
+    "TRAFFICKING_RISK_SCORE": 93.0,
+
+    # TM-13: Loan Collateral Laundering & Rapid Early Liquidation
+    "LOAN_WASH_MIN_AMOUNT_USD": 20000.0,
+    "LOAN_WASH_MAX_DAYS_TO_PAYOFF": 30,
+    "LOAN_WASH_RISK_SCORE": 84.0,
 }

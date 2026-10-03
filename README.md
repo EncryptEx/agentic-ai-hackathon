@@ -105,6 +105,14 @@ When an alert is flagged or a customer is inspected, the system dispatches the c
    - Missing information & investigative gaps
    - Suggested next investigative questions (audit checklist)
    - Overall case summary & human compliance disclaimer
+7. **`executive_summary_agent`**: Synthesizes a concise, high-level **1-Page Executive Decision Briefing** for human compliance officers, managers, and risk committees who do not want to examine the entire multi-agent investigation:
+   - **Bottom Line Up Front (BLUF):** Decisive 1-2 sentence verdict and threat level
+   - **Case & Subject Snapshot:** Customer ID, Name, Archetype, Jurisdiction, and trigger
+   - **FRAML Risk Profile:** Composite score, AML & Fraud sub-scores, statutory overrides
+   - **Critical Red Flags:** Top 3-4 actionable findings (structuring, ATO, mule, PEP)
+   - **Financial Exposure:** Scrutinized turnover, suspicious/flagged volume, cash metrics
+   - **Immediate Recommended Action:** Direct compliance directive and operational checklist
+   - **Human Governance Disclaimer:** Synthetic data notice & confirmation that final decisions rest with human officers
 
 ---
 
@@ -140,8 +148,13 @@ python cli.py alerts --severity CRITICAL --type AML
 
 ### 5. Trigger Autonomous AI Investigation
 ```bash
-# Run agent team on a flagged customer
+# Run agent team on a flagged customer (full 11-section dossier)
 python cli.py investigate CUST-00015
+
+# Run Executive Summary Agent (for rapid human decision-making)
+python cli.py executive-summary CUST-00015
+# Or investigate with summary flag
+python cli.py investigate CUST-00015 --summary
 
 # Investigate a customer with a specific triggering alert
 python cli.py investigate CUST-00045 --alert-id FR-ALT-ATO-TXN-0103005

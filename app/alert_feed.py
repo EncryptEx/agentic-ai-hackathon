@@ -336,3 +336,181 @@ def generate_specialist_investigation_report(
 """
     return report.strip()
 
+
+def generate_executive_summary_report(
+    customer_id: str,
+    trigger_alert: Optional[Dict[str, Any]] = None
+) -> str:
+    """Synthesize findings from specialist tools into a concise, decision-ready Executive Summary for human compliance officers."""
+    from app.tools import (
+        analyze_transactions,
+        get_customer_profile,
+        get_digital_telemetry,
+        get_fraud_alerts,
+        get_risk_assessment,
+        get_transaction_alerts,
+        get_transactions,
+    )
+
+    profile = get_customer_profile(customer_id)
+    if "error" in profile:
+        return f"Error: Customer {customer_id!r} could not be retrieved from the compliance database."
+
+    risk = get_risk_assessment(customer_id)
+    tx_analysis = analyze_transactions(customer_id)
+    tx_alerts = get_transaction_alerts(customer_id)
+    fraud_alerts = get_fraud_alerts(customer_id)
+    telemetry = get_digital_telemetry(customer_id)
+    txs = get_transactions(customer_id)
+
+    name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip() or profile.get('name', 'Unknown')
+    archetype = profile.get("archetype", "RETAIL_INDIVIDUAL")
+    country = profile.get("residence_country") or profile.get("country", "US")
+    tier = risk.get("risk_tier", "MEDIUM") if "error" not in risk else "UNKNOWN"
+    comp_score = risk.get("composite_score", 0.0) if "error" not in risk else 0.0
+    sub_scores = risk.get("sub_scores", {}) if "error" not in risk else {}
+    aml_score = sub_scores.get("aml_score", 0.0)
+    fraud_score = sub_scores.get("fraud_score", 0.0)
+    directive = risk.get("recommended_action", "MANUAL_COMPLIANCE_REVIEW") if "error" not in risk else "REVIEW"
+    checklist = risk.get("action_checklist", []) if "error" not in risk else []
+
+    # Typologies identified
+    typologies = []
+    for a in tx_alerts:
+        typologies.append(f"{a.get('rule_id')}: {a.get('rule_name')}")
+    for f in fraud_alerts:
+        typologies.append(f"{f.get('rule_id')}: {f.get('rule_name')}")
+
+    # Trigger rationale
+    if trigger_alert:
+        trigger_desc = f"[{trigger_alert.get('severity', 'HIGH')}] {trigger_alert.get('rule_id')}: {trigger_alert.get('rule_name')} - {trigger_alert.get('summary')}"
+    elif typologies:
+        trigger_desc = f"{len(tx_alerts)} AML alert(s) and {len(fraud_alerts)} fraud alert(s). Lead alert: {typologies[0]}"
+    else:
+        trigger_desc = "Routine Periodic FRAML Compliance Review"
+
+    # Transaction financials
+    inbound_amt = sum(t["amount_usd"] for t in txs if t.get("direction") == "INBOUND")
+    outbound_amt = sum(t["amount_usd"] for t in txs if t.get("direction") == "OUTBOUND")
+    total_vol = tx_analysis.get("total_volume", sum(t["amount_usd"] for t in txs))
+
+    # Calculate suspicious / at-risk volume
+    near_thresh = tx_analysis.get("near_threshold_deposits", 0)
+    cash_cnt = tx_analysis.get("cash_count", 0)
+    suspicious_vol = 0.0
+    flagged_tx_ids = set()
+    for a in tx_alerts + fraud_alerts:
+        for tid in a.get("supporting_transaction_ids", []):
+            flagged_tx_ids.add(tid)
+    if flagged_tx_ids:
+        suspicious_vol = sum(t["amount_usd"] for t in txs if t.get("transaction_id") in flagged_tx_ids)
+    if suspicious_vol == 0.0 and (tx_alerts or fraud_alerts):
+        suspicious_vol = outbound_amt if outbound_amt > 0 else total_vol * 0.5
+
+    # Craft Bottom Line Up Front (BLUF)
+    if tier in ("CRITICAL", "HIGH"):
+        top_cause = typologies[0] if typologies else "elevated behavioral anomalies"
+        bluf = (
+            f"**URGENT ESCALATION REQUIRED:** Customer {name} ({customer_id}) presents a **{tier}** FRAML risk profile "
+            f"(Composite Score: **{comp_score:.1f}/100**). Active typologies indicate severe exposure driven by **{top_cause}**. "
+            f"Immediate operational execution of **`{directive}`** is advised."
+        )
+    elif tier == "MEDIUM":
+        bluf = (
+            f"**ELEVATED RISK REVIEW:** Customer {name} ({customer_id}) exhibits moderate FRAML risk "
+            f"(Composite Score: **{comp_score:.1f}/100**). Identified behavioral anomalies warrant Enhanced Due Diligence (EDD) "
+            f"and supervisory review under directive **`{directive}`**."
+        )
+    else:
+        bluf = (
+            f"**ROUTINE COMPLIANCE BASELINE:** Customer {name} ({customer_id}) presents low overall risk "
+            f"(Composite Score: **{comp_score:.1f}/100**). No immediate restrictive measures or SAR filings are warranted at this time."
+        )
+
+    # Top red flags (3-4 points)
+    red_flags = []
+    if tx_alerts:
+        for a in tx_alerts[:2]:
+            red_flags.append(f"**AML / Transaction Monitoring:** Triggered `{a.get('rule_id')}` ({a.get('rule_name')}) — {a.get('summary')}")
+    if fraud_alerts:
+        for f in fraud_alerts[:2]:
+            red_flags.append(f"**Fraud & Cyber Telemetry:** Triggered `{f.get('rule_id')}` ({f.get('rule_name')}) — {f.get('summary')}")
+    if profile.get("pep_status") not in (None, "NONE", "NO"):
+        red_flags.append(f"**PEP Exposure:** Confirmed Politically Exposed Person: {profile.get('pep_details') or profile.get('pep_status')}")
+    if profile.get("sanction_status") not in (None, "CLEAN", "NO", "NONE"):
+        red_flags.append(f"**Sanctions Match:** Derogatory screening hit: {profile.get('sanction_details') or profile.get('sanction_status')}")
+    if profile.get("adverse_media") not in (None, "CLEAN", "NO", "NONE"):
+        red_flags.append(f"**Adverse Media:** Derogatory media hit: {profile.get('adverse_media_details') or profile.get('adverse_media')}")
+    if not red_flags:
+        red_flags.append("No active statutory overrides or critical alerts triggered; profile aligns with expected baseline.")
+
+    # Overrides
+    overrides_text = "None applied"
+    if tier in ("CRITICAL", "HIGH") and (tx_alerts or fraud_alerts):
+        applied = [t for t in typologies[:3]]
+        overrides_text = f"High-risk overrides applied: {', '.join(applied)}"
+
+    # Executive Summary Markdown
+    summary = f"""# ⚡ EXECUTIVE BRIEFING // FINANCIAL CRIME INVESTIGATION
+**CONFIDENTIAL // DECISION BRIEFING FOR COMPLIANCE LEADERSHIP**
+
+---
+
+### 1. Bottom Line Up Front (BLUF)
+{bluf}
+
+---
+
+### 2. Case & Subject Snapshot
+* **Case Identifier:** `CASE-{customer_id}`
+* **Subject Under Review:** **{name}** (ID: `{customer_id}`) | Archetype: `{archetype}`
+* **Jurisdiction:** {country} (Citizenship: {profile.get('citizenship', 'N/A')})
+* **Investigation Trigger:** {trigger_desc}
+* **Investigation Scope:** {len(txs)} transactions scrutinized totaling **${total_vol:,.2f} USD**
+
+---
+
+### 3. FRAML Risk Profile & Scores
+* **Composite FRAML Score:** **{comp_score:.1f} / 100** — **[{tier}]** Risk Tier
+* **AML Behavioral Sub-Score:** **{aml_score:.1f} / 100**
+* **Fraud & Cyber Sub-Score:** **{fraud_score:.1f} / 100**
+* **Statutory / Policy Overrides:** {overrides_text}
+
+---
+
+### 4. Critical Red Flags & Primary Typologies
+"""
+    for flag in red_flags:
+        summary += f"- {flag}\n"
+
+    summary += f"""
+---
+
+### 5. Financial Exposure & Impact
+* **Total Scrutinized Turnover:** **${total_vol:,.2f} USD** ({len(txs)} transactions)
+* **Inbound Capital:** ${inbound_amt:,.2f} USD | **Outbound Dispersal:** ${outbound_amt:,.2f} USD
+* **Suspected At-Risk / Flagged Volume:** **${suspicious_vol:,.2f} USD**
+* **Cash & Near-Threshold Volume:** {cash_cnt} cash transactions | {near_thresh} near-CTR deposits ($7,500-$9,999)
+
+---
+
+### 6. Immediate Recommended Action
+* **Primary Compliance Directive:** **`{directive}`**
+* **Immediate Operational Checklist:**
+"""
+    if checklist:
+        for item in checklist[:3]:
+            summary += f"  - [ ] **Action:** {item}\n"
+    else:
+        summary += "  - [ ] Complete standard periodic compliance review.\n"
+
+    summary += f"""
+---
+
+### 7. Human Governance & Compliance Authority
+* **Human-in-the-Loop Authority:** *This executive summary provides automated decision-support intelligence for a human investigator. Final decisions regarding SAR filings, account freezes, or regulatory notices remain the sole responsibility of authorized human compliance officers.*
+* **Synthetic Data Disclaimer:** *ALL DATA IS SYNTHETIC AND FICTIONAL. Entities, account numbers, and activities are synthetic constructs created for compliance demonstration.*
+"""
+    return summary.strip()
+
+

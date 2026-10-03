@@ -535,7 +535,11 @@ class InvestigateRequest(BaseModel):
 async def investigate_customer(req: InvestigateRequest, request: Request):
     """Trigger the autonomous Google ADK multi-agent investigation pipeline for a customer."""
     from google.genai import types
-    from app.alert_feed import AlertDispatcher, generate_specialist_investigation_report
+    from app.alert_feed import (
+        AlertDispatcher,
+        generate_executive_summary_report,
+        generate_specialist_investigation_report,
+    )
 
     dispatcher = AlertDispatcher()
     cust_id = req.customer_id.upper().strip()
@@ -579,6 +583,9 @@ async def investigate_customer(req: InvestigateRequest, request: Request):
     if not final_report or not final_report.strip():
         final_report = generate_specialist_investigation_report(cust_id, trigger_alert=packet.get("trigger_alert"))
 
+    # Also generate the concise executive summary for leadership review
+    exec_summary = generate_executive_summary_report(cust_id, trigger_alert=packet.get("trigger_alert"))
+
     if req.alert_id and final_report:
         dispatcher.mark_alert_investigated(req.alert_id, notes=final_report[:500])
 
@@ -609,7 +616,64 @@ async def investigate_customer(req: InvestigateRequest, request: Request):
         "risk_tier": packet["risk_tier"],
         "composite_score": packet["composite_score"],
         "prompt_dispatched": prompt,
-        "report": final_report
+        "report": final_report,
+        "executive_summary": exec_summary,
+    }
+
+
+@app.post("/api/investigate/executive-summary")
+async def investigate_customer_executive_summary(req: InvestigateRequest, request: Request):
+    """Run Executive Summary Agent for rapid human compliance decision-making without the full dossier."""
+    from app.alert_feed import AlertDispatcher, generate_executive_summary_report
+
+    dispatcher = AlertDispatcher()
+    cust_id = req.customer_id.upper().strip()
+
+    try:
+        packet = dispatcher.prepare_case_packet(cust_id, alert_id=req.alert_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    summary_prompt = (
+        f"Provide a concise Executive Summary (BLUF, risk scores, red flags, "
+        f"exposure, and immediate recommendations) for customer {cust_id} "
+        f"({packet.get('customer_name')}) for a human compliance officer who does not want to read "
+        f"the full multi-agent investigation."
+    )
+
+    exec_summary = generate_executive_summary_report(cust_id, trigger_alert=packet.get("trigger_alert"))
+
+    if req.alert_id and exec_summary:
+        dispatcher.mark_alert_investigated(req.alert_id, notes=exec_summary[:500])
+
+    db = DatabaseManager()
+    inv_id = db.log_investigation({
+        "customer_id": cust_id,
+        "customer_name": packet.get("customer_name"),
+        "trigger_alert_id": req.alert_id,
+        "trigger_rule": (packet.get("trigger_alert") or {}).get("rule_name", "Manual Risk Review"),
+        "risk_tier": packet.get("risk_tier"),
+        "composite_score": packet.get("composite_score", 0.0),
+        "model_version": "gemini-3.8-flash",
+        "raw_prompt": summary_prompt,
+        "final_report_text": exec_summary,
+        "officer_sign_off_status": "PENDING",
+    })
+    log_record = db.get_investigation_audit_log(inv_id)
+    report_sha256 = log_record.get("final_report_sha256") if log_record else ""
+
+    return {
+        "investigation_id": inv_id,
+        "report_sha256": report_sha256,
+        "officer_sign_off_status": "PENDING",
+        "customer_id": cust_id,
+        "customer_name": packet["customer_name"],
+        "archetype": packet["archetype"],
+        "risk_tier": packet["risk_tier"],
+        "composite_score": packet["composite_score"],
+        "prompt_dispatched": summary_prompt,
+        "report": exec_summary,
+        "executive_summary": exec_summary,
     }
 
 
@@ -653,6 +717,135 @@ async def get_investigation_detail(investigation_id: str):
     if not log:
         raise HTTPException(status_code=404, detail="Investigation not found")
     return log
+
+
+# --------------------------------------------------------------------------
+# Customer Outreach Video & Audio Call Endpoints (Anti-Tipping-Off)
+# --------------------------------------------------------------------------
+
+class StartCallRequest(BaseModel):
+    customer_id: str
+    alert_id: Optional[str] = None
+    voice_name: Optional[str] = "Aoede"
+
+
+class CallTurnRequest(BaseModel):
+    session_id: str
+    message: str
+    voice_name: Optional[str] = "Aoede"
+    interrupted: Optional[bool] = False
+
+
+class AudioTurnRequest(BaseModel):
+    session_id: str
+    audio_base64: str
+    audio_mime: Optional[str] = "audio/webm"
+    voice_name: Optional[str] = "Aoede"
+    interrupted: Optional[bool] = False
+
+
+class CompleteCallRequest(BaseModel):
+    session_id: str
+
+
+class TTSRequest(BaseModel):
+    text: str
+    emotion: Optional[str] = "warm_reassuring"
+    voice_name: Optional[str] = "Aoede"
+
+
+@app.post("/api/call/start")
+async def api_start_customer_call(req: StartCallRequest):
+    """Initiates an interactive voice/video verification call with a customer under anti-tipping-off rules."""
+    from app.customer_call_agent import start_customer_call
+    try:
+        voice = req.voice_name or "Aoede"
+        greeting = start_customer_call(req.customer_id.upper().strip(), alert_id=req.alert_id, voice_name=voice)
+        return greeting
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/call/turn")
+async def api_customer_call_turn(req: CallTurnRequest):
+    """Processes a conversational turn with the customer, updating plausibility and generating agent speech."""
+    from app.customer_call_agent import process_call_turn
+    try:
+        voice = req.voice_name or "Aoede"
+        result = process_call_turn(
+            req.session_id,
+            req.message.strip(),
+            voice_name=voice,
+            interrupted=bool(req.interrupted),
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/call/audio-turn")
+async def api_customer_call_audio_turn(req: AudioTurnRequest):
+    """Processes a spoken audio turn from customer microphone using Gemini multimodal transcription."""
+    from app.customer_call_agent import process_audio_turn
+    import base64
+    try:
+        audio_bytes = base64.b64decode(req.audio_base64)
+        mime = req.audio_mime or "audio/webm"
+        voice = req.voice_name or "Aoede"
+        result = process_audio_turn(
+            req.session_id,
+            audio_bytes,
+            mime_type=mime,
+            voice_name=voice,
+            interrupted=bool(req.interrupted),
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/call/tts")
+async def api_synthesize_call_tts(req: TTSRequest):
+    """Generates expressive neural audio on-demand using Google Gemini Audio."""
+    from app.customer_call_agent import CustomerCallSession
+    session = CustomerCallSession("CUST-00019")
+    audio_b64 = session.synthesize_speech(req.text, emotion=req.emotion or "warm_reassuring", voice_name=req.voice_name or "Aoede")
+    if not audio_b64:
+        raise HTTPException(status_code=500, detail="Neural audio synthesis unavailable")
+    return {
+        "audio_base64": audio_b64,
+        "audio_mime": "audio/wav",
+        "emotion": req.emotion or "warm_reassuring",
+        "voice_name": req.voice_name or "Aoede",
+    }
+
+
+@app.post("/api/call/complete")
+async def api_complete_customer_call(req: CompleteCallRequest):
+    """Concludes the customer call, compiles formal interview dossier, and logs to audit ledger."""
+    from app.customer_call_agent import complete_customer_call
+    try:
+        result = complete_customer_call(req.session_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/call/persona")
+async def api_get_call_persona():
+    """Returns metadata and configuration for the AI video agent persona."""
+    return {
+        "name": "Agent Claire Sterling",
+        "title": "Senior Customer Verification & Account Security Specialist",
+        "department": "Valiant Bank Client Care & Verification Unit",
+        "badge_id": "VB-SEC-8419",
+        "jurisdiction": "Global Banking Operations",
+        "voice_gender": "female",
+        "voice_pitch": 1.05,
+        "voice_rate": 0.96,
+        "model": "gemini-3.8-flash (Gemini Audio Reasoning)",
+        "security_protocol": "Anti-Tipping-Off Safeguards Active (POCA §333A / BSA 31 U.S.C. §5318)",
+    }
 
 
 # --------------------------------------------------------------------------

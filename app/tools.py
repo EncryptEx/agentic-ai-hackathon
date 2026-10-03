@@ -691,3 +691,11 @@ ALERT_TRIAGE_TOOLS = [
     get_risk_assessment,
     get_customer_profile,
 ]
+
+EXECUTIVE_SUMMARY_TOOLS = [
+    get_customer_profile,
+    get_risk_assessment,
+    get_transaction_alerts,
+    get_fraud_alerts,
+    analyze_transactions,
+]

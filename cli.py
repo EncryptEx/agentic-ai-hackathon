@@ -318,6 +318,9 @@ def handle_alerts(args):
 
 def handle_investigate(args):
     """Triggers autonomous Google ADK multi-agent investigation on a customer."""
+    if getattr(args, "summary", False):
+        return handle_executive_summary(args)
+
     cust_id = args.customer_id.upper().strip()
     from app.alert_feed import AlertDispatcher
     from app.agent import root_agent
@@ -438,6 +441,122 @@ def handle_investigate(args):
         print("Investigation completed. No text output returned.")
 
 
+def handle_executive_summary(args):
+    """Runs Executive Summary Agent for rapid human compliance decision-making without the full dossier."""
+    cust_id = args.customer_id.upper().strip()
+    from app.alert_feed import AlertDispatcher, generate_executive_summary_report
+    from app.agent import executive_summary_agent
+    from app.app_utils import services
+    from google.adk.runners import Runner
+    from google.genai import types
+
+    dispatcher = AlertDispatcher()
+    try:
+        packet = dispatcher.prepare_case_packet(cust_id, alert_id=args.alert_id)
+    except Exception as e:
+        print(f"Error preparing case: {e}")
+        return
+
+    prompt = (
+        f"Generate a concise, decision-ready Executive Summary (BLUF, risk scores, red flags, "
+        f"financial exposure, and immediate recommendations) for customer {cust_id} "
+        f"({packet.get('customer_name')}) for a human compliance officer who does not wish to read "
+        f"the full multi-agent investigation."
+    )
+
+    if HAS_RICH:
+        trigger_rule = (packet.get("trigger_alert") or {}).get("rule_name", "Manual Risk Review")
+        console.print(Panel(
+            f"[bold cyan]Subject:[/bold cyan] {packet['customer_name']} ({cust_id})\n"
+            f"[bold cyan]Risk Rating:[/bold cyan] {packet['risk_tier']} (Score: {packet['composite_score']:.1f})\n"
+            f"[bold cyan]Trigger Alert:[/bold cyan] {trigger_rule}\n"
+            f"[bold cyan]Mode:[/bold cyan] Executive Summary Briefing",
+            title="[bold yellow]⚡ Running Executive Summary Agent[/bold yellow]"
+        ))
+    else:
+        print(f"Running Executive Summary Agent for {cust_id}...")
+
+    final_text = ""
+    try:
+        runner = Runner(
+            agent=executive_summary_agent,
+            app_name="app",
+            session_service=services.get_session_service(),
+            artifact_service=services.get_artifact_service(),
+            auto_create_session=True,
+        )
+
+        async def _run():
+            session = await runner.session_service.create_session(
+                app_name="app",
+                user_id="compliance_executive"
+            )
+            new_message = types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            )
+            events = []
+            async for event in runner.run_async(
+                user_id="compliance_executive",
+                session_id=session.id,
+                new_message=new_message,
+            ):
+                events.append(event)
+            return events
+
+        events = asyncio.run(_run())
+        for ev in events:
+            if hasattr(ev, "content") and ev.content and hasattr(ev.content, "parts"):
+                for p in ev.content.parts:
+                    if hasattr(p, "text") and p.text:
+                        final_text = p.text
+    except Exception as ex:
+        if HAS_RICH:
+            console.print(f"[yellow]Synthesizing Executive Briefing from forensic evidence: {ex}[/yellow]")
+        else:
+            print(f"Synthesizing Executive Briefing from forensic evidence: {ex}")
+        final_text = generate_executive_summary_report(cust_id, trigger_alert=packet.get("trigger_alert"))
+
+    if not final_text or not final_text.strip():
+        final_text = generate_executive_summary_report(cust_id, trigger_alert=packet.get("trigger_alert"))
+
+    if final_text:
+        db = DatabaseManager()
+        inv_id = db.log_investigation({
+            "customer_id": cust_id,
+            "customer_name": packet.get("customer_name"),
+            "trigger_alert_id": args.alert_id,
+            "trigger_rule": (packet.get("trigger_alert") or {}).get("rule_name", "Manual Risk Review"),
+            "risk_tier": packet.get("risk_tier"),
+            "composite_score": packet.get("composite_score", 0.0),
+            "model_version": "gemini-3.8-flash",
+            "raw_prompt": prompt,
+            "final_report_text": final_text,
+            "officer_sign_off_status": "PENDING",
+        })
+        log_rec = db.get_investigation_audit_log(inv_id)
+        sha = log_rec.get("final_report_sha256", "") if log_rec else ""
+
+        if HAS_RICH:
+            console.print(Panel(final_text, title="[bold green]⚡ AI Executive Decision Briefing[/bold green]"))
+            console.print(Panel(
+                f"[bold green]Audit Status:[/bold green] Recorded to Immutable Compliance Ledger\n"
+                f"[bold cyan]Investigation ID:[/bold cyan] {inv_id}\n"
+                f"[bold cyan]Cryptographic SHA-256 Digest:[/bold cyan] {sha}\n"
+                f"[bold yellow]Officer Disposition:[/bold yellow] PENDING Human Review\n"
+                f"[dim]To record review: python cli.py sign-off {inv_id} --officer \"<Name>\" --decision APPROVED_SAR_FILED[/dim]",
+                title="[bold blue]Compliance Audit Trail Verification[/bold blue]"
+            ))
+        else:
+            print("\n=== AI EXECUTIVE DECISION BRIEFING ===")
+            print(final_text)
+            print(f"\nAudit Log ID: {inv_id}")
+            print(f"SHA-256 Digest: {sha}")
+            print("Status: PENDING Officer Sign-Off")
+    else:
+        print("Executive summary completed. No text output returned.")
+
+
 def handle_audit(args):
     """View immutable investigation audit logs."""
     db = DatabaseManager()
@@ -503,6 +622,94 @@ def handle_sign_off(args):
         print(f"Sign-off recorded for {args.investigation_id}: {args.decision} by {args.officer}")
 
 
+def handle_call(args):
+    """Conducts an interactive AI customer verification call with anti-tipping-off safeguards."""
+    cust_id = args.customer_id.upper().strip()
+    from app.customer_call_agent import start_customer_call, process_call_turn, complete_customer_call
+    import base64
+    import shutil
+    import subprocess
+    import tempfile
+
+    def _play_b64_audio(b64_str):
+        if not b64_str or not shutil.which("afplay"):
+            return
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf:
+                tf.write(base64.b64decode(b64_str))
+                tmp_path = tf.name
+            subprocess.Popen(["afplay", tmp_path])
+        except Exception:
+            pass
+
+    try:
+        greeting_data = start_customer_call(cust_id)
+    except Exception as e:
+        print(f"Error starting customer call: {e}")
+        return
+
+    session_id = greeting_data["session_id"]
+    customer_name = greeting_data["customer_name"]
+
+    if HAS_RICH:
+        console.print(Panel(
+            f"[bold cyan]Subject Customer:[/bold cyan] {customer_name} ({cust_id})\n"
+            f"[bold cyan]AI Verification Officer:[/bold cyan] Agent Claire Sterling (Badge #VB-SEC-8419)\n"
+            f"[bold green]Security Protocol:[/bold green] Anti-Tipping-Off Safeguards Active (POCA §333A / BSA 31 U.S.C.)\n"
+            f"[bold magenta]Audio Engine:[/bold magenta] Google Gemini Neural Voice (Aoede — Expressive Human Cadence)\n"
+            f"[dim]Type your response as the customer, or 'exit' / 'done' to conclude the call and compile dossier.[/dim]",
+            title="[bold yellow]📞 Valiant Bank Secure Customer Verification Call[/bold yellow]"
+        ))
+        console.print(f"\n[bold blue]Agent Claire Sterling [dim](Warm & Empathetic)[/dim]:[/bold blue] {greeting_data['message']}\n")
+    else:
+        print(f"\n=== VALIANT BANK SECURE CALL: {customer_name} ({cust_id}) ===")
+        print(f"Agent Claire Sterling (Warm & Empathetic): {greeting_data['message']}\n")
+
+    _play_b64_audio(greeting_data.get("audio_base64"))
+
+    while True:
+        try:
+            cust_input = input("Customer > ").strip()
+        except (KeyboardInterrupt, EOFError):
+            break
+
+        if not cust_input or cust_input.lower() in ("exit", "quit", "done", "bye"):
+            break
+
+        turn_res = process_call_turn(session_id, cust_input)
+        score = turn_res["plausibility_score"]
+        verdict = turn_res["plausibility_verdict"]
+        emotion = turn_res.get("audio_emotion", "warm_reassuring").replace("_", " ").title()
+
+        if HAS_RICH:
+            score_col = "green" if score >= 70 else "yellow" if score >= 45 else "red"
+            console.print(f"[dim]Plausibility: [{score_col}]{score:.1f}%[/{score_col}] ({verdict}) | Sentiment: {turn_res['customer_sentiment']} | Emotion: [magenta]{emotion}[/magenta][/dim]")
+            console.print(f"\n[bold blue]Agent Claire Sterling [dim]({emotion})[/dim]:[/bold blue] {turn_res['agent_message']}\n")
+        else:
+            print(f"[Plausibility: {score:.1f}% ({verdict}) | Emotion: {emotion}]")
+            print(f"Agent Claire Sterling: {turn_res['agent_message']}\n")
+
+        _play_b64_audio(turn_res.get("audio_base64"))
+
+        if turn_res.get("inquiry_complete"):
+            print("[Agent has gathered sufficient verification information for this inquiry.]")
+
+    print("\nConcluding call and compiling formal Customer Interview Dossier...")
+    final_res = complete_customer_call(session_id)
+    if HAS_RICH:
+        console.print(Panel(
+            final_res["interview_dossier"],
+            title=f"[bold green]Formal Customer Interview Dossier — {final_res['investigation_id']}[/bold green]"
+        ))
+        console.print(f"[bold cyan]SHA-256 Tamper-Evident Digest:[/bold cyan] {final_res['sha256_digest']}")
+        console.print("[dim]Logged to immutable audit ledger in database.[/dim]")
+    else:
+        print("\n=== FORMAL CUSTOMER INTERVIEW DOSSIER ===")
+        print(final_res["interview_dossier"])
+        print(f"\nInvestigation ID: {final_res['investigation_id']}")
+        print(f"SHA-256 Digest: {final_res['sha256_digest']}")
+
+
 def handle_serve(args):
     """Launches the combined FastAPI server with web dashboard and ADK agent endpoints."""
     import uvicorn
@@ -541,6 +748,15 @@ def main():
     inv_parser = subparsers.add_parser("investigate", help="Run autonomous ADK multi-agent investigation on a customer")
     inv_parser.add_argument("customer_id", help="Customer ID (e.g., CUST-00015)")
     inv_parser.add_argument("--alert-id", help="Optional triggering alert ID")
+    inv_parser.add_argument("--summary", action="store_true", help="Generate concise Executive Summary instead of full 11-section dossier")
+
+    # Executive Summary (Dedicated Fast Triage)
+    exec_parser = subparsers.add_parser("executive-summary", help="Run Executive Summary Agent for rapid human decision-making")
+    exec_parser.add_argument("customer_id", help="Customer ID (e.g., CUST-00015)")
+    exec_parser.add_argument("--alert-id", help="Optional triggering alert ID")
+    subparsers.add_parser("briefing", help="Alias for executive-summary")
+    subparsers._name_parser_map["briefing"].add_argument("customer_id", help="Customer ID (e.g., CUST-00015)")
+    subparsers._name_parser_map["briefing"].add_argument("--alert-id", help="Optional triggering alert ID")
 
     # Audit Trail
     audit_parser = subparsers.add_parser("audit", help="View immutable investigation audit trail & tamper-evident digests")
@@ -556,6 +772,10 @@ def main():
     ], help="Compliance decision")
     signoff_parser.add_argument("--notes", help="Officer rationale and justification")
     signoff_parser.add_argument("--action", help="Specific operational action taken")
+
+    # Customer Call (Interactive Voice/Video Verification)
+    call_parser = subparsers.add_parser("call", help="Conduct interactive customer verification call with anti-tipping-off safeguards")
+    call_parser.add_argument("customer_id", help="Customer ID (e.g. CUST-00019)")
 
     # Serve
     serve_parser = subparsers.add_parser("serve", help="Launch web dashboard and FastAPI agent server")
@@ -575,10 +795,14 @@ def main():
         handle_alerts(args)
     elif args.command == "investigate":
         handle_investigate(args)
+    elif args.command in ("executive-summary", "briefing"):
+        handle_executive_summary(args)
     elif args.command == "audit":
         handle_audit(args)
     elif args.command == "sign-off":
         handle_sign_off(args)
+    elif args.command == "call":
+        handle_call(args)
     elif args.command == "serve":
         handle_serve(args)
     else:

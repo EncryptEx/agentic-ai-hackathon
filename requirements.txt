@@ -2,3 +2,6 @@ pydantic>=2.0.0
 pandas>=2.0.0
 faker>=19.0.0
 rich>=13.0.0
+
+# G-Eval (pinned to the version verified against the official GEval API)
+deepeval==4.2.8

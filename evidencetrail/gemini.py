@@ -24,9 +24,9 @@ class ModelTurn:
 class GeminiClient:
     provider = "gemini"
 
-    def __init__(self, model=None):
+    def __init__(self, model=None, generation_settings=None):
         self.requested_model = model or GEMINI_MODEL
-        self.generation_settings = dict(GENERATION_SETTINGS)
+        self.generation_settings = dict(generation_settings or GENERATION_SETTINGS)
 
     def available(self):
         return bool(gemini_key())
@@ -37,12 +37,14 @@ class GeminiClient:
             raise ProviderUnavailable("GEMINI_API_KEY is not configured")
         body = {
             "model": self.requested_model,
-            "system_instruction": system_prompt,
             "input": steps,
-            "tools": tools,
             "store": False,  # stateless: no server-side answer reuse between runs
             "generation_config": dict(self.generation_settings),
         }
+        if system_prompt:
+            body["system_instruction"] = system_prompt
+        if tools:
+            body["tools"] = tools
         req = urllib.request.Request(
             GEMINI_BASE_URL, data=json.dumps(body).encode("utf-8"), method="POST",
             headers={"x-goog-api-key": key, "Content-Type": "application/json"})
@@ -58,7 +60,23 @@ class GeminiClient:
             raise ProviderUnavailable("Gemini response had no 'steps' list")
         calls = [{"id": s.get("id"), "name": s.get("name"), "arguments": s.get("arguments", {})}
                  for s in out_steps if s.get("type") == "function_call"]
-        text = " ".join(part.get("text", "") for s in out_steps if s.get("type") == "model_output"
-                        for part in (s.get("content") or []) if isinstance(part, dict))
+        text = _extract_text(out_steps)
         return ModelTurn(out_steps, calls, text, raw.get("model") or raw.get("model_version"),
                          raw.get("usage"))
+
+
+def _extract_text(steps) -> str:
+    """Collect text from non-call steps. The text step type name is not pinned down by the docs
+    we verified, so accept any step that is not a function call or user input."""
+    parts = []
+    for s in steps:
+        if s.get("type") in ("function_call", "user_input", "function_result"):
+            continue
+        content = s.get("content")
+        if isinstance(content, str):
+            parts.append(content)
+        elif isinstance(content, list):
+            parts.extend(p.get("text", "") for p in content if isinstance(p, dict))
+        elif isinstance(s.get("text"), str):
+            parts.append(s["text"])
+    return " ".join(p for p in parts if p).strip()

@@ -265,9 +265,18 @@ class ApiFlow(unittest.TestCase):
         self.assertEqual(run["state"], "completed")
         self.assertTrue(run["recorded_audit_trail_verified"])
         status, ev = api.handle_post(f"/api/investigations/{body['runId']}/evaluate", {})
-        self.assertEqual(status, 200)
-        self.assertTrue(ev["deterministic"]["policy_label_match"])
-        self.assertEqual(ev["geval"]["status"], "unavailable")
+        self.assertEqual(status, 202)
+        for _ in range(100):
+            _, run = api.handle_get(f"/api/investigations/{body['runId']}")
+            if run["evaluation"] and run["evaluation"]["state"] != "running":
+                break
+            time.sleep(0.05)
+        evaluation = run["evaluation"]
+        self.assertTrue(evaluation["deterministic"]["policy_label_match"])
+        for metric in evaluation["geval"].values():
+            self.assertIn(metric["status"], ("unavailable", "scored", "error"))
+            if metric["status"] != "scored":
+                self.assertIsNone(metric["score"])
 
     def test_unknown_case_and_bad_input(self):
         self.assertEqual(api.handle_post("/api/investigations", {"caseId": "nope"})[0], 404)

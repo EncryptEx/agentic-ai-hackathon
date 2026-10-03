@@ -3,7 +3,6 @@
 import re
 
 from .config import MAX_TOOL_CALLS
-from .metrics import deterministic_checks
 from .runs import RunManager
 from .scenarios import list_scenarios
 
@@ -61,16 +60,10 @@ def handle_post(path, payload):
             return 202, {"experimentId": exp}
         m = _RUN.match(path)
         if m and m.group(2) == "/evaluate":
-            run = _manager.get(m.group(1))
-            if not run:
+            if _manager.get(m.group(1)) is None:
                 return 404, {"error": "run not found"}
-            if run["state"] not in ("completed", "failed"):
-                return 409, {"error": "run is still in progress"}
-            return 200, {"run_id": run["run_id"], "deterministic": deterministic_checks(run),
-                         "geval": {"status": "unavailable",
-                                   "reason": "Actual G-Eval is not integrated yet; no scores are shown.",
-                                   "metrics": ["Evidence grounding", "Explanation completeness",
-                                               "Investigation relevance"]}}
+            evaluation = _manager.start_evaluation(m.group(1))
+            return 202, {"run_id": m.group(1), "evaluation": evaluation}
         if m and m.group(2) == "/context-answer":
             final = _manager.answer_context_check(m.group(1), payload.get("answer"))
             return 200, {"final": final}

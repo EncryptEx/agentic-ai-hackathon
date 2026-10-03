@@ -3,7 +3,7 @@
 import threading
 import uuid
 
-from . import agent, policy
+from . import agent, evaluator, policy
 from .canon import now_utc
 from .config import JEV_MODEL
 from .gemini import GeminiClient
@@ -13,9 +13,10 @@ from .trace import verify_chain
 
 
 class RunManager:
-    def __init__(self, model_factory=GeminiClient, jev_factory=JevClient):
+    def __init__(self, model_factory=GeminiClient, jev_factory=JevClient, judge_factory=None):
         self._model_factory = model_factory
         self._jev_factory = jev_factory
+        self._judge_factory = judge_factory
         self._runs = {}
         self._cases = {}  # run_id -> case snapshot (counterfactual clones keep the original intact)
         self._experiments = {}
@@ -63,6 +64,25 @@ class RunManager:
 
     def case_for(self, run_id):
         return self._cases.get(run_id)
+
+    def start_evaluation(self, run_id):
+        """Evaluate a finished run in the background; poll GET /api/investigations/{id}."""
+        run = self._runs[run_id]
+        if run["state"] not in ("completed", "failed"):
+            raise ValueError("run is still in progress")
+        with self._lock:
+            if run["evaluation"] and run["evaluation"].get("state") == "running":
+                return run["evaluation"]
+            run["evaluation"] = {"state": "running", "started_at": now_utc()}
+        threading.Thread(target=self._evaluate, args=(run_id,), daemon=True).start()
+        return run["evaluation"]
+
+    def _evaluate(self, run_id):
+        run = self._runs[run_id]
+        try:
+            run["evaluation"] = evaluator.evaluate(run, self._cases[run_id], self._judge_factory)
+        except Exception as e:
+            run["evaluation"] = {"state": "failed", "error": f"{type(e).__name__}: {e}"}
 
     def answer_context_check(self, run_id, answer):
         run = self._runs[run_id]

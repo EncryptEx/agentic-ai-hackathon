@@ -10,11 +10,29 @@ import json
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from starlette.convertors import Convertor, register_url_convertor
 
 from . import api, handoff
 from .canon import now_utc
 
 router = APIRouter()
+
+
+class RunIdConvertor(Convertor):
+    """Matches only EvidenceTrail run ids ('run-' + 10 hex characters). The combined app also serves
+    /api/investigations/audit-trail, /sign-off and /{investigation id} for the audit ledger, so these routes must not
+    claim the whole /api/investigations/... namespace: anything that is not a run id falls through to those handlers,
+    whatever the registration order."""
+    regex = r"run-[0-9a-f]{10}"
+
+    def convert(self, value: str) -> str:
+        return value
+
+    def to_string(self, value: str) -> str:
+        return value
+
+
+register_url_convertor("runid", RunIdConvertor())
 _tasks = set()  # keep references so background hand-offs are not garbage collected mid-run
 
 
@@ -46,7 +64,8 @@ async def _json_body(request: Request):
 @router.get("/api/evidencetrail/seed/transactions")
 @router.get("/api/evidencetrail/consistency")
 @router.get("/api/evidencetrail/consistency/{rest:path}")
-@router.get("/api/investigations/{rest:path}")
+@router.get("/api/investigations/{run_id:runid}")
+@router.get("/api/investigations/{run_id:runid}/export")
 @router.get("/api/experiments/{rest:path}")
 @router.get("/api/evidencetrail/alerts")
 @router.get("/api/evidencetrail/alerts/{rest:path}")
@@ -103,7 +122,8 @@ async def evidencetrail_handoff(alert_id: str, request: Request):
 
 
 @router.post("/api/investigations")
-@router.post("/api/investigations/{rest:path}")
+@router.post("/api/investigations/{run_id:runid}/evaluate")
+@router.post("/api/investigations/{run_id:runid}/context-answer")
 @router.post("/api/experiments/{rest:path}")
 @router.post("/api/evidencetrail/alerts/{rest:path}")
 async def evidencetrail_post(request: Request):

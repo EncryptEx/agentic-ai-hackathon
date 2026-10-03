@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google ADK Multi-Agent Investigation Studio</title>
+    <style>
+        :root {
+            --bg-dark: #05070c;
+            --panel-bg: #0d1322;
+            --card-bg: #131c31;
+            --card-subtle: rgba(59, 130, 246, 0.05);
+            --border-color: #1e2c4a;
+            --border-highlight: #3b82f6;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-purple: #8b5cf6;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --agent-customer: #06b6d4;
+            --agent-tx: #10b981;
+            --agent-fraud: #f43f5e;
+            --agent-owner: #8b5cf6;
+            --agent-risk: #f59e0b;
+            --agent-consolidator: #3b82f6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top Command Header */
+        .header-bar {
+            height: 56px;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            gap: 12px;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .header-title-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-icon {
+            font-size: 20px;
+        }
+
+        .header-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 0.3px;
+        }
+
+        .header-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.4px;
+        }
+
+        .badge-live {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-live .pulse-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #34d399;
+            box-shadow: 0 0 8px #34d399;
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.8; }
+            50% { transform: scale(1.4); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.8; }
+        }
+
+        .select-input {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .select-input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            border-color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .btn-primary {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: #3b82f6;
+            color: #93c5fd;
+        }
+
+        .btn-primary:hover {
+            background: #3b82f6;
+            color: #ffffff;
+        }
+
+        /* Main Workspace Split */
+        .workspace-split {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 440px;
+            height: calc(100vh - 56px);
+            overflow: hidden;
+        }
+
+        @media (max-width: 1080px) {
+            .workspace-split {
+                grid-template-columns: 1fr;
+            }
+            .right-panel {
+                display: none;
+            }
+        }
+
+        /* Left Chat Console */
+        .chat-console {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: var(--bg-dark);
+            border-right: 1px solid var(--border-color);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Quick Pills Bar */
+        .quick-pills-bar {
+            padding: 10px 16px;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow-x: auto;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .quick-pills-bar::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .quick-pills-bar::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+
+        .pill-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: 4px;
+        }
+
+        .pill-chip {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .pill-chip:hover {
+            border-color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.15);
+            color: #93c5fd;
+        }
+
+        /* Chat Messages Stream */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .messages-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .messages-container::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        .message-bubble {
+            display: flex;
+            flex-direction: column;
+            max-width: 95%;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-user {
+            align-self: flex-end;
+            max-width: 80%;
+        }
+
+        .user-content {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(59, 130, 246, 0.15));
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            padding: 10px 14px;
+            border-radius: 12px 12px 2px 12px;
+            color: #f1f5f9;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .message-agent-wrapper {
+            align-self: flex-start;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* Specialist Agent Card */
+        .agent-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            transition: border-color 0.2s;
+        }
+
+        .agent-card.customer_agent { border-left: 4px solid var(--agent-customer); }
+        .agent-card.transaction_agent { border-left: 4px solid var(--agent-tx); }
+        .agent-card.fraud_agent { border-left: 4px solid var(--agent-fraud); }
+        .agent-card.ownership_agent { border-left: 4px solid var(--agent-owner); }
+        .agent-card.risk_agent { border-left: 4px solid var(--agent-risk); }
+        .agent-card.consolidator_agent { border-left: 4px solid var(--agent-consolidator); }
+        .agent-card.investigation_agent { border-left: 4px solid var(--accent-blue); }
+
+        .agent-header {
+            padding: 10px 14px;
+            background: rgba(15, 23, 42, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .agent-badge-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .agent-avatar {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .agent-name-text {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .agent-role-pill {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-secondary);
+        }
+
+        .agent-tools-count {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Tool calls drawer */
+        .tool-calls-drawer {
+            padding: 8px 14px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .tool-call-item {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 5px;
+            padding: 5px 8px;
+            color: #93c5fd;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .tool-name-highlight {
+            color: #38bdf8;
+            font-weight: 700;
+        }
+
+        .tool-args-preview {
+            color: var(--text-secondary);
+            font-size: 10px;
+            margin-left: 6px;
+        }
+
+        .tool-status-icon {
+            font-size: 10px;
+            color: #34d399;
+        }
+
+        .agent-body {
+            padding: 14px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #cbd5e1;
+        }
+
+        .agent-body h3, .agent-body h4 {
+            color: #f1f5f9;
+            margin: 12px 0 6px 0;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .agent-body p {
+            margin-bottom: 8px;
+        }
+
+        .agent-body ul {
+            padding-left: 20px;
+            margin-bottom: 8px;
+        }
+
+        .agent-body li {
+            margin-bottom: 4px;
+        }
+
+        .agent-body strong {
+            color: #f8fafc;
+        }
+
+        .agent-body code {
+            font-family: ui-monospace, monospace;
+            background: rgba(255, 255, 255, 0.08);
+            color: #e2e8f0;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        /* Live Thinking Indicator */
+        .thinking-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(59, 130, 246, 0.2);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Bottom Chat Input Form */
+        .chat-input-bar {
+            padding: 12px 16px;
+            background: var(--panel-bg);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .chat-textarea {
+            flex: 1;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+            resize: none;
+            height: 44px;
+            outline: none;
+            transition: all 0.2s;
+            line-height: 1.4;
+        }
+
+        .chat-textarea:focus {
+            border-color: var(--accent-blue);
+            height: 72px;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+        }
+
+        .chat-textarea:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-send {
+            height: 44px;
+            padding: 0 18px;
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-send:hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
+        }
+
+        .btn-send:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .input-hint-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Right Panel: Workflow Telemetry & Architecture */
+        .right-panel {
+            background: var(--panel-bg);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .panel-content::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .panel-content::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+
+        /* Pipeline Steps Visualizer */
+        .pipeline-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .pipeline-steps-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .pipeline-step-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .pipeline-step-item.active {
+            border-color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.15);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+        }
+
+        .pipeline-step-item.completed {
+            border-color: rgba(16, 185, 129, 0.4);
+            background: rgba(16, 185, 129, 0.08);
+        }
+
+        .step-label-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .step-status-tag {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+
+        .tag-waiting { color: var(--text-muted); }
+        .tag-running { color: #60a5fa; background: rgba(59, 130, 246, 0.2); animation: pulse 1.5s infinite; }
+        .tag-done { color: #34d399; background: rgba(16, 185, 129, 0.2); }
+
+        /* Architecture Schematic Box */
+        .schematic-box {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .schematic-title {
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .tree-view {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            background: rgba(10, 15, 25, 0.8);
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            color: #93c5fd;
+            line-height: 1.6;
+        }
+
+        /* Tool Chronology Feed */
+        .tool-ticker-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .ticker-list {
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        .ticker-entry {
+            font-size: 11px;
+            padding: 4px 6px;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 4px;
+            border-left: 2px solid var(--accent-cyan);
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .empty-placeholder {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
+            padding: 20px 0;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Bar -->
+    <div class="header-bar">
+        <div class="header-title-group">
+            <span class="header-icon">🤖</span>
+            <div>
+                <div class="header-title">Google ADK Multi-Agent Studio</div>
+                <div class="header-subtitle">Live Autonomous Investigation Pipeline • Gemini 3.8 Flash</div>
+            </div>
+        </div>
+
+        <div class="header-controls">
+            <div class="badge badge-live">
+                <span class="pulse-dot"></span>
+                <span>6 ADK SPECIALISTS ACTIVE</span>
+            </div>
+
+            <!-- Target Agent Selector -->
+            <select id="agent-target-select" class="select-input" title="Select which agent to invoke">
+                <option value="all" selected>⚡ Complete Investigation Pipeline (All 6 Agents)</option>
+                <option value="customer_agent">👤 Customer Agent (KYC CDD & Wealth)</option>
+                <option value="transaction_agent">💳 Transaction Agent (AML Typologies)</option>
+                <option value="fraud_agent">🛡️ Fraud Agent (Device & Cyber Forensics)</option>
+                <option value="ownership_agent">🏢 Ownership Agent (UBOs & Country Risk)</option>
+                <option value="risk_agent">⚖️ Risk Agent (5-Pillar Scores & Overrides)</option>
+                <option value="consolidator_agent">📋 Consolidator Agent (Case Synthesis)</option>
+            </select>
+
+            <!-- Customer Picker -->
+            <select id="customer-select" class="select-input" title="Pick customer target">
+                <option value="CUST-00019" selected>Kimberly Henson (CUST-00019 — Student Mule)</option>
+                <option value="CUST-00015">James Moran (CUST-00015 — Cash Structuring)</option>
+                <option value="CUST-00021">Mark Johnson (CUST-00021 — Car Dealer Structuring)</option>
+                <option value="CUST-00004">Cynthia Diaz (CUST-00004 — Card Fraud Victim)</option>
+                <option value="CUST-00002">Anthony Gonzalez (CUST-00002 — Clean Baseline)</option>
+            </select>
+
+            <!-- Clear / New Session -->
+            <button id="btn-new-session" class="btn" title="Start fresh investigation session">
+                <span>🔄</span> New Session
+            </button>
+
+            <!-- External ADK Dev UI Launcher -->
+            <a href="/dev-ui/" target="_blank" class="btn btn-primary" title="Open native Google ADK Dev UI in new tab">
+                <span>↗️</span> Open ADK Dev UI
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Workspace Split -->
+    <div class="workspace-split">
+        <!-- Left: Interactive Chat Console -->
+        <div class="chat-console">
+            <!-- Quick Chips Bar -->
+            <div class="quick-pills-bar">
+                <span class="pill-label">Prompts:</span>
+                <button class="pill-chip" onclick="applyQuickPrompt('Investigate customer ' + getSelectedCustomer() + ' thoroughly. Run the full FRAML multi-agent workflow.')">
+                    ⚡ Full FRAML Investigation
+                </button>
+                <button class="pill-chip" onclick="applyQuickPrompt('Review KYC CDD dossier, occupation, and wealth plausibility for ' + getSelectedCustomer())">
+                    👤 KYC CDD & Wealth Plausibility
+                </button>
+                <button class="pill-chip" onclick="applyQuickPrompt('Analyze transaction patterns, volume spikes, and triggered AML alerts for ' + getSelectedCustomer())">
+                    💳 AML Transaction Analysis
+                </button>
+                <button class="pill-chip" onclick="applyQuickPrompt('Audit device fingerprints, IP locations, impossible travel, and fraud alerts for ' + getSelectedCustomer())">
+                    🛡️ Cyber & Device Forensics
+                </button>
+                <button class="pill-chip" onclick="applyQuickPrompt('Map beneficial ownership, UBO stakes, and FATF country risks for ' + getSelectedCustomer())">
+                    🏢 UBO & Control Structure
+                </button>
+                <button class="pill-chip" onclick="applyQuickPrompt('Evaluate 5-pillar risk scores, statutory overrides, and audit checklist for ' + getSelectedCustomer())">
+                    ⚖️ 5-Pillar Score & Overrides
+                </button>
+            </div>
+
+            <!-- Messages Stream -->
+            <div class="messages-container" id="messages-container">
+                <!-- Welcome system greeting -->
+                <div class="message-agent-wrapper">
+                    <div class="agent-card investigation_agent">
+                        <div class="agent-header">
+                            <div class="agent-badge-group">
+                                <div class="agent-avatar">🛡️</div>
+                                <div>
+                                    <div class="agent-name-text">Google ADK Autonomous Multi-Agent Suite</div>
+                                    <div class="agent-role-pill">Investigation Orchestrator & Specialist Pipeline</div>
+                                </div>
+                            </div>
+                            <span class="badge badge-live">Gemini 3.8 Flash</span>
+                        </div>
+                        <div class="agent-body">
+                            <p>Welcome to the <strong>Valiant Bank Financial Crime Agent Studio</strong>. This workspace connects directly to the live Google Agent Development Kit (ADK) autonomous multi-agent pipeline.</p>
+                            <p>You can chat directly with the entire investigation pipeline or target individual specialists. Each agent reflects on its own tools, validates against the bank ledger, and reports evidence in real time.</p>
+                            <p><strong>Available Specialists:</strong></p>
+                            <ul>
+                                <li><strong>Customer Agent:</strong> Reviews KYC CDD dossier, screening watchlists, and wealth-to-income plausibility.</li>
+                                <li><strong>Transaction Agent:</strong> Runs rule-based transaction monitoring for AML structuring, rapid drain, and surges.</li>
+                                <li><strong>Fraud Agent:</strong> Analyzes digital telemetry, device fingerprints, impossible travel velocity, and ATO patterns.</li>
+                                <li><strong>Ownership Agent:</strong> Audits corporate UBO structures, executive directorships, and secrecy jurisdictions.</li>
+                                <li><strong>Risk Agent:</strong> Evaluates 5-pillar composite scores (0–100), AML vs Fraud subscores, and statutory overrides.</li>
+                                <li><strong>Consolidator Agent:</strong> Synthesizes specialist findings into a formal 11-section case investigation dossier.</li>
+                            </ul>
+                            <p style="margin-top: 8px; color: var(--text-muted); font-size: 11px;">Select a prompt above or type a message below to start an interactive multi-agent investigation.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Bar -->
+            <div class="chat-input-bar">
+                <div class="input-row">
+                    <textarea 
+                        id="chat-input" 
+                        class="chat-textarea" 
+                        placeholder="Chat with the ADK agents (e.g. 'Investigate customer CUST-00019' or ask about specific AML/Fraud typologies)..."
+                    ></textarea>
+                    <button id="btn-send" class="btn-send" title="Send message to agents">
+                        <span>Send</span>
+                        <span>➤</span>
+                    </button>
+                </div>
+                <div class="input-hint-row">
+                    <span>Press <strong>Enter</strong> to send • <strong>Shift+Enter</strong> for newline</span>
+                    <span id="session-tag" style="color: var(--accent-blue); font-family: ui-monospace, monospace;">Session: Ready</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Live Pipeline Telemetry & Architecture -->
+        <div class="right-panel">
+            <div class="panel-header">
+                <div class="panel-title">ADK Multi-Agent Execution HUD</div>
+                <span id="workflow-status-badge" class="badge" style="background: rgba(255,255,255,0.06); color: var(--text-secondary);">
+                    Idle
+                </span>
+            </div>
+
+            <div class="panel-content">
+                <!-- Pipeline Stages Tracker -->
+                <div class="pipeline-card">
+                    <div class="panel-title" style="margin-bottom: 4px;">Pipeline Stages</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Deterministic Sequential Execution Flow</div>
+                    
+                    <div class="pipeline-steps-list">
+                        <div class="pipeline-step-item" id="stage-customer_agent">
+                            <div class="step-label-group">
+                                <span>👤</span>
+                                <div>
+                                    <strong style="color: var(--agent-customer);">Customer Agent</strong>
+                                    <div style="font-size: 10px; color: var(--text-muted);">KYC CDD, Wealth Plausibility</div>
+                                </div>
+                            </div>
+                            <span class="step-status-tag tag-waiting" id="tag-customer_agent">Waiting</span>
+                        </div>
+
+                        <div class="pipeline-step-item" id="stage-transaction_agent">
+                            <div class="step-label-group">
+                                <span>💳</span>
+                                <div>
+                                    <strong style="color: var(--agent-tx);">Transaction Agent</strong>
+                                    <div style="font-size: 10px; color: var(--text-muted);">AML Typologies & Patterns</div>
+                                </div>
+                            </div>
+                            <span class="step-status-tag tag-waiting" id="tag-transaction_agent">Waiting</span>
+                        </div>
+
+                        <div class="pipeline-step-item" id="stage-fraud_agent">
+                            <div class="step-label-group">
+                                <span>🛡️</span>
+                                <div>
+                                    <strong style="color: var(--agent-fraud);">Fraud & Cyber Agent</strong>
+                                    <div style="font-size: 10px; color: var(--text-muted);">Device Telemetry & ATO</div>
+                                </div>
+                            </div>
+                            <span class="step-status-tag tag-waiting" id="tag-fraud_agent">Waiting</span>
+                        </div>
+
+                        <div class="pipeline-step-item" id="stage-ownership_agent">
+                            <div class="step-label-group">
+                                <span>🏢</span>
+                                <div>
+                                    <strong style="color: var(--agent-owner);">Ownership Agent</strong>
+                                    <div style="font-size: 10px; color: var(--text-muted);">UBOs & Country Risks</div>
+                                </div>
+                            </div>
+                            <span class="step-status-tag tag-waiting" id="tag-ownership_agent">Waiting</span>
+                        </div>
+
+                        <div class="pipeline-step-item" id="stage-risk_agent">
+                            <div class="step-label-group">
+                                <span>⚖️</span>
+                                <div>
+                                    <strong style="color: var(--agent-risk);">Risk Engine Agent</strong>
+                                    <div style="font-size: 10px; color: var(--text-muted);">5-Pillar FRAML Composite</div>
+                                </div>
+                            </div>
+                            <span class="step-status-tag tag-waiting" id="tag-risk_agent">Waiting</span>
+                        </div>
+
+                        <div class="pipeline-step-item" id="stage-consolidator_agent">
+                            <div class="step-label-group">
+                                <span>📋</span>
+                                <div>
+                                    <strong style="color: var(--agent-consolidator);">Consolidator Agent</strong>
+                                    <div style="font-size: 10px; color: var(--text-muted);">11-Section Case Synthesis</div>
+                                </div>
+                            </div>
+                            <span class="step-status-tag tag-waiting" id="tag-consolidator_agent">Waiting</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-time Tool Call Activity Log -->
+                <div class="tool-ticker-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div class="panel-title">Tool Calls Executed</div>
+                        <span id="tools-counter" class="badge" style="background: rgba(59, 130, 246, 0.15); color: #93c5fd;">
+                            0 Calls
+                        </span>
+                    </div>
+                    <div class="ticker-list" id="ticker-list">
+                        <div class="empty-placeholder">No tools executed yet</div>
+                    </div>
+                </div>
+
+                <!-- Architecture Schematic -->
+                <div class="schematic-box">
+                    <div class="schematic-title">
+                        <span>Architecture Schematic</span>
+                        <span style="font-size: 10px; color: var(--text-muted);">Google ADK</span>
+                    </div>
+                    <pre class="tree-view">
+root_agent (SequentialAgent)
+├── investigation_pipeline (Sequential)
+│   ├── customer_agent
+│   ├── transaction_agent
+│   ├── fraud_agent
+│   ├── ownership_agent
+│   └── risk_agent
+└── consolidator_agent</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        let activeSessionId = null;
+        let isProcessing = false;
+        let totalToolCallsCount = 0;
+        let activeAgentCards = {};
+
+        const STAGES = [
+            "customer_agent",
+            "transaction_agent",
+            "fraud_agent",
+            "ownership_agent",
+            "risk_agent",
+            "consolidator_agent"
+        ];
+
+        const AGENT_METADATA = {
+            "customer_agent": {
+                name: "Customer Agent",
+                icon: "👤",
+                role: "KYC CDD & Wealth Plausibility Specialist",
+                color: "var(--agent-customer)"
+            },
+            "transaction_agent": {
+                name: "Transaction Agent",
+                icon: "💳",
+                role: "AML Monitoring & Transaction Anomaly Specialist",
+                color: "var(--agent-tx)"
+            },
+            "fraud_agent": {
+                name: "Fraud & Cybercrime Agent",
+                icon: "🛡️",
+                role: "Device Telemetry & ATO Forensics Specialist",
+                color: "var(--agent-fraud)"
+            },
+            "ownership_agent": {
+                name: "Ownership & Control Agent",
+                icon: "🏢",
+                role: "UBO & Corporate Jurisdictions Specialist",
+                color: "var(--agent-owner)"
+            },
+            "risk_agent": {
+                name: "Risk & Governance Agent",
+                icon: "⚖️",
+                role: "5-Pillar FRAML Composite & Regulatory Overrides",
+                color: "var(--agent-risk)"
+            },
+            "consolidator_agent": {
+                name: "Consolidator Agent",
+                icon: "📋",
+                role: "Lead Financial Crime Investigator (Case Synthesis)",
+                color: "var(--agent-consolidator)"
+            },
+            "investigation_agent": {
+                name: "Investigation Orchestrator",
+                icon: "🤖",
+                role: "Root Sequential Orchestrator",
+                color: "var(--accent-blue)"
+            }
+        };
+
+        function getSelectedCustomer() {
+            const select = document.getElementById("customer-select");
+            return select ? select.value : "CUST-00019";
+        }
+
+        function applyQuickPrompt(text) {
+            const input = document.getElementById("chat-input");
+            if (input) {
+                input.value = text;
+                input.focus();
+            }
+        }
+
+        function resetPipelineUI() {
+            STAGES.forEach(s => {
+                const item = document.getElementById("stage-" + s);
+                const tag = document.getElementById("tag-" + s);
+                if (item) {
+                    item.className = "pipeline-step-item";
+                }
+                if (tag) {
+                    tag.className = "step-status-tag tag-waiting";
+                    tag.textContent = "Waiting";
+                }
+            });
+            const statusBadge = document.getElementById("workflow-status-badge");
+            if (statusBadge) {
+                statusBadge.className = "badge";
+                statusBadge.style.background = "rgba(255,255,255,0.06)";
+                statusBadge.style.color = "var(--text-secondary)";
+                statusBadge.textContent = "Idle";
+            }
+        }
+
+        function setAgentStageStatus(agentName, status) {
+            const item = document.getElementById("stage-" + agentName);
+            const tag = document.getElementById("tag-" + agentName);
+            const statusBadge = document.getElementById("workflow-status-badge");
+
+            if (item && tag) {
+                if (status === "running") {
+                    item.className = "pipeline-step-item active";
+                    tag.className = "step-status-tag tag-running";
+                    tag.textContent = "Executing...";
+                    if (statusBadge) {
+                        statusBadge.className = "badge badge-live";
+                        statusBadge.innerHTML = `<span class="pulse-dot"></span><span>${agentName} working</span>`;
+                    }
+                } else if (status === "done") {
+                    item.className = "pipeline-step-item completed";
+                    tag.className = "step-status-tag tag-done";
+                    tag.textContent = "✓ Complete";
+                }
+            }
+        }
+
+        function recordToolCallInHUD(agentName, toolName, args) {
+            totalToolCallsCount++;
+            const counter = document.getElementById("tools-counter");
+            if (counter) counter.textContent = `${totalToolCallsCount} Calls`;
+
+            const list = document.getElementById("ticker-list");
+            if (!list) return;
+
+            const empty = list.querySelector(".empty-placeholder");
+            if (empty) empty.remove();
+
+            const entry = document.createElement("div");
+            entry.className = "ticker-entry";
+            const now = new Date().toLocaleTimeString().split(" ")[0];
+            const meta = AGENT_METADATA[agentName] || { name: agentName };
+
+            entry.innerHTML = `
+                <div>
+                    <strong style="color: #38bdf8;">${toolName}</strong>
+                    <span style="font-size: 9px; color: var(--text-muted); margin-left: 4px;">(${meta.name})</span>
+                </div>
+                <span style="font-size: 9px; color: var(--text-muted);">${now}</span>
+            `;
+            list.prepend(entry);
+        }
+
+        // Markdown formatter for agent responses
+        function formatMarkdown(text) {
+            if (!text) return "";
+            let html = text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+
+            // Headings
+            html = html.replace(/^### (.*$)/gim, '<h4>$1</h4>');
+            html = html.replace(/^## (.*$)/gim, '<h3>$1</h3>');
+            html = html.replace(/^# (.*$)/gim, '<h2>$1</h2>');
+
+            // Bold and italics
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+            // Code blocks and inline code
+            html = html.replace(/```([\s\S]*?)```/g, '<pre class="tree-view">$1</pre>');
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+            // Lists
+            html = html.replace(/^\s*\*\s+(.*$)/gim, '<li>$1</li>');
+            html = html.replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)/gims, '<ul>$1</ul>');
+            html = html.replace(/<\/ul>\s*<ul>/g, '');
+
+            // Paragraphs
+            html = html.replace(/\n\n+/g, '</p><p>');
+            return `<p>${html}</p>`;
+        }
+
+        function appendUserMessage(text) {
+            const container = document.getElementById("messages-container");
+            if (!container) return;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "message-bubble message-user";
+            wrapper.innerHTML = `<div class="user-content">${text.replace(/</g, "&lt;")}</div>`;
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function createThinkingIndicator(message = "Orchestrating Google ADK agents...") {
+            const container = document.getElementById("messages-container");
+            const thinking = document.createElement("div");
+            thinking.id = "thinking-indicator";
+            thinking.className = "message-bubble message-agent-wrapper";
+            thinking.innerHTML = `
+                <div class="thinking-card">
+                    <div class="spinner"></div>
+                    <span id="thinking-text">${message}</span>
+                </div>
+            `;
+            container.appendChild(thinking);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeThinkingIndicator() {
+            const el = document.getElementById("thinking-indicator");
+            if (el) el.remove();
+        }
+
+        function getOrCreateAgentCard(agentName) {
+            if (activeAgentCards[agentName]) {
+                return activeAgentCards[agentName];
+            }
+
+            const container = document.getElementById("messages-container");
+            const meta = AGENT_METADATA[agentName] || {
+                name: agentName,
+                icon: "🤖",
+                role: "Specialist Agent",
+                color: "var(--accent-blue)"
+            };
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "message-bubble message-agent-wrapper";
+
+            const card = document.createElement("div");
+            card.className = `agent-card ${agentName}`;
+
+            card.innerHTML = `
+                <div class="agent-header">
+                    <div class="agent-badge-group">
+                        <div class="agent-avatar">${meta.icon}</div>
+                        <div>
+                            <div class="agent-name-text">${meta.name}</div>
+                            <div class="agent-role-pill">${meta.role}</div>
+                        </div>
+                    </div>
+                    <span class="agent-tools-count" id="tool-count-${agentName}">0 tools called</span>
+                </div>
+                <div class="tool-calls-drawer" id="tools-drawer-${agentName}" style="display: none;"></div>
+                <div class="agent-body" id="body-${agentName}"></div>
+            `;
+
+            wrapper.appendChild(card);
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+
+            activeAgentCards[agentName] = {
+                card: card,
+                toolsDrawer: card.querySelector(`#tools-drawer-${agentName}`),
+                toolCountEl: card.querySelector(`#tool-count-${agentName}`),
+                bodyEl: card.querySelector(`#body-${agentName}`),
+                textBuffer: "",
+                toolsCount: 0
+            };
+
+            return activeAgentCards[agentName];
+        }
+
+        async function submitAgentChat() {
+            if (isProcessing) return;
+
+            const input = document.getElementById("chat-input");
+            const message = input.value.trim();
+            if (!message) return;
+
+            const agentTarget = document.getElementById("agent-target-select").value;
+            const customerId = getSelectedCustomer();
+
+            input.value = "";
+            appendUserMessage(message);
+
+            isProcessing = true;
+            document.getElementById("btn-send").disabled = true;
+            input.disabled = true;
+            activeAgentCards = {};
+
+            resetPipelineUI();
+            createThinkingIndicator("Google ADK Orchestrator activating specialist pipeline...");
+
+            try {
+                const response = await fetch("/api/adk/chat/stream", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        message: message,
+                        agent_target: agentTarget,
+                        customer_id: customerId,
+                        session_id: activeSessionId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server returned HTTP ${response.status}`);
+                }
+
+                removeThinkingIndicator();
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n\n");
+                    buffer = lines.pop(); // Keep uncompleted tail
+
+                    for (const block of lines) {
+                        const trimmed = block.trim();
+                        if (!trimmed.startsWith("data:")) continue;
+
+                        try {
+                            const eventData = JSON.parse(trimmed.replace(/^data:\s*/, ""));
+                            handleADKStreamEvent(eventData);
+                        } catch (err) {
+                            console.warn("Error parsing SSE event:", err, trimmed);
+                        }
+                    }
+                }
+
+            } catch (err) {
+                removeThinkingIndicator();
+                const container = document.getElementById("messages-container");
+                const errDiv = document.createElement("div");
+                errDiv.className = "message-bubble message-agent-wrapper";
+                errDiv.innerHTML = `
+                    <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; padding: 12px; color: #fca5a5; font-size: 13px;">
+                        <strong>Investigation Execution Notice:</strong> ${err.message}
+                    </div>
+                `;
+                container.appendChild(errDiv);
+            } finally {
+                isProcessing = false;
+                document.getElementById("btn-send").disabled = false;
+                input.disabled = false;
+                input.focus();
+                const statusBadge = document.getElementById("workflow-status-badge");
+                if (statusBadge) {
+                    statusBadge.className = "badge";
+                    statusBadge.style.background = "rgba(16, 185, 129, 0.15)";
+                    statusBadge.style.color = "#34d399";
+                    statusBadge.textContent = "✓ Completed";
+                }
+            }
+        }
+
+        function handleADKStreamEvent(data) {
+            const container = document.getElementById("messages-container");
+
+            if (data.type === "init") {
+                activeSessionId = data.session_id;
+                const tag = document.getElementById("session-tag");
+                if (tag) tag.textContent = `Session: ${data.session_id.substring(0, 8)}...`;
+            } 
+            else if (data.type === "agent_start") {
+                const agent = data.agent || "investigation_agent";
+                setAgentStageStatus(agent, "running");
+                getOrCreateAgentCard(agent);
+            } 
+            else if (data.type === "tool_call") {
+                const agent = data.agent || "customer_agent";
+                setAgentStageStatus(agent, "running");
+                const cardObj = getOrCreateAgentCard(agent);
+
+                cardObj.toolsCount++;
+                cardObj.toolCountEl.textContent = `${cardObj.toolsCount} tool${cardObj.toolsCount > 1 ? 's' : ''} called`;
+                cardObj.toolsDrawer.style.display = "flex";
+
+                const toolItem = document.createElement("div");
+                toolItem.className = "tool-call-item";
+                const argsStr = data.args ? JSON.stringify(data.args) : "{}";
+                toolItem.innerHTML = `
+                    <div>
+                        <span>🔧</span>
+                        <span class="tool-name-highlight">${data.tool}</span>
+                        <span class="tool-args-preview">${argsStr.length > 50 ? argsStr.substring(0, 50) + '...' : argsStr}</span>
+                    </div>
+                    <span class="tool-status-icon">⏳ executing</span>
+                `;
+                cardObj.toolsDrawer.appendChild(toolItem);
+                recordToolCallInHUD(agent, data.tool, data.args);
+
+                if (container) container.scrollTop = container.scrollHeight;
+            } 
+            else if (data.type === "tool_response") {
+                const agent = data.agent || "customer_agent";
+                const cardObj = getOrCreateAgentCard(agent);
+                const items = cardObj.toolsDrawer.querySelectorAll(".tool-call-item");
+                if (items.length > 0) {
+                    const last = items[items.length - 1];
+                    const icon = last.querySelector(".tool-status-icon");
+                    if (icon) {
+                        icon.textContent = "✓ success";
+                    }
+                }
+            } 
+            else if (data.type === "agent_text") {
+                const agent = data.agent || "investigation_agent";
+                const cardObj = getOrCreateAgentCard(agent);
+                cardObj.textBuffer += data.text;
+                cardObj.bodyEl.innerHTML = formatMarkdown(cardObj.textBuffer);
+                if (container) container.scrollTop = container.scrollHeight;
+            } 
+            else if (data.type === "agent_done") {
+                const agent = data.agent;
+                if (agent) {
+                    setAgentStageStatus(agent, "done");
+                }
+            } 
+            else if (data.type === "done") {
+                STAGES.forEach(s => {
+                    const tag = document.getElementById("tag-" + s);
+                    if (tag && tag.textContent.includes("Executing")) {
+                        setAgentStageStatus(s, "done");
+                    }
+                });
+            }
+        }
+
+        // Initialize Event Listeners
+        document.getElementById("btn-send").addEventListener("click", submitAgentChat);
+
+        document.getElementById("chat-input").addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submitAgentChat();
+            }
+        });
+
+        document.getElementById("btn-new-session").addEventListener("click", () => {
+            activeSessionId = null;
+            totalToolCallsCount = 0;
+            resetPipelineUI();
+            const list = document.getElementById("ticker-list");
+            if (list) list.innerHTML = '<div class="empty-placeholder">No tools executed yet</div>';
+            const counter = document.getElementById("tools-counter");
+            if (counter) counter.textContent = '0 Calls';
+            const tag = document.getElementById("session-tag");
+            if (tag) tag.textContent = 'Session: Ready';
+
+            const container = document.getElementById("messages-container");
+            if (container) {
+                // Keep welcome message
+                const firstCard = container.querySelector(".message-agent-wrapper");
+                container.innerHTML = "";
+                if (firstCard) container.appendChild(firstCard);
+            }
+        });
+    </script>
+</body>
+</html>

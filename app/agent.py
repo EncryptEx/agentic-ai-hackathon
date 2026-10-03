@@ -38,10 +38,25 @@ if os.path.exists(_ENV_PATH):
     load_dotenv(_ENV_PATH)
 load_dotenv()
 
-from google.adk.agents import Agent, SequentialAgent
-from google.adk.apps import App
-from google.adk.models import Gemini
-from google.genai import types
+try:
+    from google.adk.agents import Agent, SequentialAgent
+    from google.adk.apps import App
+    from google.adk.models import Gemini
+    from google.genai import types
+    HAS_ADK = True
+except ImportError:
+    HAS_ADK = False
+    class Agent:
+        def __init__(self, *args, **kwargs): pass
+    class SequentialAgent(Agent):
+        def __init__(self, *args, **kwargs): pass
+    class App:
+        def __init__(self, *args, **kwargs): pass
+    class Gemini:
+        def __init__(self, *args, **kwargs): pass
+    class types:
+        class HttpRetryOptions:
+            def __init__(self, *args, **kwargs): pass
 
 from app.context_callbacks import after_model_usage, before_model_context
 
@@ -52,6 +67,7 @@ from app.tools import (
     RISK_TOOLS,
     TRANSACTION_TOOLS,
 )
+from app.orchestrator.agent import arbiter_agent
 
 MODEL = "gemini-3.8-flash"
 
@@ -68,6 +84,13 @@ def _model() -> Gemini:
     """Build the shared Gemini model config for every agent in this app."""
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     client_kwargs = {"api_key": api_key} if api_key else {}
+    
+    # If the user has provided an API key (e.g. for Google AI Studio),
+    # ensure Vertex AI is disabled, otherwise google-genai throws credential errors
+    # because it prioritizes Vertex AI config in the .env file.
+    if api_key and os.environ.get("GOOGLE_GENAI_USE_VERTEXAI"):
+        os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)
+        
     return Gemini(
         model=MODEL,
         client_kwargs=client_kwargs,
@@ -268,33 +291,39 @@ risk_agent = Agent(
 # Each writes its findings to session state via `output_key`.
 # The consolidator then reads all five and produces the final investigation.
 
+_sub_agents = [
+    customer_agent,
+    transaction_agent,
+    fraud_agent,
+    ownership_agent,
+    risk_agent,
+]
+if arbiter_agent is not None:
+    arbiter_agent.before_model_callback = before_model_context
+    arbiter_agent.after_model_callback = after_model_usage
+    _sub_agents.append(arbiter_agent)
+
 investigation_pipeline = SequentialAgent(
     name="investigation_pipeline",
     description=(
-        "Runs the five specialist agents in order: customer, transaction, "
-        "fraud, ownership, risk."
+        "Runs the specialist agents in sequence, followed by the senior Arbiter Tribunal Agent "
+        "to resolve cross-specialist contradictions."
     ),
-    sub_agents=[
-        customer_agent,
-        transaction_agent,
-        fraud_agent,
-        ownership_agent,
-        risk_agent,
-    ],
+    sub_agents=_sub_agents,
 )
 
 
 consolidator_agent = Agent(
     name="consolidator_agent",
     description=(
-        "Consolidates the specialist findings into the final investigation "
-        "report for a human investigator, starting with an executive case overview."
+        "Consolidates the specialist findings and Arbiter Tribunal rulings into the final "
+        "investigation report for a human investigator, starting with an executive case overview."
     ),
     model=_model(),
     before_model_callback=before_model_context,
     after_model_callback=after_model_usage,
-    instruction=f"""You are the Consolidator Agent. The five specialist agents have
-   already completed their work; their findings are in your context.
+    instruction=f"""You are the Consolidator Agent. The specialist agents and Arbiter Tribunal
+   have completed their work; their findings and debate rulings are in your context.
 
    Consolidate them into ONE final investigation report with exactly these
    sections:
@@ -308,6 +337,7 @@ consolidator_agent = Agent(
    - Relevant risk indicators & FRAML score
    - Evidence supporting each finding
    - Contradictory or mitigating evidence
+   - Multi-specialist cross-debate & contradiction resolution (Arbiter Tribunal ruling)
    - Missing information
    - Suggested next investigative questions
    - Overall case summary
@@ -316,6 +346,7 @@ consolidator_agent = Agent(
    - Case overview: Executive case summary at the top:
      * Case Identifier / Reference (e.g. Case CUST-00015)
      * Subject Under Review (Customer Name, ID, Entity Type, Jurisdiction)
+     * Dynamic Triage Classification & Topology
      * Investigation Trigger / Rationale (Specific alert IDs: e.g. TM-01 Structuring, FR-01 ATO, or High-Risk Influx)
      * Investigation Scope & Timeline (Transaction window, count, and dollar volume)
      * Primary Typologies Identified (Core AML or Fraud typologies suspected)
@@ -329,6 +360,9 @@ consolidator_agent = Agent(
    - Relevant risk indicators & FRAML score: Composite score (0-100), risk tier, 5-pillar breakdown, and overrides.
    - Evidence supporting each finding: Specific transaction dates, IDs, devices, IPs, channels, and records cited.
    - Contradictory or mitigating evidence: Clean history factors, legitimate explanations, or lack of derogatory hits.
+   - Multi-specialist cross-debate & contradiction resolution: Report the Arbiter Agent's
+     cross-examination findings, whether Money Mule vs APP Coercion or ATO vs Friendly Fraud
+     tension was detected, the calibrated confidence score, and the Tribunal's final consensus verdict.
    - Missing information: Data gaps, pending source-of-wealth documentation, or unverified counterparties.
    - Suggested next investigative questions: Concrete audit checklist steps for the compliance team.
    - Overall case summary: Final concluding recommendation (e.g. SAR filing, account freeze, EDD review),

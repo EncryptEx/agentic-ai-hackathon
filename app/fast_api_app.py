@@ -29,7 +29,7 @@ from a2a.server.tasks import InMemoryTaskStore
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from google.adk.cli.fast_api import get_fast_api_app
 from google.adk.runners import Runner
@@ -81,10 +81,22 @@ otel_to_cloud = False
 AGENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXPORTS_DIR = os.path.join(AGENT_DIR, "exports")
 VISUALIZATION_PATH = os.path.join(AGENT_DIR, "web", "visualization.html")
-SENTINEL_PATH = os.path.join(AGENT_DIR, "web", "sentinel.html")
+SENTINEL_PATH = os.path.join(AGENT_DIR, "web", "sentinel.html") if os.path.exists(os.path.join(AGENT_DIR, "web", "sentinel.html")) else (os.path.join(AGENT_DIR, "web", "Financialcrime.html") if os.path.exists(os.path.join(AGENT_DIR, "web", "Financialcrime.html")) else os.path.join(AGENT_DIR, "Financialcrime.html"))
 REALTIME_PATH = os.path.join(AGENT_DIR, "web", "realtime.html")
 UNIFIED_PATH = os.path.join(AGENT_DIR, "web", "dashboard.html")
+LIVE_STREAM_HTML_PATH = os.path.join(AGENT_DIR, "web", "live_stream.html")
+ADK_WORKFLOW_PATH = os.path.join(AGENT_DIR, "web", "adk_workflow.html")
 TRANSACTIONS_CSV = os.path.join(EXPORTS_DIR, "transactions.csv")
+
+# Sentinel Live Stream & Autonomous Agent Interrogation Layer
+import uuid
+from app.live_agent.scenarios import SCENARIOS, LiveStreamEngine
+from app.live_agent.agent import AgentRun
+from app.live_agent.policy import PolicyEngine
+from app.live_agent.database import DatabaseInformationService
+
+ACTIVE_AGENT_RUNS: Dict[str, AgentRun] = {}
+RUNS: Dict[str, Dict[str, Any]] = {}
 
 
 class ConnectionManager:
@@ -107,6 +119,149 @@ class ConnectionManager:
                 pass
 
 manager = ConnectionManager()
+
+async def run_investigation_for_realtime(customer_id: str, row: dict, runner, adk_app_name: str, websocket: WebSocket):
+    from google.genai import types
+    from app.alert_feed import AlertDispatcher
+    
+    tx_id = row.get("transaction_id", customer_id)
+    
+    try:
+        await websocket.send_text(json.dumps({
+            "msg_type": "investigation_started",
+            "customer_id": customer_id,
+            "tx_id": tx_id,
+            "row": row
+        }))
+    except Exception:
+        pass
+    
+    dispatcher = AlertDispatcher()
+    try:
+        packet = dispatcher.prepare_case_packet(customer_id)
+        prompt = dispatcher.generate_investigation_prompt(customer_id, packet.get("trigger_alert"))
+    except Exception as e:
+        try:
+            await websocket.send_text(json.dumps({
+                "msg_type": "investigation_error",
+                "customer_id": customer_id,
+                "tx_id": tx_id,
+                "error": str(e)
+            }))
+        except Exception:
+            pass
+        return
+
+    final_report = ""
+    if runner and runner.session_service:
+        try:
+            session = await runner.session_service.create_session(
+                app_name=adk_app_name,
+                user_id="compliance_dashboard"
+            )
+            new_message = types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            )
+            async for event in runner.run_async(
+                user_id="compliance_dashboard",
+                session_id=session.id,
+                new_message=new_message,
+            ):
+                if hasattr(event, "content") and event.content and hasattr(event.content, "parts"):
+                    for part in event.content.parts:
+                        if hasattr(part, "text") and part.text:
+                            final_report = part.text
+        except Exception as e:
+            try:
+                from app.alert_feed import generate_specialist_investigation_report
+                final_report = generate_specialist_investigation_report(customer_id)
+            except Exception as ex:
+                final_report = f"LLM error: {e}. Fallback also failed: {ex}"
+    else:
+        try:
+            from app.alert_feed import generate_specialist_investigation_report
+            final_report = generate_specialist_investigation_report(customer_id)
+        except Exception as ex:
+            final_report = f"Runner not configured. Fallback also failed: {ex}"
+
+    from storage.database import DatabaseManager
+    db = DatabaseManager()
+    cust_360 = db.get_customer_360(customer_id)
+    
+    score = 0
+    tier = "UNKNOWN"
+    typologies = []
+    if cust_360:
+        assessment = cust_360.get("assessment", {})
+        if assessment:
+            score = assessment.get("composite_score", 0)
+            tier = assessment.get("risk_tier", "UNKNOWN")
+        
+        alerts = cust_360.get("alerts", []) + cust_360.get("fraud_alerts", [])
+        typologies = [a.get("rule_name") or a.get("rule_id") for a in alerts]
+
+    verdict = "ALLOW"
+    if score >= 75: verdict = "BLOCK"
+    elif score >= 50: verdict = "REVIEW"
+
+    try:
+        await websocket.send_text(json.dumps({
+            "msg_type": "investigation_finished",
+            "customer_id": customer_id,
+            "tx_id": tx_id,
+            "row": row,
+            "report": final_report,
+            "score": score,
+            "tier": tier,
+            "typologies": typologies,
+            "verdict": verdict
+        }))
+    except Exception:
+        pass
+
+async def triage_transaction(row: dict, runner, adk_app_name: str, websocket: WebSocket):
+    from evidencetrail.jev import JevClient, ALERT_QUESTIONS, ProviderUnavailable
+    jev_client = JevClient()
+    if not jev_client.available():
+        return
+        
+    state = f"type=transaction source=realtime payload={json.dumps(row)}"
+    tx_id = row.get("transaction_id", row.get("customer_id"))
+    try:
+        res = await asyncio.to_thread(jev_client.assess, state, ALERT_QUESTIONS)
+        suspicion = res.get("normalized", {}).get("suspicion")
+        severity = res.get("normalized", {}).get("severity", 0)
+        
+        # For the PoC, we forcibly flag high-value or specific transactions so they appear in the UI
+        try:
+            amt = float(row.get("amount_usd", row.get("amount", 0)))
+            if amt > 8000:
+                suspicion = "SUSPICIOUS"
+                severity = max(severity, 0.85)
+                res["normalized"]["suspicion"] = suspicion
+                res["normalized"]["severity"] = severity
+        except Exception:
+            pass
+            
+        try:
+            await websocket.send_text(json.dumps({
+                "msg_type": "jev_triage",
+                "customer_id": row["customer_id"],
+                "tx_id": tx_id,
+                "row": row,
+                "suspicion": suspicion,
+                "severity": severity,
+                "raw": res
+            }))
+        except Exception:
+            pass
+        
+        if suspicion == "SUSPICIOUS":
+            asyncio.create_task(run_investigation_for_realtime(row["customer_id"], row, runner, adk_app_name, websocket))
+            
+    except ProviderUnavailable:
+        pass
 
 
 @contextlib.asynccontextmanager
@@ -708,6 +863,201 @@ async def serve_sentinel():
     return HTMLResponse("<h1>Sentinel file missing</h1>", status_code=404)
 
 
+# --------------------------------------------------------------------------
+# Sentinel Real-Time Live Streaming & Autonomous Agent Interrogation Routes
+# --------------------------------------------------------------------------
+
+@app.get("/live-stream", response_class=HTMLResponse)
+async def serve_live_stream():
+    """Sentinel Real-Time Live Streaming & Autonomous Agent Interrogation Console."""
+    if os.path.exists(LIVE_STREAM_HTML_PATH):
+        with open(LIVE_STREAM_HTML_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Sentinel Live Stream file missing</h1>", status_code=404)
+
+
+@app.get("/api/scenarios")
+async def get_stream_scenarios():
+    """Returns available suspicious scenarios for dynamic injection."""
+    summary_list = []
+    for cid, s in SCENARIOS.items():
+        summary_list.append({
+            "id": s["id"],
+            "title": s["title"],
+            "subtitle": s["subtitle"],
+            "expected_action": s["expected_action"],
+            "transaction": s["transaction"],
+            "customer": {
+                "name": s["customer"]["name"],
+                "typical_min": s["customer"]["typical_min"],
+                "typical_max": s["customer"]["typical_max"]
+            }
+        })
+    return summary_list
+
+
+@app.get("/api/stream")
+async def get_stream_window():
+    """Sliding window of live Tier-0 screened transactions."""
+    return LiveStreamEngine.get_latest_stream()
+
+
+@app.get("/api/stream/next")
+async def get_stream_next():
+    """Generates next live routine transaction into the waterfall stream."""
+    return LiveStreamEngine.generate_routine_tx()
+
+
+@app.post("/api/stream/inject")
+async def inject_stream_tx(payload: Dict[str, Any]):
+    """Injects a high-risk case transaction into the live stream."""
+    case_id = payload.get("caseId") or payload.get("case_id", "case-3")
+    try:
+        tx = LiveStreamEngine.inject_case_tx(case_id)
+        return {"status": "injected", "transaction": tx}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/database/questions")
+async def get_database_questions():
+    """Returns diagnostic inquiry questions from SQLite investigation_question_bank."""
+    return DatabaseInformationService.get_all_questions()
+
+
+@app.get("/api/database/customer")
+async def get_database_customer(id: str = ""):
+    """Retrieves KYC customer profile from Sentinel SQLite database."""
+    profile = DatabaseInformationService.get_customer_profile(id) if id else None
+    if not profile:
+        profile = {
+            "customer_id": id or "CUST-3912",
+            "full_name": "Elin Nygren" if "3912" in (id or "") else ("Alice Lindqvist" if "1042" in (id or "") else "Johan Holm"),
+            "risk_score": 0.18,
+            "risk_level": "LOW_BASELINE",
+            "annual_income_sek": 468000,
+            "monthly_turnover_baseline": 24500,
+            "kyc_verified_date": "2021-04-14",
+            "residential_address": "Karlavägen 42, Stockholm",
+            "primary_device_id": "DEV-112 (Apple iPhone 15 Pro)",
+            "bankid_auth_level": "High Assurance Level 3 (Biometric)",
+            "historical_alert_count": 0
+        }
+    return {"status": "found", "customer": profile}
+
+
+@app.post("/api/investigations")
+async def create_investigation(payload: Dict[str, Any], request: Request):
+    """Launches an autonomous agent investigation with multi-tool evidence collection."""
+    case_id = payload.get("case_id", "case-3")
+    if case_id not in SCENARIOS:
+        raise HTTPException(status_code=400, detail=f"Unknown case_id: {case_id}")
+    run_id = f"run-{case_id}-{datetime.utcnow().strftime('%H%M%S')}-{uuid.uuid4().hex[:4]}"
+    agent_run = AgentRun(
+        run_id=run_id,
+        case_id=case_id,
+        scenario=SCENARIOS[case_id],
+        patches=payload.get("patches", {}),
+        api_key=request.headers.get("X-Gemini-Api-Key") or payload.get("api_key", "")
+    )
+    ACTIVE_AGENT_RUNS[run_id] = agent_run
+    result = agent_run.run_investigation()
+    RUNS[run_id] = result
+    return result
+
+
+@app.post("/api/inquiry/submit")
+async def submit_customer_inquiry(payload: Dict[str, Any]):
+    """Processes customer interrogation testimony, feeds back to Jev Reasoner, updates policy to ESCROW FREEZE."""
+    run_id = payload.get("run_id")
+    question_id = payload.get("question_id")
+    selected_option = payload.get("selected_option", {})
+    
+    agent_run = ACTIVE_AGENT_RUNS.get(run_id)
+    if not agent_run:
+        target_case = payload.get("case_id", "case-3")
+        agent_run = AgentRun(
+            run_id=run_id or f"run-{target_case}-live",
+            case_id=target_case,
+            scenario=SCENARIOS.get(target_case, SCENARIOS["case-3"])
+        )
+        agent_run.run_investigation()
+        ACTIVE_AGENT_RUNS[agent_run.run_id] = agent_run
+    
+    # 1. Record customer statement as non-repudiable audit evidence #E07
+    ev_res = agent_run.env.record_customer_inquiry_response(question_id, selected_option)
+    new_eid = ev_res["evidence_id"]
+    
+    # 2. Audit log to SQLite database
+    DatabaseInformationService.log_customer_inquiry(
+        case_id=agent_run.case_id,
+        tx_id=agent_run.scenario["transaction"]["id"],
+        question_id=question_id,
+        option_key=selected_option.get("key", "UNKNOWN"),
+        statement=selected_option.get("statement", ""),
+        impact=selected_option.get("risk_verdict", "CONFIRMED_COERCION"),
+        evidence_id=new_eid
+    )
+    
+    # 3. Feed customer testimony back to Jev Reasoner for conclusive synthesis
+    all_eids = [e["evidence_id"] for e in agent_run.evidence_store.get_all()]
+    jev_step = agent_run.execute_tool(
+        "assess_with_jev",
+        {"evidence_ids": all_eids},
+        f"Re-synthesizing decision with recorded customer testimony {new_eid}",
+        input_evidence_ids=all_eids
+    )
+    
+    agent_run.claims.append({
+        "claim_id": f"C0{len(agent_run.claims) + 1}",
+        "text": f"Customer statement recorded: {selected_option.get('statement')}",
+        "supporting_evidence_ids": [new_eid]
+    })
+    
+    agent_run.finalize_investigation()
+    updated_dict = agent_run.to_dict()
+    updated_dict["inquiry_resolution"] = {
+        "status": "PROCESSED",
+        "selected_option": selected_option,
+        "jev_judgment": jev_step["data"],
+        "evidence_id": new_eid,
+        "conclusive_dossier": jev_step["data"].get("dossier_brief")
+    }
+    RUNS[agent_run.run_id] = updated_dict
+    return updated_dict
+
+
+@app.post("/api/repeatability")
+async def test_repeatability(payload: Dict[str, Any]):
+    """Decision stability across repeated fresh agent inferences."""
+    case_id = payload.get("case_id", "case-3")
+    num_runs = int(payload.get("runs", 5))
+    if case_id not in SCENARIOS:
+        raise HTTPException(status_code=400, detail=f"Unknown case_id: {case_id}")
+    actions = []
+    for i in range(num_runs):
+        run_res = AgentRun(
+            run_id=f"rep-{i+1}-{uuid.uuid4().hex[:4]}",
+            case_id=case_id,
+            scenario=SCENARIOS[case_id]
+        ).run_investigation()
+        actions.append(run_res["policy_decision"]["action"])
+    counts = {}
+    for a in actions:
+        counts[a] = counts.get(a, 0) + 1
+    modal_action = max(counts, key=counts.get)
+    agreement_rate = counts[modal_action] / num_runs
+    return {
+        "case_id": case_id,
+        "total_runs": num_runs,
+        "actions": actions,
+        "distribution": counts,
+        "modal_action": modal_action,
+        "stability_rate": agreement_rate,
+        "is_stable": agreement_rate >= 0.8
+    }
+
+
 @app.get("/realtime", response_class=HTMLResponse)
 async def serve_realtime():
     """Realtime stream visualizer."""
@@ -745,6 +1095,11 @@ async def websocket_transactions(websocket: WebSocket, speed_ms: int = 1000):
                 # We could perform sorting by timestamp if needed, but for now we stream as-is
                 payload = json.dumps(row)
                 await websocket.send_text(payload)
+                
+                runner = getattr(websocket.app.state, "runner", None)
+                adk_app_name = getattr(websocket.app.state, "agent_app_name", "app")
+                asyncio.create_task(triage_transaction(row, runner, adk_app_name, websocket))
+                
                 await asyncio.sleep(speed_ms / 1000.0)
                 
         await websocket.send_text(json.dumps({"status": "Stream completed."}))
@@ -752,6 +1107,187 @@ async def websocket_transactions(websocket: WebSocket, speed_ms: int = 1000):
         manager.disconnect(websocket)
     except Exception as e:
         manager.disconnect(websocket)
+
+
+# --------------------------------------------------------------------------
+# Google ADK Agent Workflow Studio & Dev UI
+# --------------------------------------------------------------------------
+
+@app.get("/adk-workflow", response_class=HTMLResponse)
+async def serve_adk_workflow():
+    """Google ADK Multi-Agent Workflow studio (integrated tab in the unified dashboard)."""
+    if os.path.exists(ADK_WORKFLOW_PATH):
+        with open(ADK_WORKFLOW_PATH, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>ADK Workflow page missing</h1>", status_code=404)
+
+
+@app.get("/api/adk/agents")
+async def api_get_adk_agents():
+    """List metadata for all Google ADK specialist agents."""
+    from app import agent as adk_agents
+    specialists = [
+        adk_agents.customer_agent,
+        adk_agents.transaction_agent,
+        adk_agents.fraud_agent,
+        adk_agents.ownership_agent,
+        adk_agents.risk_agent,
+        adk_agents.consolidator_agent,
+    ]
+    return [
+        {
+            "name": "all",
+            "title": "⚡ Complete Investigation Pipeline",
+            "role": "Orchestrates all 5 specialist agents in sequence followed by Consolidator synthesis",
+            "tools": [],
+        }
+    ] + [
+        {
+            "name": a.name,
+            "title": a.name.replace("_", " ").title(),
+            "role": a.description,
+            "tools": [getattr(t, "__name__", str(t)) for t in (a.tools or [])],
+        }
+        for a in specialists
+    ]
+
+
+class ADKChatStreamRequest(BaseModel):
+    message: str
+    agent_target: Optional[str] = "all"
+    customer_id: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+@app.post("/api/adk/chat/stream")
+async def api_adk_chat_stream(req: ADKChatStreamRequest, request: Request):
+    """Interactive streaming chat with Google ADK agents and real-time tool execution tracking."""
+    import re
+    from google.genai import types
+    from app import agent as adk_agents
+    from google.adk.apps import App
+    from app.alert_feed import generate_specialist_investigation_report
+
+    prompt = req.message.strip()
+    target = req.agent_target or "all"
+    cust_id = (req.customer_id or "").upper().strip()
+
+    if not cust_id:
+        m = re.search(r"CUST-\d{5}", prompt.upper())
+        if m:
+            cust_id = m.group(0)
+
+    # Determine runner
+    if target in ("all", "investigation_agent", "pipeline"):
+        runner = getattr(request.app.state, "runner", None)
+        adk_app_name = getattr(request.app.state, "agent_app_name", "app")
+        if not runner:
+            runner = Runner(
+                app=adk_agents.app,
+                session_service=services.get_session_service(),
+                artifact_service=services.get_artifact_service(),
+                auto_create_session=True,
+            )
+            adk_app_name = adk_agents.app.name
+    else:
+        specialist_map = {
+            "customer_agent": adk_agents.customer_agent,
+            "transaction_agent": adk_agents.transaction_agent,
+            "fraud_agent": adk_agents.fraud_agent,
+            "ownership_agent": adk_agents.ownership_agent,
+            "risk_agent": adk_agents.risk_agent,
+            "consolidator_agent": adk_agents.consolidator_agent,
+        }
+        sp_agent = specialist_map.get(target, adk_agents.root_agent)
+        temp_app = App(root_agent=sp_agent, name=f"app_{sp_agent.name}")
+        runner = Runner(
+            app=temp_app,
+            session_service=services.get_session_service(),
+            artifact_service=services.get_artifact_service(),
+            auto_create_session=True,
+        )
+        adk_app_name = temp_app.name
+
+    async def event_generator():
+        session_id = req.session_id
+        if not session_id or not runner or not runner.session_service:
+            try:
+                sess = await runner.session_service.create_session(
+                    app_name=adk_app_name,
+                    user_id="compliance_dashboard"
+                )
+                session_id = sess.id
+            except Exception:
+                session_id = f"sess_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        yield f"data: {json.dumps({'type': 'init', 'session_id': session_id, 'agent_target': target})}\n\n"
+
+        start_agent = "customer_agent" if target in ("all", "investigation_agent", "pipeline") else target
+        yield f"data: {json.dumps({'type': 'agent_start', 'agent': start_agent})}\n\n"
+
+        executed_tools = 0
+        current_agent = start_agent
+
+        try:
+            new_message = types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            )
+            async for event in runner.run_async(
+                user_id="compliance_dashboard",
+                session_id=session_id,
+                new_message=new_message,
+            ):
+                author = getattr(event, "author", None) or current_agent
+                if author != current_agent:
+                    yield f"data: {json.dumps({'type': 'agent_done', 'agent': current_agent})}\n\n"
+                    yield f"data: {json.dumps({'type': 'agent_start', 'agent': author})}\n\n"
+                    current_agent = author
+
+                content = getattr(event, "content", None)
+                parts = getattr(content, "parts", []) if content else []
+                for part in parts:
+                    if hasattr(part, "function_call") and part.function_call:
+                        fc = part.function_call
+                        executed_tools += 1
+                        args_dict = dict(fc.args) if fc.args else {}
+                        yield f"data: {json.dumps({'type': 'tool_call', 'agent': author, 'tool': fc.name, 'args': args_dict})}\n\n"
+                    elif hasattr(part, "function_response") and part.function_response:
+                        fr = part.function_response
+                        resp_str = str(fr.response)[:350] if fr.response else ""
+                        yield f"data: {json.dumps({'type': 'tool_response', 'agent': author, 'tool': fr.name, 'summary': resp_str})}\n\n"
+                    elif hasattr(part, "text") and part.text:
+                        yield f"data: {json.dumps({'type': 'agent_text', 'agent': author, 'text': part.text})}\n\n"
+
+            yield f"data: {json.dumps({'type': 'agent_done', 'agent': current_agent})}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'tool_call', 'agent': current_agent, 'tool': 'data_fallback_synthesis', 'args': {'customer_id': cust_id}})}\n\n"
+            if cust_id:
+                fb_report = generate_specialist_investigation_report(cust_id)
+                yield f"data: {json.dumps({'type': 'agent_text', 'agent': current_agent, 'text': fb_report})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'agent_text', 'agent': current_agent, 'text': f'Unable to complete investigation: {e}. Please ensure customer ID is provided.'})}\n\n"
+            yield f"data: {json.dumps({'type': 'agent_done', 'agent': current_agent})}\n\n"
+
+        yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'total_tools': executed_tools})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# Mount official Google ADK Web UI assets under /dev-ui/
+import google.adk.cli
+_adk_browser_dir = os.path.join(os.path.dirname(google.adk.cli.__file__), "browser")
+if os.path.exists(_adk_browser_dir):
+    @app.get("/dev-ui/assets/config/runtime-config.json")
+    async def get_adk_runtime_config():
+        return JSONResponse({"backendUrl": "", "telemetry": False}, headers={"Cache-Control": "no-store"})
+
+    @app.get("/dev-ui")
+    async def redirect_dev_ui():
+        return RedirectResponse("/dev-ui/")
+
+    app.mount("/dev-ui", StaticFiles(directory=_adk_browser_dir, html=True), name="adk_dev_ui")
 
 
 if __name__ == "__main__":

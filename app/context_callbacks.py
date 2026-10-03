@@ -13,9 +13,10 @@ from google.genai import types
 from app.context_compression import ContextCompressor, reduction_enabled, wire_bytes
 
 _SPECIALISTS = frozenset({"customer_agent", "transaction_agent", "fraud_agent",
-                         "ownership_agent", "risk_agent"})
-_FINDINGS = tuple(name.removesuffix("_agent") + "_findings" for name in (
-    "customer_agent", "transaction_agent", "fraud_agent", "ownership_agent", "risk_agent"))
+                         "ownership_agent", "risk_agent", "arbiter_agent"})
+# session-state keys written by the agents' output_key; the consolidator gets all of them explicitly
+_FINDINGS = ("customer_findings", "transaction_findings", "fraud_findings", "ownership_findings",
+             "risk_findings", "tribunal_findings")
 _COMPRESSORS = OrderedDict()
 _LOCK = threading.Lock()
 

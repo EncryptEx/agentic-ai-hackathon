@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EvidenceTrail — Auditable AI Fraud Investigator</title>
+  <link rel="stylesheet" href="/static/live_stream.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: { 850: '#0f172a', 950: '#020617' }
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+  <!-- Multi-Platform Navigation Switcher -->
+  <div class="bg-slate-950 border-b border-cyan-900/60 px-4 py-2 flex flex-wrap items-center justify-between text-xs font-mono">
+    <div class="flex items-center space-x-2">
+      <span class="text-sm">🛡️</span>
+      <span class="font-bold text-white tracking-wider">VALIANT BANK HACKATHON PLATFORM SUITE:</span>
+    </div>
+    <div class="flex items-center space-x-2 mt-1 sm:mt-0">
+      <a href="/index.html" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition">
+        🏦 1. FRAML Bank Core (Customers & SARs)
+      </a>
+      <a href="/live_stream.html" class="px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-500 font-bold shadow-sm shadow-cyan-950">
+        ⚡ 2. Live Stream & Google Voice (Case 3)
+      </a>
+      <a href="/Financialcrime_realtime.html" target="_blank" class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition">
+        🌐 3. 3D Holographic Particle Radar
+      </a>
+    </div>
+  </div>
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-cyan-500/20">
+          ST
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-cyan-400 bg-clip-text text-transparent">Sentinel</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-400 border border-cyan-800/60 font-mono">Live Stream & Interrogation</span>
+          </div>
+          <p class="text-xs text-slate-400">Real-Time Stream Waterfall · Diagnostic Question Bank · Jev Feedback · Audit Dossier</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <!-- Gemini API Key Input -->
+        <div class="flex items-center space-x-2 bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1 text-xs">
+          <span class="text-slate-500 font-mono">🔑</span>
+          <input id="input-api-key" type="password" placeholder="Gemini API Key..." class="bg-transparent border-none text-slate-200 text-xs font-mono outline-none w-28 focus:w-44 transition-all" />
+          <button id="btn-save-key" class="text-cyan-400 hover:text-cyan-300 font-bold font-mono text-[11px] px-1.5 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/50">Save</button>
+        </div>
+
+        <div class="hidden md:flex items-center space-x-2 text-xs font-mono text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-md border border-slate-700/60">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Gemini Agent</span>
+          <span class="text-slate-600">•</span>
+          <span>Jev Reasoner</span>
+          <span class="text-slate-600">•</span>
+          <span>G-Eval Auditor</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= LIVE TRANSACTION STREAM & DYNAMIC EVALUATION CONSOLE ================= -->
+  <section class="border-b border-slate-800 bg-slate-900/90 backdrop-blur">
+    <div class="max-w-7xl mx-auto px-4 py-3 space-y-3">
+      
+      <!-- Top Stream Header & Telemetry Bar -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="flex items-center space-x-3">
+          <div class="flex items-center space-x-2">
+            <span class="relative flex h-3 w-3">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+            </span>
+            <span class="font-extrabold text-xs font-mono uppercase tracking-wider text-cyan-300">Live Payment Ingestion Rail</span>
+          </div>
+          <span class="text-xs text-slate-500 font-mono">|</span>
+          <!-- Dynamic Telemetry Counters -->
+          <div class="flex items-center space-x-4 text-xs font-mono text-slate-300">
+            <span class="flex items-center space-x-1">
+              <span class="text-slate-500">Throughput:</span>
+              <span class="text-cyan-400 font-bold" id="stream-tps">142 tx/min</span>
+            </span>
+            <span class="flex items-center space-x-1">
+              <span class="text-slate-500">Tier-0 Latency:</span>
+              <span class="text-emerald-400 font-bold" id="stream-latency">1.2ms avg</span>
+            </span>
+            <span class="flex items-center space-x-1">
+              <span class="text-slate-500">Escrow Soft-Holds:</span>
+              <span class="text-amber-400 font-bold" id="stream-escrow-count">1 Active</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Stream Controls & Injections -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Play/Pause Toggle -->
+          <button id="btn-stream-toggle" class="px-2.5 py-1 text-xs font-mono font-bold rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center space-x-1 transition cursor-pointer">
+            <span id="stream-toggle-icon">⏸</span>
+            <span id="stream-toggle-text">Pause Stream</span>
+          </button>
+
+          <!-- Auto-Investigate Mode Switch -->
+          <button id="btn-auto-investigate" class="px-2.5 py-1 text-xs font-mono font-bold rounded bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 flex items-center space-x-1 transition cursor-pointer">
+            <span>🤖 Auto-Investigate:</span>
+            <span class="text-emerald-400 font-extrabold" id="auto-investigate-status">ON</span>
+          </button>
+
+          <!-- Quick Test Event Injectors -->
+          <div class="flex items-center space-x-1.5 pl-2 border-l border-slate-800">
+            <button class="btn-inject-scenario px-2 py-0.5 text-[11px] font-mono rounded bg-rose-950/70 hover:bg-rose-900 border border-rose-800/80 text-rose-300 transition cursor-pointer" data-case="case-3" title="Inject 24,500 SEK APP Scam Transfer">
+              ⚡ Inject Scam (24.5k)
+            </button>
+            <button class="btn-inject-scenario px-2 py-0.5 text-[11px] font-mono rounded bg-amber-950/70 hover:bg-amber-900 border border-amber-800/80 text-amber-300 transition cursor-pointer" data-case="case-2" title="Inject 8,000 SEK Account Takeover">
+              ⚠️ Inject ATO (8k)
+            </button>
+            <button class="btn-inject-scenario px-2 py-0.5 text-[11px] font-mono rounded bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition cursor-pointer" data-case="case-1" title="Inject 600 SEK Routine Transfer">
+              ✅ Inject Routine (600)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-Time Sliding Stream Waterfall Feed -->
+      <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-2 overflow-hidden shadow-inner">
+        <div class="stream-table-header text-[10px] font-mono text-slate-400 uppercase tracking-wider pb-1.5 border-b border-slate-800">
+          <span>Time</span>
+          <span>Tx ID</span>
+          <span>Payer</span>
+          <span class="text-right">Amount</span>
+          <span>Counterparty</span>
+          <span>Dynamic Tier-0 Screener Result</span>
+          <span class="text-right">Action</span>
+        </div>
+        <div class="divide-y divide-slate-900/80 font-mono text-xs max-h-48 overflow-y-auto space-y-1 mt-1 pr-1" id="live-stream-feed">
+          <!-- Live streaming transactions slide in dynamically here -->
+        </div>
+      </div>
+
+      <!-- Live Hand-off Alert Toast (shows when an anomaly is escalated to Agent) -->
+      <div id="stream-escalation-alert" class="hidden bg-gradient-to-r from-rose-950/90 via-slate-900 to-cyan-950/90 border border-rose-500/50 rounded-lg px-3 py-2 text-xs flex items-center justify-between animate-pulse">
+        <div class="flex items-center space-x-2">
+          <span class="text-rose-400 font-bold">🚨 TIER-0 BREACH DETECTED:</span>
+          <span class="text-slate-200" id="stream-alert-msg">TX-8903 (24,500 SEK) placed in Escrow Soft-Hold.</span>
+          <span class="text-cyan-300 font-semibold">Gemini Agent autonomously launching investigation...</span>
+        </div>
+        <span class="text-[10px] text-slate-400 font-mono">1.8ms screening</span>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- Active Investigation Case Header & Manual Trigger -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div>
+        <div class="flex items-center space-x-2">
+          <h2 class="text-xs font-semibold tracking-wider uppercase text-slate-400">Current Investigation Target</h2>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800" id="current-target-badge">Selected from Stream</span>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-2" id="scenario-tabs">
+          <!-- Dynamically injected scenarios -->
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <button id="btn-run" class="flex items-center space-x-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold px-5 py-2.5 rounded-lg shadow-lg shadow-cyan-500/25 transition-all transform active:scale-95 text-sm cursor-pointer">
+          <svg class="w-4 h-4 animate-spin hidden" id="spinner" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <span id="btn-run-text">⚡ Launch Agent Investigation</span>
+        </button>
+      </div>
+    </div>
+
+
+    <!-- Dynamic Agent Interrogation & Question Bank Console -->
+    <section id="context-check-banner" class="hidden border border-amber-500/50 bg-slate-900/95 rounded-xl p-5 shadow-2xl shadow-amber-950/30">
+      <div class="flex items-start space-x-4">
+        <div class="w-10 h-10 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/40 text-lg">
+          🤖
+        </div>
+        <div class="flex-1 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+            <div class="flex items-center space-x-2">
+              <span class="text-xs font-bold uppercase font-mono tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">Dynamic Agent Interrogation</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800" id="inquiry-typology-badge">TYPOLOGY: APP_SCAM</span>
+              <span class="text-[10px] font-mono text-slate-400 hidden sm:inline" id="inquiry-db-src">Source: SQLite Question Bank</span>
+            </div>
+            <span class="text-xs text-amber-200/80 font-mono">Escrow Soft-Hold Active</span>
+          </div>
+          
+          <div>
+            <div class="text-[10px] font-mono text-slate-400 uppercase">Agent-Formulated Diagnostic Question:</div>
+            <p class="text-sm text-slate-100 font-semibold mt-1 bg-slate-950/80 p-3 rounded-lg border border-slate-800" id="context-check-question">
+              "Has someone asked you to move this money to a 'safe account', keep the transfer secret, or act urgently?"
+            </p>
+          </div>
+
+          <!-- Dynamically Populated Multiple-Choice Response Cards -->
+          <div>
+            <div class="text-[10px] font-mono text-slate-400 uppercase mb-2">Simulate Customer Answer (Feeds Into Jev Reasoner):</div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5" id="inquiry-options-container">
+              <!-- Rendered via app.js from Database Question Bank -->
+            </div>
+          </div>
+
+          <!-- GOOGLE VOICE INTERROGATION & TESTIMONY (Google Multimodal Speech) -->
+          <div class="mt-3 p-4 rounded-xl border border-cyan-500/50 bg-gradient-to-r from-cyan-950/40 via-slate-900 to-indigo-950/40 space-y-3 shadow-lg">
+            <div class="flex items-center justify-between border-b border-cyan-800/40 pb-2">
+              <div class="flex items-center space-x-2">
+                <span class="text-base">🎙️</span>
+                <span class="text-xs font-bold font-mono text-cyan-300 uppercase tracking-wider">Google Voice Interrogation & Testimony Console</span>
+                <span class="text-[9px] px-2 py-0.5 rounded bg-cyan-900/60 text-cyan-200 border border-cyan-500/40 font-mono">Google Web Speech + TTS</span>
+              </div>
+              <div class="flex items-center space-x-2" id="voice-call-status">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                </span>
+                <span class="text-[10px] text-cyan-400 font-mono font-bold" id="voice-call-label">AI OUT-OF-BAND CALL READY</span>
+              </div>
+            </div>
+
+            <!-- Speech Audio Controls -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <!-- 1. Agent Outcall TTS -->
+              <button id="btn-agent-voice-call" class="flex items-center justify-center space-x-2 p-2.5 rounded-lg bg-cyan-900/40 hover:bg-cyan-800/60 border border-cyan-500/40 text-cyan-200 text-xs font-mono font-bold transition cursor-pointer">
+                <span id="speaker-icon">🔊</span>
+                <span>Speak Question (TTS)</span>
+              </button>
+
+              <!-- 2. Live Mic STT -->
+              <button id="btn-mic-testify" class="flex items-center justify-center space-x-2 p-2.5 rounded-lg bg-rose-950/50 hover:bg-rose-900/70 border border-rose-500/50 text-rose-200 text-xs font-mono font-bold transition cursor-pointer">
+                <span id="mic-icon">🎙️</span>
+                <span id="mic-label">Record Voice Testimony</span>
+              </button>
+
+              <!-- 3. Preset Audio Demo Fallback -->
+              <button id="btn-audio-preset" class="flex items-center justify-center space-x-2 p-2.5 rounded-lg bg-indigo-950/50 hover:bg-indigo-900/70 border border-indigo-500/40 text-indigo-200 text-xs font-mono font-bold transition cursor-pointer">
+                <span>▶️</span>
+                <span>Play Victim Audio (1-Click)</span>
+              </button>
+            </div>
+
+            <!-- Real-time Speech Transcription Box -->
+            <div id="voice-transcript-box" class="p-3 bg-slate-950/90 rounded-lg border border-cyan-900/50 text-xs font-mono text-slate-300 min-h-[52px] flex items-center justify-between">
+              <div id="voice-transcript-text" class="italic text-slate-400">
+                Click "Record Voice Testimony" to speak into your microphone, or "Play Victim Audio" for instant speech simulation.
+              </div>
+              <button id="btn-submit-voice" class="hidden px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-bold text-xs shrink-0 ml-3 shadow-md shadow-cyan-600/30 transition cursor-pointer">
+                ⚡ Feed to Jev (#E07)
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-xs text-slate-400 font-mono" id="cc-status-text">Simulating secure BankID / Google Voice interrogation response</span>
+            <span class="text-[10px] text-cyan-400 font-mono" id="inquiry-sync-indicator">⚡ Synchronizes with Jev Structured Judgment</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Causal Sensitivity Recalculation Banner -->
+    <div id="causal-recalculate-panel" class="hidden border border-cyan-500/40 bg-slate-900 rounded-xl p-4 shadow-xl space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <div class="flex items-center space-x-2">
+          <span class="text-cyan-400 font-bold text-xs font-mono">🧪 Dynamic Causal Sensitivity Recalculation ("What-If")</span>
+          <span class="text-[11px] text-slate-400 font-mono" id="causal-delta-title">--</span>
+        </div>
+        <button id="btn-close-causal" class="text-slate-400 hover:text-white text-xs font-mono cursor-pointer">✕ Dismiss</button>
+      </div>
+      <div class="p-3 bg-cyan-950/40 border border-cyan-800/40 rounded-lg text-xs font-sans text-slate-200" id="causal-delta-text">
+        --
+      </div>
+    </div>
+
+    <!-- 3-PANE WORKSPACE: LEFT (Case) | CENTER (Agent Investigation) | RIGHT (Evidence & Explanation) -->
+    <div class="workspace-grid gap-5">
+
+      <!-- ================= PANE 1: CASE ================= -->
+      <div class="pane-case space-y-4">
+        
+        <!-- Suspicious Transaction Card -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-mono font-bold uppercase text-slate-400">Suspicious Transfer</span>
+            <span class="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-slate-800 text-slate-300" id="tx-id">TX-XXXX</span>
+          </div>
+
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase font-mono">Amount</div>
+            <div class="text-2xl font-bold text-white font-mono mt-0.5" id="tx-amount">-- SEK</div>
+          </div>
+
+          <div class="space-y-2 text-xs">
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-mono">Sender</div>
+              <div class="font-semibold text-slate-200 mt-0.5" id="tx-payer">--</div>
+              <div class="text-[11px] text-slate-400 font-mono flex items-center justify-between" id="tx-payer-id">
+                <span id="tx-payer-baseline">Baseline: -- SEK</span>
+                <button id="btn-open-db-modal" class="text-cyan-400 hover:text-cyan-300 underline text-[10px] cursor-pointer">🗄️ DB Record</button>
+              </div>
+            </div>
+
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-mono">Recipient</div>
+              <div class="font-semibold text-slate-200 mt-0.5" id="tx-recipient">--</div>
+              <div class="text-[11px] text-slate-400 font-mono" id="tx-recipient-id">REC-XXXX</div>
+            </div>
+
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-mono">Device & Auth</div>
+              <div class="text-slate-300 font-medium" id="tx-channel">--</div>
+              <div class="text-[11px] text-slate-400 font-mono" id="tx-auth">--</div>
+            </div>
+
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-mono">Banking Lifecycle State</div>
+              <span class="inline-block mt-1 px-2 py-0.5 text-[11px] font-mono font-bold rounded bg-amber-950 text-amber-300 border border-amber-800/60" id="tx-state-badge">
+                PENDING ESCROW
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Decision Stability (Repeatability x5 Fresh Runs) -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-mono font-bold uppercase text-slate-400">Decision Stability</span>
+            <span class="text-[10px] text-slate-500 font-mono">Repeatability</span>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            Tests whether fresh inferences reach the identical policy recommendation across 5 runs:
+          </p>
+          <button id="btn-test-repeatability" class="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 font-mono text-xs font-bold rounded shadow cursor-pointer transition">
+            🧪 Run 5x Stability Test
+          </button>
+          <div id="repeatability-result" class="hidden p-2.5 rounded bg-slate-950 border border-slate-800 text-xs font-mono space-y-1">
+            <div class="flex justify-between text-slate-300">
+              <span>Consistency:</span>
+              <span class="font-bold text-emerald-400" id="rep-rate">5/5 (100%)</span>
+            </div>
+            <div class="text-[10px] text-slate-400" id="rep-distribution">CONTEXT_CHECK: 5/5</div>
+          </div>
+        </div>
+
+        <!-- Relationship Network Mini Graph -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-2">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-mono font-bold uppercase text-slate-400">Entity Network (2 Hops)</span>
+            <span class="text-[10px] text-cyan-400 font-mono">Live SVG</span>
+          </div>
+          <div class="bg-slate-950 rounded-lg border border-slate-800 p-1 flex items-center justify-center min-h-[170px]">
+            <svg id="graph-svg" class="w-full h-40" viewBox="0 0 460 220"></svg>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= PANE 2: AGENT INVESTIGATION ================= -->
+      <div class="pane-agent space-y-4">
+
+        <!-- Agent Investigation Trace Card -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+              <h3 class="text-sm font-bold text-white tracking-wide">Dynamic Investigation Trace</h3>
+            </div>
+            <span class="text-xs font-mono text-slate-400" id="trace-step-count">0 steps completed</span>
+          </div>
+
+          <!-- Trace Timeline -->
+          <div id="trace-container" class="space-y-3 font-mono text-xs">
+            <div class="text-slate-500 italic py-12 text-center font-sans">
+              Click "Launch Agent Investigation" to begin.
+            </div>
+          </div>
+        </div>
+
+        <!-- Binding Policy Gate Card -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-mono font-bold uppercase text-slate-400">Deterministic Policy Layer</span>
+            <span id="policy-action-badge" class="px-2.5 py-1 text-xs font-mono font-bold rounded bg-slate-800 text-slate-400">PENDING</span>
+          </div>
+          <div id="policy-summary-box" class="hidden p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs space-y-1">
+            <div class="text-slate-400 font-mono uppercase text-[10px]" id="policy-rule-name">RULE_EVALUATION</div>
+            <div class="text-slate-300" id="policy-rule-reason">--</div>
+          </div>
+        </div>
+
+        <!-- Conclusive Human Decision Dossier Card (可解释性合规终审结案卷宗) -->
+        <div id="human-dossier-card" class="hidden bg-slate-900/90 border border-emerald-500/40 rounded-xl p-5 space-y-3 shadow-lg shadow-emerald-950/20">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div class="flex items-center space-x-2">
+              <span class="text-xs font-mono font-bold uppercase text-emerald-400">🛡️ Audit-Ready Compliance Dossier</span>
+              <span class="px-2 py-0.5 text-[9px] font-mono font-bold rounded bg-emerald-950 text-emerald-300 border border-emerald-800" id="dossier-status-badge">GROUNDED RESOLUTION</span>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono">100% Traceable to Evidence</span>
+          </div>
+          
+          <div class="space-y-2 text-xs">
+            <div class="p-3 bg-slate-950/90 rounded-lg border border-slate-800 space-y-1">
+              <div class="text-[10px] text-slate-400 uppercase font-mono">Audited Decision Synthesis</div>
+              <div class="text-slate-100 font-medium leading-relaxed" id="dossier-narrative">--</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
+              <div class="p-2 bg-slate-950 rounded border border-slate-800">
+                <span class="text-slate-500 block text-[10px]">Jev Recipient Assessment:</span>
+                <span class="text-rose-400 font-bold" id="dossier-jev-risk">CRITICAL (0.99)</span>
+              </div>
+              <div class="p-2 bg-slate-950 rounded border border-slate-800">
+                <span class="text-slate-500 block text-[10px]">Payer Manipulation State:</span>
+                <span class="text-amber-300 font-bold" id="dossier-payer-state">CONFIRMED_COERCED</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= PANE 3: EVIDENCE & EXPLANATION ================= -->
+      <div class="pane-evidence space-y-4">
+
+        <!-- Findings & Clickable Claims -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-mono font-bold uppercase text-slate-400">Evidence-Backed Findings</span>
+            <span class="text-[10px] text-cyan-400 font-mono">Click to cite</span>
+          </div>
+          <div id="claims-container" class="space-y-2">
+            <div class="text-xs text-slate-500 italic py-4">No investigation findings yet.</div>
+          </div>
+        </div>
+
+        <!-- Human Hand-off: Remaining Uncertainty -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-2">
+          <div class="flex items-center space-x-2 border-b border-slate-800 pb-2">
+            <span class="text-amber-400 text-xs">👤</span>
+            <span class="text-xs font-mono font-bold uppercase text-slate-400">Human Hand-off (Remaining Uncertainty)</span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed font-sans" id="remaining-uncertainty-text">
+            Investigation pending.
+          </p>
+        </div>
+
+        <!-- G-Eval Post-Investigation Audit Scorecard -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-2.5">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div class="flex items-center space-x-1.5">
+              <span class="text-emerald-400 text-xs">⚖️</span>
+              <span class="text-xs font-mono font-bold uppercase text-slate-400">G-Eval Post-Run Audit</span>
+            </div>
+            <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">Quality Verified</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-center text-xs font-mono">
+            <div class="bg-slate-950 p-2 rounded border border-slate-800">
+              <div class="text-[10px] text-slate-400">Grounding</div>
+              <div class="text-sm font-bold text-emerald-400 mt-0.5" id="geval-grounding">5/5</div>
+            </div>
+            <div class="bg-slate-950 p-2 rounded border border-slate-800">
+              <div class="text-[10px] text-slate-400">Completeness</div>
+              <div class="text-sm font-bold text-emerald-400 mt-0.5" id="geval-completeness">5/5</div>
+            </div>
+            <div class="bg-slate-950 p-2 rounded border border-slate-800">
+              <div class="text-[10px] text-slate-400">Relevance</div>
+              <div class="text-sm font-bold text-emerald-400 mt-0.5" id="geval-relevance">5/5</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Auditable Evidence Vault with Interactive Checkboxes ("What-If?") -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div class="flex items-center space-x-1.5">
+              <span class="text-amber-400 text-xs">🗂️</span>
+              <span class="text-xs font-mono font-bold uppercase text-slate-400">Evidence Vault</span>
+            </div>
+            <button id="btn-recalculate-evidence" class="px-2.5 py-1 bg-cyan-950 hover:bg-cyan-900 border border-cyan-600/60 text-cyan-300 font-mono text-[10px] font-bold rounded shadow cursor-pointer transition">
+              ⚡ Recalculate ("What-If")
+            </button>
+          </div>
+
+          <p class="text-[10px] text-slate-400">
+            Uncheck any evidence item to test counterfactual sensitivity:
+          </p>
+
+          <div id="evidence-container" class="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+            <div class="text-slate-500 italic py-6 text-center text-xs">
+              Evidence items recorded during investigation appear here with stable IDs.
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500 font-mono">
+    EvidenceTrail • Bank-Side Autonomous Investigation Layer for Suspicious Transactions • Powered by Gemini & Jev
+  </footer>
+
+  <!-- Customer Database Information Modal (SQLite Integration) -->
+  <div id="customer-db-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center space-x-2">
+          <span class="text-cyan-400 text-lg">🗄️</span>
+          <h3 class="text-sm font-bold text-white font-mono">SQLite Customer Intelligence Record</h3>
+        </div>
+        <button id="btn-close-db-modal" class="text-slate-400 hover:text-white text-xs font-mono cursor-pointer">✕ Close</button>
+      </div>
+
+      <div class="space-y-3 text-xs font-mono" id="db-modal-content">
+        <div class="text-slate-400">Loading database profile from <code class="text-cyan-400">kyc_aml.db</code>...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/live_stream.js"></script>
+</body>
+</html>

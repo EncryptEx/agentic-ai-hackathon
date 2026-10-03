@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Sentinel — Nordic AML &amp; Sanctions Screening</title>
 <style>
   :root {
-    --bg: #05070c;
-    --ink: #cfe0ff;
-    --dim: rgba(150, 180, 220, 0.6);
-    --line: rgba(90, 130, 190, 0.28);
-    --panel: rgba(8, 12, 22, 0.80);
-    --crit: #ff5f6d;
-    --high: #ffc857;
-    --med:  #6fb3ff;
-    --ok:   #4fe0a0;
+    --bg: #050505;
+    --ink: #f4f4f5;
+    --dim: #a1a1aa;
+    --line: rgba(255, 255, 255, 0.08);
+    --panel: rgba(15, 15, 17, 0.7);
+    --crit: #ef4444;
+    --high: #f59e0b;
+    --med: #3b82f6;
+    --ok: #10b981;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -22,7 +23,7 @@
     overflow: hidden;
     background: var(--bg);
     color: var(--ink);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: 'Inter', -apple-system, sans-serif;
   }
   canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
 
@@ -30,8 +31,8 @@
     position: fixed;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    backdrop-filter: blur(12px);
     padding: 11px 13px;
     font-size: 10px;
     letter-spacing: 0.09em;
@@ -804,11 +805,68 @@
     const ws = new WebSocket(`ws://${window.location.host}/ws/transactions?speed_ms=${speed}`);
     activeWs = ws;
     
-    ws.onmessage = (event) => {
+        ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
         if (payload.status || payload.error) return; // stream status or error
         
+        if (payload.msg_type === 'jev_triage') {
+            const row = payload.row;
+            if (payload.suspicion === 'SUSPICIOUS') {
+                const li = document.createElement('div');
+                li.className = 'case enter flash';
+                const tx_id = payload.tx_id || row.transaction_id || row.customer_id;
+                li.id = 'case-' + tx_id;
+                li.innerHTML = `
+                    <div class="row1">
+                        <span class="cstat">TRIAGED</span>
+                        <span class="cid">Customer ${row.customer_id}</span>
+                        <span class="camt">${payload.suspicion}</span>
+                    </div>
+                    <div class="row2">Jev triggered investigation</div>
+                `;
+                li.style.cursor = 'pointer';
+                li.onclick = () => {
+                    if (window.parent && window.parent.document) {
+                        const invTab = window.parent.document.querySelector('[data-target="investigator-tab"]');
+                        if (invTab) invTab.click();
+                        
+                        const invIframe = window.parent.document.querySelector('#investigator-tab iframe');
+                        if (invIframe && invIframe.contentWindow) {
+                            invIframe.contentWindow.postMessage({ type: 'highlight_case', customer_id: row.customer_id, tx_id: payload.tx_id || row.transaction_id || row.customer_id }, '*');
+                        }
+                    }
+                };
+                caseList.prepend(li);
+                if (caseList.children.length > 5) caseList.lastChild.remove();
+                
+                let srcCust = getOrCreateCounterparty(row.customer_id);
+                srcCust.suspicious = true;
+                srcCust.riskScore = Math.max(srcCust.riskScore, 0.8);
+            }
+            return;
+        } else if (payload.msg_type === 'investigation_started') {
+            const id = payload.tx_id || payload.customer_id;
+            const li = document.getElementById('case-' + id);
+            if (li) {
+                li.querySelector('.cstat').innerText = 'INVESTIGATING';
+                li.querySelector('.row2').innerText = 'Agents are analyzing evidence...';
+            }
+            return;
+        } else if (payload.msg_type === 'investigation_finished') {
+            const id = payload.tx_id || payload.customer_id;
+            const li = document.getElementById('case-' + id);
+            if (li) {
+                li.querySelector('.cstat').innerText = 'CLOSED';
+                li.querySelector('.cstat').style.background = 'rgba(79, 224, 160, 0.14)';
+                li.querySelector('.cstat').style.color = '#7fe0ab';
+                li.querySelector('.row2').innerText = 'Investigation complete';
+            }
+            return;
+        } else if (payload.msg_type === 'investigation_error') {
+            return;
+        }
+
         const custId = payload.customer_id;
         const cpName = payload.counterparty_name || payload.counterparty_account || 'Unknown';
         const direction = payload.direction;
@@ -837,33 +895,17 @@
           leg: null,
         };
         
-        // Basic real-time logic (no simulated fraud for now, but leave structure)
-        const struct = amount > 8000 && amount < 10000;
-        const big = amount > 25000;
-        let score = 0;
-        if (struct) { score += 0.55; e.reason = 'structuring'; }
-        if (big) { score += 0.35; e.reason = e.reason || 'large volume'; }
-        
         // Add to recent feed
         if (txListEl) {
           const li = document.createElement('li');
-          if (score > 0.6) li.classList.add('high-risk');
           li.innerHTML = `
-            <span class="tx-parties">${srcCust.name} → ${dstCust.name}</span>
-            <span class="tx-amt">$${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            <span class="tx-parties">${srcCust.name} &rarr; ${dstCust.name}</span>
+            <span class="tx-amt">${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
           `;
           txListEl.prepend(li);
           if (txListEl.children.length > 5) txListEl.lastChild.remove();
         }
 
-        if (score > 0.6) {
-          e.suspicious = true;
-          e.score = score;
-          srcCust.riskyFlow += amount;
-          dstCust.riskyFlow += amount;
-          srcCust.signals.velocity = (srcCust.signals.velocity || 0) + 0.3;
-        }
-        
         if (!srcCust.outTo) srcCust.outTo = new Set();
         if (!dstCust.inFrom) dstCust.inFrom = new Set();
         if (!srcCust.counterparties) srcCust.counterparties = new Set();

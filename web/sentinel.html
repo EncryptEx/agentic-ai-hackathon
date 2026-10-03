@@ -450,8 +450,24 @@
   <button id="btn-pause">Pause</button>
   <button id="btn-clear">Clear alerts</button>
   <div class="sep"></div>
-  <label>sensitivity <input id="sens" type="range" min="20" max="90" value="55" /></label>
+  <label>stream speed <input id="speed" type="range" min="1" max="1000" value="250" dir="rtl" /></label>
   <button class="card-toggle" type="button" aria-label="Collapse controls card" aria-expanded="true">−</button>
+</div>
+
+<div class="panel" id="tx-feed" style="bottom: 120px; right: 20px;">
+  <h3>Real-time Transactions <button class="card-toggle" type="button" aria-label="Collapse transaction feed card" aria-expanded="true">−</button></h3>
+  <div class="card-content">
+    <div style="font-size: 0.82rem; margin-bottom: 8px; color: var(--dim);">Latest 5 cross-border & high-value flows</div>
+    <style>
+      #tx-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+      #tx-list li { background: rgba(90, 130, 190, 0.08); border-left: 2px solid var(--med); padding: 6px 8px; border-radius: 0 4px 4px 0; font-family: var(--mono); font-size: 0.8rem; display: flex; justify-content: space-between; animation: slideIn 0.3s ease-out; }
+      #tx-list li.high-risk { border-left-color: var(--crit); background: rgba(255, 95, 109, 0.08); }
+      #tx-list li .tx-parties { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+      #tx-list li .tx-amt { color: var(--ok); font-weight: 500; }
+      @keyframes slideIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+    </style>
+    <ul id="tx-list"></ul>
+  </div>
 </div>
 
 <script>
@@ -486,7 +502,8 @@
   const insSigs = $('ins-sigs');
   const btnPause = $('btn-pause'), btnClear = $('btn-clear');
   const btnBurst = null, btnSanction = null, btnLayer = null;
-  const sensEl = $('sens');
+  const speedEl = $('speed');
+  const txListEl = $('tx-list');
 
   let W = 0, H = 0, DPR = 1;
 
@@ -506,7 +523,7 @@
     riskDecay: 0.22,
     riskRise: 0.85,
     alertCooldown: 3.2,
-    sensitivity: 0.55,
+    streamSpeedMs: 250,
     exposureThreshold: 0.30,   // share of flow to listed parties that flags exposure
     chainMin: 3,               // shortest layering chain worth flagging
     chainMax: 6,               // longest layering chain we will build
@@ -541,6 +558,7 @@
   let txAccum = 0;
   let txTotal = 0;
   let alertTotal = 0;
+  let activeWs = null;
   let blockedTotal = 0;
   let sanctionHits = 0;
   let valueScreened = 0;
@@ -738,7 +756,10 @@
     
     try {
       const res = await fetch('/api/customers');
-      const data = await res.json();
+      const jsonResponse = await res.json();
+      
+      // The API returns { total: 100, customers: [...] }
+      const data = Array.isArray(jsonResponse) ? jsonResponse : (jsonResponse.customers || []);
       
       data.forEach((c, i) => {
         const angle = rand(0, Math.PI * 2);
@@ -778,8 +799,10 @@
     return a;
   }
 
-  function setupWebsocket() {
-    const ws = new WebSocket(`ws://${window.location.host}/ws/transactions?speed_ms=250`);
+  function setupWebsocket(speed = CONFIG.streamSpeedMs) {
+    if (activeWs) activeWs.close();
+    const ws = new WebSocket(`ws://${window.location.host}/ws/transactions?speed_ms=${speed}`);
+    activeWs = ws;
     
     ws.onmessage = (event) => {
       try {
@@ -821,6 +844,18 @@
         if (struct) { score += 0.55; e.reason = 'structuring'; }
         if (big) { score += 0.35; e.reason = e.reason || 'large volume'; }
         
+        // Add to recent feed
+        if (txListEl) {
+          const li = document.createElement('li');
+          if (score > 0.6) li.classList.add('high-risk');
+          li.innerHTML = `
+            <span class="tx-parties">${srcCust.name} → ${dstCust.name}</span>
+            <span class="tx-amt">$${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+          `;
+          txListEl.prepend(li);
+          if (txListEl.children.length > 5) txListEl.lastChild.remove();
+        }
+
         if (score > 0.6) {
           e.suspicious = true;
           e.score = score;
@@ -851,7 +886,10 @@
     };
     
     ws.onclose = () => {
-      setTimeout(setupWebsocket, 5000); // Try reconnect
+      // Only try to reconnect if this is still the active connection
+      if (activeWs === ws) {
+        setTimeout(() => setupWebsocket(CONFIG.streamSpeedMs), 5000); // Try reconnect
+      }
     };
   }
 
@@ -1379,7 +1417,7 @@
 
   // ---------------------------------------------------------------- verdicts
   function verdictFor(risk) {
-    const s = CONFIG.sensitivity;
+    const s = 0.55; // static default sensitivity
     if (risk > 0.52 - s * 0.14) return 'blocked';
     if (risk > 0.38 - s * 0.10) return 'suspicious';
     if (risk > 0.24 - s * 0.06) return 'review';
@@ -2460,8 +2498,9 @@
     refreshStats();
   });
 
-  sensEl.addEventListener('input', () => {
-    CONFIG.sensitivity = Number(sensEl.value) / 100;
+  speedEl.addEventListener('change', () => {
+    CONFIG.streamSpeedMs = Number(speedEl.value);
+    setupWebsocket(CONFIG.streamSpeedMs); // reconnect with new speed
   });
 
   // ---------------------------------------------------------------- boot

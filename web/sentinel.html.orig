@@ -450,7 +450,7 @@
   <button id="btn-pause">Pause</button>
   <button id="btn-clear">Clear alerts</button>
   <div class="sep"></div>
-  <label>sensitivity <input id="sens" type="range" min="20" max="90" value="55" /></label>
+  <label>stream speed <input id="speed" type="range" min="1" max="1000" value="250" dir="rtl" /></label>
   <button class="card-toggle" type="button" aria-label="Collapse controls card" aria-expanded="true">−</button>
 </div>
 
@@ -486,7 +486,7 @@
   const insSigs = $('ins-sigs');
   const btnPause = $('btn-pause'), btnClear = $('btn-clear');
   const btnBurst = null, btnSanction = null, btnLayer = null;
-  const sensEl = $('sens');
+  const speedEl = $('speed');
 
   let W = 0, H = 0, DPR = 1;
 
@@ -506,7 +506,7 @@
     riskDecay: 0.22,
     riskRise: 0.85,
     alertCooldown: 3.2,
-    sensitivity: 0.55,
+    streamSpeedMs: 250,
     exposureThreshold: 0.30,   // share of flow to listed parties that flags exposure
     chainMin: 3,               // shortest layering chain worth flagging
     chainMax: 6,               // longest layering chain we will build
@@ -541,6 +541,7 @@
   let txAccum = 0;
   let txTotal = 0;
   let alertTotal = 0;
+  let activeWs = null;
   let blockedTotal = 0;
   let sanctionHits = 0;
   let valueScreened = 0;
@@ -738,7 +739,10 @@
     
     try {
       const res = await fetch('/api/customers');
-      const data = await res.json();
+      const jsonResponse = await res.json();
+      
+      // The API returns { total: 100, customers: [...] }
+      const data = Array.isArray(jsonResponse) ? jsonResponse : (jsonResponse.customers || []);
       
       data.forEach((c, i) => {
         const angle = rand(0, Math.PI * 2);
@@ -778,8 +782,10 @@
     return a;
   }
 
-  function setupWebsocket() {
-    const ws = new WebSocket(`ws://${window.location.host}/ws/transactions?speed_ms=250`);
+  function setupWebsocket(speed = CONFIG.streamSpeedMs) {
+    if (activeWs) activeWs.close();
+    const ws = new WebSocket(`ws://${window.location.host}/ws/transactions?speed_ms=${speed}`);
+    activeWs = ws;
     
     ws.onmessage = (event) => {
       try {
@@ -829,8 +835,12 @@
           srcCust.signals.velocity = (srcCust.signals.velocity || 0) + 0.3;
         }
         
-        srcCust.outTo.add(dstCust);
-        dstCust.inFrom.add(srcCust);
+        if (!srcCust.outTo) srcCust.outTo = new Set();
+        if (!dstCust.inFrom) dstCust.inFrom = new Set();
+        if (!srcCust.counterparties) srcCust.counterparties = new Set();
+        if (!dstCust.counterparties) dstCust.counterparties = new Set();
+        srcCust.outTo.add(dstCust.id);
+        dstCust.inFrom.add(srcCust.id);
         srcCust.counterparties.add(dstCust.id);
         dstCust.counterparties.add(srcCust.id);
         if (!srcCust.recent) srcCust.recent = [];
@@ -847,7 +857,10 @@
     };
     
     ws.onclose = () => {
-      setTimeout(setupWebsocket, 5000); // Try reconnect
+      // Only try to reconnect if this is still the active connection
+      if (activeWs === ws) {
+        setTimeout(() => setupWebsocket(CONFIG.streamSpeedMs), 5000); // Try reconnect
+      }
     };
   }
 
@@ -1375,7 +1388,7 @@
 
   // ---------------------------------------------------------------- verdicts
   function verdictFor(risk) {
-    const s = CONFIG.sensitivity;
+    const s = 0.55; // static default sensitivity
     if (risk > 0.52 - s * 0.14) return 'blocked';
     if (risk > 0.38 - s * 0.10) return 'suspicious';
     if (risk > 0.24 - s * 0.06) return 'review';
@@ -2456,8 +2469,9 @@
     refreshStats();
   });
 
-  sensEl.addEventListener('input', () => {
-    CONFIG.sensitivity = Number(sensEl.value) / 100;
+  speedEl.addEventListener('change', () => {
+    CONFIG.streamSpeedMs = Number(speedEl.value);
+    setupWebsocket(CONFIG.streamSpeedMs); // reconnect with new speed
   });
 
   // ---------------------------------------------------------------- boot

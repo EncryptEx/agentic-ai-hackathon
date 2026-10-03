@@ -1,0 +1,52 @@
+--- web/sentinel.html
++++ web/sentinel.html
+@@ -455,6 +455,22 @@
+   <button class="card-toggle" type="button" aria-label="Collapse controls card" aria-expanded="true">−</button>
+ </div>
+ 
++<div class="panel" id="tx-feed" style="bottom: 120px; right: 20px;">
++  <h3>Real-time Transactions <button class="card-toggle" type="button" aria-label="Collapse transaction feed card" aria-expanded="true">−</button></h3>
++  <div class="card-content">
++    <div style="font-size: 0.82rem; margin-bottom: 8px; color: var(--dim);">Latest 5 cross-border & high-value flows</div>
++    <style>
++      #tx-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
++      #tx-list li { background: rgba(90, 130, 190, 0.08); border-left: 2px solid var(--med); padding: 6px 8px; border-radius: 0 4px 4px 0; font-family: var(--mono); font-size: 0.8rem; display: flex; justify-content: space-between; animation: slideIn 0.3s ease-out; }
++      #tx-list li.high-risk { border-left-color: var(--crit); background: rgba(255, 95, 109, 0.08); }
++      #tx-list li .tx-parties { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
++      #tx-list li .tx-amt { color: var(--ok); font-weight: 500; }
++      @keyframes slideIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
++    </style>
++    <ul id="tx-list"></ul>
++  </div>
++</div>
++
+ <script>
+ (() => {
+   'use strict';
+@@ -487,6 +503,7 @@
+   const btnPause = $('btn-pause'), btnClear = $('btn-clear');
+   const btnBurst = null, btnSanction = null, btnLayer = null;
+   const speedEl = $('speed');
++  const txListEl = $('tx-list');
+ 
+   let W = 0, H = 0, DPR = 1;
+ 
+@@ -825,6 +842,18 @@
+         if (struct) { score += 0.55; e.reason = 'structuring'; }
+         if (big) { score += 0.35; e.reason = e.reason || 'large volume'; }
+         
++        // Add to recent feed
++        if (txListEl) {
++          const li = document.createElement('li');
++          if (score > 0.6) li.classList.add('high-risk');
++          li.innerHTML = `
++            <span class="tx-parties">${srcCust.name} → ${dstCust.name}</span>
++            <span class="tx-amt">$${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
++          `;
++          txListEl.prepend(li);
++          if (txListEl.children.length > 5) txListEl.lastChild.remove();
++        }
++
+         if (score > 0.6) {
+           e.suspicious = true;
+           e.score = score;

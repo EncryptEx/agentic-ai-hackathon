@@ -3,108 +3,382 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EvidenceTrail Investigator Backlog</title>
+    <title>Investigator Workspace</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #05070c;
-            --panel-bg: #101726;
-            --card-bg: rgba(90, 130, 190, 0.05);
-            --border-color: rgba(90, 130, 190, 0.2);
-            --text-main: #cfe0ff;
-            --text-muted: rgba(150, 180, 220, 0.7);
+            --bg-base: #050505;
+            --bg-panel: rgba(15, 15, 17, 0.7);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-active: rgba(255, 255, 255, 0.2);
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            
+            --accent-brand: #3b82f6;
+            --color-high: #ef4444;
+            --color-med: #f59e0b;
+            --color-low: #10b981;
         }
+
         body { 
-            background: var(--bg-color); 
+            background: var(--bg-base); 
             color: var(--text-main); 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            margin: 0; padding: 20px; 
+            font-family: 'Inter', -apple-system, sans-serif; 
+            margin: 0; padding: 0;
+            overflow-x: hidden;
+            background-image: radial-gradient(circle at 50% -20%, rgba(59,130,246,0.1) 0%, transparent 50%);
         }
-        h1 { font-size: 1.5rem; margin-bottom: 20px; font-weight: 500; }
-        .queue { display: flex; flex-direction: column; gap: 15px; }
-        .case { 
-            background: var(--panel-bg); 
-            padding: 20px; 
-            border-radius: 8px; 
-            border: 1px solid var(--border-color);
-            border-left: 4px solid #6fb3ff;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+
+        /* Layout */
+        .container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            height: 100vh;
+            overflow: hidden;
         }
-        .case.suspicious { border-left-color: #ff5f6d; }
-        .case.ongoing { border-left-color: #ffc857; }
-        .case.closed { border-left-color: #4fe0a0; }
-        .case-header { 
-            display: flex; justify-content: space-between; align-items: center; 
-            margin-bottom: 12px; font-weight: 600; font-size: 1.1em; 
+
+        /* Sidebar - Backlog */
+        .sidebar {
+            background: rgba(10, 10, 10, 0.5);
+            border-right: 1px solid var(--border-subtle);
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 24px;
         }
-        .case-body { 
-            font-size: 0.95em; line-height: 1.5; white-space: pre-wrap; 
-            color: var(--text-muted); background: var(--card-bg); 
-            padding: 12px; border-radius: 4px; 
+
+        .sidebar-header {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .status-badge { 
-            padding: 4px 10px; border-radius: 4px; font-size: 0.75em; 
-            letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700;
+        .sidebar-header .pulse {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--color-high);
+            box-shadow: 0 0 10px var(--color-high);
+            animation: pulse 2s infinite;
         }
-        .status-suspicious { background: rgba(255, 95, 109, 0.15); color: #ff5f6d; border: 1px solid rgba(255, 95, 109, 0.3); }
-        .status-ongoing { background: rgba(255, 200, 87, 0.15); color: #ffc857; border: 1px solid rgba(255, 200, 87, 0.3); }
-        .status-closed { background: rgba(79, 224, 160, 0.15); color: #4fe0a0; border: 1px solid rgba(79, 224, 160, 0.3); }
-        .btn-action { 
-            margin-top: 15px; background: rgba(111, 179, 255, 0.15); 
-            color: #9ccbff; border: 1px solid rgba(111, 179, 255, 0.3); 
-            padding: 6px 12px; border-radius: 4px; cursor: pointer; 
-            font-size: 0.85em; font-weight: 600;
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
         }
-        .btn-action:hover { background: rgba(111, 179, 255, 0.25); }
+
+        .queue { display: flex; flex-direction: column; gap: 12px; }
+
+        /* Case Card */
+        .case-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .case-card:hover, .case-card.active {
+            border-color: var(--border-active);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        .case-card.active::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+            background: var(--accent-brand);
+        }
+
+        .card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 8px;
+        }
+        .card-id { font-weight: 500; font-size: 0.9rem; }
+        .card-amt { font-size: 0.85rem; color: var(--text-muted); font-family: monospace; }
         
+        .badge {
+            font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+            padding: 4px 8px; border-radius: 99px;
+            display: inline-block; margin-bottom: 8px;
+        }
+        .b-suspicious { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+        .b-ongoing { background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+        .b-closed { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+
+        /* Main Workspace */
+        .workspace {
+            padding: 32px 48px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .empty-state {
+            margin: auto; text-align: center; color: var(--text-muted); font-weight: 300;
+        }
+
+        /* Dossier Header */
+        .dossier-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .dossier-title { font-size: 2rem; font-weight: 600; letter-spacing: -0.03em; margin: 0 0 8px 0; }
+        .dossier-meta { color: var(--text-muted); font-size: 0.9rem; }
+
+        /* KPI / Shapes Grid */
+        .kpi-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+        }
         
-        .case-body h1, .case-body h2, .case-body h3 { margin-top: 0; color: #fff; }
-        .case-body p { margin-top: 0; }
-        .case-body ul, .case-body ol { margin-top: 0; padding-left: 20px; }
-        .case-body code { background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 3px; }
-        .case-body blockquote { border-left: 3px solid #3b82f6; margin-left: 0; padding-left: 10px; color: #94a3b8; }
-        .no-cases { color: var(--text-muted); text-align: center; padding: 40px; font-style: italic; }
+        .kpi-card {
+            background: linear-gradient(145deg, rgba(20,20,25,0.8) 0%, rgba(10,10,12,0.9) 100%);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex; flex-direction: column; gap: 16px;
+            position: relative; overflow: hidden;
+        }
+        
+        .kpi-card::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        }
+
+        .kpi-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+        
+        /* Circular Progress */
+        .progress-circle {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: conic-gradient(var(--c, var(--color-high)) calc(var(--p, 0) * 1%), rgba(255,255,255,0.05) 0);
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
+        }
+        .progress-circle::before {
+            content: ''; position: absolute; inset: 6px; border-radius: 50%; background: #0a0a0c;
+        }
+        .progress-val { position: relative; font-size: 1.2rem; font-weight: 700; }
+
+        /* Typology Pills */
+        .typologies { display: flex; flex-wrap: wrap; gap: 8px; }
+        .pill { 
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            padding: 6px 12px; border-radius: 99px; font-size: 0.75rem; color: #e4e4e7;
+        }
+
+        /* Verdict Shape */
+        .verdict-shape {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 100%; height: 80px; border-radius: 12px;
+            font-size: 1.5rem; font-weight: 700; letter-spacing: 0.1em;
+            background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.1);
+            text-transform: uppercase;
+        }
+        .v-BLOCK { color: var(--color-high); border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.05); }
+        .v-REVIEW { color: var(--color-med); border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.05); }
+        .v-ALLOW { color: var(--color-low); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.05); }
+
+        /* Actions */
+        .actions {
+            display: flex; gap: 12px; margin-top: auto;
+        }
+        .btn {
+            flex: 1; padding: 12px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s; border: none; outline: none;
+        }
+        .btn-primary { background: var(--text-main); color: var(--bg-base); }
+        .btn-primary:hover { background: #d4d4d8; transform: translateY(-1px); }
+        .btn-secondary { background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid var(--border-subtle); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+        /* Report Body (Markdown) */
+        .report-body {
+            background: rgba(20,20,25,0.4);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 32px;
+            font-size: 0.95rem; line-height: 1.6; color: #d4d4d8;
+        }
+        .report-body h1, .report-body h2, .report-body h3 { color: #fff; letter-spacing: -0.02em; margin-top: 1.5em; }
+        .report-body h1:first-child { margin-top: 0; }
+        .report-body hr { border: none; border-top: 1px solid var(--border-subtle); margin: 2em 0; }
+        .report-body code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+        .report-body ul { padding-left: 20px; }
+        .report-body li { margin-bottom: 0.5em; }
+        
+        .loading-shimmer {
+            height: 20px; width: 100%; background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+            background-size: 200% 100%; animation: shimmer 2s infinite; border-radius: 4px; margin-bottom: 10px;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-    <h1>Investigation Backlog</h1>
-    <div class="queue" id="backlog-queue">
-        <div class="no-cases" id="empty-state">Waiting for real-time transactions...</div>
+    <div class="container">
+        <!-- Sidebar Queue -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="pulse"></div>
+                Live Backlog
+            </div>
+            <div class="queue" id="backlog-queue">
+                <!-- Case cards inserted here -->
+            </div>
+        </div>
+
+        <!-- Main Workspace -->
+        <div class="workspace" id="workspace">
+            <div class="empty-state" id="empty-state">
+                <h2>No case selected</h2>
+                <p>Select a case from the backlog or wait for a real-time alert.</p>
+            </div>
+            
+            <div id="dossier-view" style="display: none;">
+                <div class="dossier-header">
+                    <div>
+                        <h2 class="dossier-title" id="d-title">Customer CUST-00000</h2>
+                        <div class="dossier-meta" id="d-meta">Transaction Amt: $0.00 &middot; Generated via Google ADK</div>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <!-- Score Shape -->
+                    <div class="kpi-card">
+                        <div class="kpi-label">FRAML Composite Risk</div>
+                        <div style="display:flex; justify-content:center; padding:10px 0;">
+                            <div class="progress-circle" id="d-score-ring" style="--p: 0; --c: var(--color-med)">
+                                <div class="progress-val" id="d-score-val">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Verdict Shape -->
+                    <div class="kpi-card">
+                        <div class="kpi-label">AI Decision Support</div>
+                        <div style="display:flex; justify-content:center; padding:10px 0;">
+                            <div class="verdict-shape" id="d-verdict">--</div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-secondary">Reject</button>
+                            <button class="btn btn-primary" onclick="alert('Sign-off recorded. Syncing to audit ledger...')">Sign-off & Exec</button>
+                        </div>
+                    </div>
+
+                    <!-- Typologies -->
+                    <div class="kpi-card">
+                        <div class="kpi-label">Identified Typologies</div>
+                        <div class="typologies" id="d-typologies">
+                            <!-- Pills -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="report-body" id="d-report">
+                    <!-- Markdown rendered here -->
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         const queue = document.getElementById('backlog-queue');
         const emptyState = document.getElementById('empty-state');
+        const dossierView = document.getElementById('dossier-view');
         const cases = {};
+        let activeCaseId = null;
 
-        function renderCase(c) {
-            if (emptyState) emptyState.style.display = 'none';
-            
+        function selectCase(id) {
+            activeCaseId = id;
+            document.querySelectorAll('.case-card').forEach(c => c.classList.remove('active'));
+            const card = document.getElementById('inv-case-' + id);
+            if (card) card.classList.add('active');
+
+            const c = cases[id];
+            emptyState.style.display = 'none';
+            dossierView.style.display = 'block';
+
+            document.getElementById('d-title').textContent = 'Customer ' + c.id;
+            document.getElementById('d-meta').textContent = 'Transaction Amt: $' + c.amount + ' · Investigated by AI Swarm';
+
+            // Report rendering
+            const reportEl = document.getElementById('d-report');
+            if (c.status === 'ongoing') {
+                reportEl.innerHTML = '<div class="loading-shimmer"></div><div class="loading-shimmer" style="width: 80%"></div><div class="loading-shimmer" style="width: 90%"></div><br><p style="color:#a1a1aa; text-align:center;">Multi-agent swarm is compiling forensic data...</p>';
+                
+                // Hide structured UI until done
+                document.getElementById('d-score-val').textContent = '--';
+                document.getElementById('d-score-ring').style.setProperty('--p', 0);
+                document.getElementById('d-verdict').textContent = 'ANALYZING';
+                document.getElementById('d-verdict').className = 'verdict-shape';
+                document.getElementById('d-typologies').innerHTML = '<div class="pill">Evaluating...</div>';
+            } else if (c.status === 'closed') {
+                reportEl.innerHTML = marked.parse(c.report || '*Report missing*');
+                
+                // Score
+                const score = parseFloat(c.score || 0);
+                let color = 'var(--color-low)';
+                if (score >= 75) color = 'var(--color-high)';
+                else if (score >= 50) color = 'var(--color-med)';
+                
+                document.getElementById('d-score-val').textContent = score.toFixed(1);
+                document.getElementById('d-score-ring').style.setProperty('--p', score);
+                document.getElementById('d-score-ring').style.setProperty('--c', color);
+
+                // Verdict
+                const verdict = c.verdict || 'REVIEW';
+                const vEl = document.getElementById('d-verdict');
+                vEl.textContent = verdict;
+                vEl.className = 'verdict-shape v-' + verdict;
+
+                // Typologies
+                const typEl = document.getElementById('d-typologies');
+                typEl.innerHTML = '';
+                const typs = Array.isArray(c.typologies) && c.typologies.length > 0 ? c.typologies : ['Standard Activity'];
+                typs.forEach(t => {
+                    const pill = document.createElement('div');
+                    pill.className = 'pill';
+                    pill.textContent = t.length > 25 ? t.substring(0,25)+'...' : t;
+                    typEl.appendChild(pill);
+                });
+            }
+        }
+
+        function renderCard(c) {
             let el = document.getElementById('inv-case-' + c.id);
             if (!el) {
                 el = document.createElement('div');
                 el.id = 'inv-case-' + c.id;
-                queue.prepend(el); // latest on top
+                el.onclick = () => selectCase(c.id);
+                queue.prepend(el);
             }
-            let statusClass = 'status-suspicious';
-            let statusText = 'JEV TRIAGED';
-            if (c.status === 'ongoing') {
-                statusClass = 'status-ongoing';
-                statusText = 'INVESTIGATING';
-            } else if (c.status === 'closed') {
-                statusClass = 'status-closed';
-                statusText = 'CLOSED';
-            }
+            
+            let bClass = 'b-suspicious';
+            let bText = 'TRIAGED';
+            if (c.status === 'ongoing') { bClass = 'b-ongoing'; bText = 'INVESTIGATING'; }
+            else if (c.status === 'closed') { bClass = 'b-closed'; bText = 'CLOSED'; }
 
-            el.className = 'case ' + c.status;
+            const isActive = activeCaseId === c.id ? 'active' : '';
+            el.className = 'case-card ' + isActive;
+            
             el.innerHTML = `
-                <div class="case-header">
-                    <span>Customer ${c.id} &middot; $${c.amount}</span>
-                    <span class="status-badge ${statusClass}">${statusText}</span>
+                <div class="badge ${bClass}">${bText}</div>
+                <div class="card-header">
+                    <div class="card-id">${c.id}</div>
+                    <div class="card-amt">$${c.amount}</div>
                 </div>
-                <div class="case-body">${c.report ? marked.parse(c.report) : 'Waiting for agent investigation...'}</div>
-                ${c.status === 'closed' ? '<button class="btn-action">Review & Sign-off</button>' : ''}
+                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                    ${c.status === 'closed' ? (c.verdict || 'Ready for review') : 'AI Swarm active...'}
+                </div>
             `;
+            
+            if (activeCaseId === c.id) {
+                selectCase(c.id); // refresh view if it updated
+            }
         }
 
         const ws = new WebSocket(`ws://${window.location.host}/ws/transactions?speed_ms=1000`);
@@ -117,23 +391,27 @@
                         cases[id] = { 
                             id: id, 
                             amount: parseFloat(payload.row.amount || payload.row.amount_usd || 0).toLocaleString(undefined, {minimumFractionDigits: 2}),
-                            status: 'suspicious', 
-                            report: 'Jev triaged as suspicious. Severity score: ' + payload.severity.toFixed(2)
+                            status: 'suspicious'
                         };
-                        renderCase(cases[id]);
+                        renderCard(cases[id]);
+                        if (!activeCaseId) selectCase(id);
                     }
                 } else if (payload.msg_type === 'investigation_started') {
                     const id = payload.customer_id;
                     if (cases[id]) {
                         cases[id].status = 'ongoing';
-                        renderCase(cases[id]);
+                        renderCard(cases[id]);
                     }
                 } else if (payload.msg_type === 'investigation_finished') {
                     const id = payload.customer_id;
                     if (cases[id]) {
                         cases[id].status = 'closed';
                         cases[id].report = payload.report;
-                        renderCase(cases[id]);
+                        cases[id].score = payload.score;
+                        cases[id].tier = payload.tier;
+                        cases[id].verdict = payload.verdict;
+                        cases[id].typologies = payload.typologies;
+                        renderCard(cases[id]);
                     }
                 }
             } catch (err) {
@@ -143,16 +421,11 @@
 
         window.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'highlight_case') {
-                const el = document.getElementById('inv-case-' + event.data.customer_id);
-                if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    el.style.transition = 'box-shadow 0.5s, transform 0.5s';
-                    el.style.transform = 'scale(1.02)';
-                    el.style.boxShadow = '0 0 20px rgba(111, 179, 255, 0.5)';
-                    setTimeout(() => {
-                        el.style.transform = 'scale(1)';
-                        el.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
-                    }, 2000);
+                const id = event.data.customer_id;
+                if (cases[id]) {
+                    selectCase(id);
+                    const el = document.getElementById('inv-case-' + id);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
             }
         });

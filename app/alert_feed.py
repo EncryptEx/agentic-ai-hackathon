@@ -67,12 +67,14 @@ class AlertDispatcher:
                 f"This case was triggered by [{severity}] alert {rule_id}: {rule_name} ('{summary}'). "
                 f"Evaluate customer identity, full transaction history, fraud and digital telemetry, "
                 f"ownership connections, and composite FRAML risk indicators before preparing the final "
-                f"11-section investigative report."
+                f"11-section investigative report. "
+                f"IMPORTANT: The final report MUST include a clear 'AI Verdict' (e.g., BLOCK, MONITOR, ALLOW) and explicitly state that this verdict requires human validation and sign-off."
             )
         return (
             f"Please conduct a comprehensive financial crime and FRAML investigation on customer '{customer_id}'. "
             f"Review all KYC CDD attributes, transaction velocity, cyber/fraud telemetry, and multi-pillar risk "
-            f"scores to produce the final 11-section investigative dossier."
+            f"scores to produce the final 11-section investigative dossier. "
+            f"IMPORTANT: The final report MUST include a clear 'AI Verdict' (e.g., BLOCK, MONITOR, ALLOW) and explicitly state that this verdict requires human validation and sign-off."
         )
 
     def mark_alert_investigated(self, alert_id: str, notes: str = ""):
@@ -330,7 +332,10 @@ def generate_specialist_investigation_report(
 ---
 
 ### Overall Case Summary & Governance Disposition
-**Decision-Support Recommendation:** Based on multi-specialist investigation across KYC CDD, ledger transactions, device telemetry, and 5-pillar risk evaluation, this case is assigned **{tier} PRIORITY**. The compliance officer should immediately execute **`{directive}`** and follow the Operational Action Checklist.
+**AI Verdict:** `{directive}`
+**Decision-Support Recommendation:** Based on multi-specialist investigation across KYC CDD, ledger transactions, device telemetry, and 5-pillar risk evaluation, this case is assigned **{tier} PRIORITY**. 
+
+*MANDATORY HUMAN VALIDATION REQUIRED:* The compliance officer must independently review the evidence and formally sign-off before executing the `{directive}` action.
 
 *DISCLAIMER: All entities, transactions, device telemetry, and risk scores in this case dossier are 100% SYNTHETIC and fictional. This multi-agent system provides decision-support analysis for human compliance officers; it does not make autonomous legal, SAR-filing, or debanking decisions.*
 """

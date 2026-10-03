@@ -108,6 +108,88 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+async def run_investigation_for_realtime(customer_id: str, row: dict, runner, adk_app_name: str):
+    from google.genai import types
+    from app.alert_feed import AlertDispatcher
+    
+    await manager.broadcast(json.dumps({
+        "msg_type": "investigation_started",
+        "customer_id": customer_id,
+        "row": row
+    }))
+    
+    dispatcher = AlertDispatcher()
+    try:
+        packet = dispatcher.prepare_case_packet(customer_id)
+        prompt = dispatcher.generate_investigation_prompt(customer_id, packet.get("trigger_alert"))
+    except Exception as e:
+        await manager.broadcast(json.dumps({
+            "msg_type": "investigation_error",
+            "customer_id": customer_id,
+            "error": str(e)
+        }))
+        return
+
+    final_report = ""
+    if runner and runner.session_service:
+        try:
+            session = await runner.session_service.create_session(
+                app_name=adk_app_name,
+                user_id="compliance_dashboard"
+            )
+            new_message = types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)]
+            )
+            async for event in runner.run_async(
+                user_id="compliance_dashboard",
+                session_id=session.id,
+                new_message=new_message,
+            ):
+                if hasattr(event, "content") and event.content and hasattr(event.content, "parts"):
+                    for part in event.content.parts:
+                        if hasattr(part, "text") and part.text:
+                            final_report = part.text
+        except Exception as e:
+            final_report = f"LLM error: {e}"
+    else:
+        final_report = "Runner not configured."
+
+    await manager.broadcast(json.dumps({
+        "msg_type": "investigation_finished",
+        "customer_id": customer_id,
+        "row": row,
+        "report": final_report
+    }))
+
+
+async def triage_transaction(row: dict, runner, adk_app_name: str):
+    from evidencetrail.jev import JevClient, ALERT_QUESTIONS, ProviderUnavailable
+    jev_client = JevClient()
+    if not jev_client.available():
+        return
+        
+    state = f"type=transaction source=realtime payload={json.dumps(row)}"
+    try:
+        res = await asyncio.to_thread(jev_client.assess, state, ALERT_QUESTIONS)
+        suspicion = res.get("normalized", {}).get("suspicion")
+        severity = res.get("normalized", {}).get("severity", 0)
+        
+        await manager.broadcast(json.dumps({
+            "msg_type": "jev_triage",
+            "customer_id": row["customer_id"],
+            "row": row,
+            "suspicion": suspicion,
+            "severity": severity,
+            "raw": res
+        }))
+        
+        if suspicion == "SUSPICIOUS":
+            asyncio.create_task(run_investigation_for_realtime(row["customer_id"], row, runner, adk_app_name))
+            
+    except ProviderUnavailable:
+        pass
+
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -745,6 +827,11 @@ async def websocket_transactions(websocket: WebSocket, speed_ms: int = 1000):
                 # We could perform sorting by timestamp if needed, but for now we stream as-is
                 payload = json.dumps(row)
                 await websocket.send_text(payload)
+                
+                runner = getattr(websocket.app.state, "runner", None)
+                adk_app_name = getattr(websocket.app.state, "agent_app_name", "app")
+                asyncio.create_task(triage_transaction(row, runner, adk_app_name))
+                
                 await asyncio.sleep(speed_ms / 1000.0)
                 
         await websocket.send_text(json.dumps({"status": "Stream completed."}))

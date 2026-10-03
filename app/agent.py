@@ -66,6 +66,13 @@ def _model() -> Gemini:
     """Build the shared Gemini model config for every agent in this app."""
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     client_kwargs = {"api_key": api_key} if api_key else {}
+    
+    # If the user has provided an API key (e.g. for Google AI Studio),
+    # ensure Vertex AI is disabled, otherwise google-genai throws credential errors
+    # because it prioritizes Vertex AI config in the .env file.
+    if api_key and os.environ.get("GOOGLE_GENAI_USE_VERTEXAI"):
+        os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)
+        
     return Gemini(
         model=MODEL,
         client_kwargs=client_kwargs,

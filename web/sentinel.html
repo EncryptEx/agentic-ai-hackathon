@@ -804,11 +804,53 @@
     const ws = new WebSocket(`ws://${window.location.host}/ws/transactions?speed_ms=${speed}`);
     activeWs = ws;
     
-    ws.onmessage = (event) => {
+        ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
         if (payload.status || payload.error) return; // stream status or error
         
+        if (payload.msg_type === 'jev_triage') {
+            const row = payload.row;
+            if (payload.suspicion === 'SUSPICIOUS') {
+                const li = document.createElement('div');
+                li.className = 'case enter flash';
+                li.id = 'case-' + row.customer_id;
+                li.innerHTML = `
+                    <div class="row1">
+                        <span class="cstat">TRIAGED</span>
+                        <span class="cid">Customer ${row.customer_id}</span>
+                        <span class="camt">${payload.suspicion}</span>
+                    </div>
+                    <div class="row2">Jev triggered investigation</div>
+                `;
+                caseList.prepend(li);
+                if (caseList.children.length > 5) caseList.lastChild.remove();
+                
+                let srcCust = getOrCreateCounterparty(row.customer_id);
+                srcCust.suspicious = true;
+                srcCust.riskScore = Math.max(srcCust.riskScore, 0.8);
+            }
+            return;
+        } else if (payload.msg_type === 'investigation_started') {
+            const li = document.getElementById('case-' + payload.customer_id);
+            if (li) {
+                li.querySelector('.cstat').innerText = 'INVESTIGATING';
+                li.querySelector('.row2').innerText = 'Agents are analyzing evidence...';
+            }
+            return;
+        } else if (payload.msg_type === 'investigation_finished') {
+            const li = document.getElementById('case-' + payload.customer_id);
+            if (li) {
+                li.querySelector('.cstat').innerText = 'CLOSED';
+                li.querySelector('.cstat').style.background = 'rgba(79, 224, 160, 0.14)';
+                li.querySelector('.cstat').style.color = '#7fe0ab';
+                li.querySelector('.row2').innerText = 'Investigation complete';
+            }
+            return;
+        } else if (payload.msg_type === 'investigation_error') {
+            return;
+        }
+
         const custId = payload.customer_id;
         const cpName = payload.counterparty_name || payload.counterparty_account || 'Unknown';
         const direction = payload.direction;
@@ -837,33 +879,17 @@
           leg: null,
         };
         
-        // Basic real-time logic (no simulated fraud for now, but leave structure)
-        const struct = amount > 8000 && amount < 10000;
-        const big = amount > 25000;
-        let score = 0;
-        if (struct) { score += 0.55; e.reason = 'structuring'; }
-        if (big) { score += 0.35; e.reason = e.reason || 'large volume'; }
-        
         // Add to recent feed
         if (txListEl) {
           const li = document.createElement('li');
-          if (score > 0.6) li.classList.add('high-risk');
           li.innerHTML = `
-            <span class="tx-parties">${srcCust.name} → ${dstCust.name}</span>
-            <span class="tx-amt">$${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            <span class="tx-parties">${srcCust.name} &rarr; ${dstCust.name}</span>
+            <span class="tx-amt">${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
           `;
           txListEl.prepend(li);
           if (txListEl.children.length > 5) txListEl.lastChild.remove();
         }
 
-        if (score > 0.6) {
-          e.suspicious = true;
-          e.score = score;
-          srcCust.riskyFlow += amount;
-          dstCust.riskyFlow += amount;
-          srcCust.signals.velocity = (srcCust.signals.velocity || 0) + 0.3;
-        }
-        
         if (!srcCust.outTo) srcCust.outTo = new Set();
         if (!dstCust.inFrom) dstCust.inFrom = new Set();
         if (!srcCust.counterparties) srcCust.counterparties = new Set();

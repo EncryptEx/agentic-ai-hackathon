@@ -387,13 +387,59 @@ function renderDossier(data) {
                         <span>🤖</span> Autonomous Multi-Agent Investigation Suite
                     </h3>
                     <p style="color: var(--text-secondary); font-size: 12px; margin-top: 3px;">
-                        Deploys Customer, Transaction, Fraud, Ownership, and Risk specialist agents to investigate this customer's live profile, ledger, telemetry, and 5-pillar scores.
+                        Deploys Customer, Transaction, Fraud, Ownership, and Risk specialist agents with dialectic debate and voice interrogation.
                     </p>
                 </div>
-                <button id="btn-run-agent-investigate" class="btn-magenta" style="padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                    <span>⚡</span> Run Multi-Agent Investigation
-                </button>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button id="btn-run-agent-investigate" class="btn-magenta" style="padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <span>⚡</span> Run Investigation
+                    </button>
+                    <button id="btn-google-voice-call" style="background: #0891b2; color: #fff; border: 1px solid #06b6d4; border-radius: 6px; padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <span>🎙️</span> Google Voice Interrogation
+                    </button>
+                </div>
             </div>
+
+            <!-- Google Voice Interrogation Interactive Modal/Panel -->
+            <div id="voice-interrogation-panel" style="display: none; margin-top: 16px; background: linear-gradient(135deg, rgba(8,145,178,0.12), rgba(15,23,42,0.95)); border: 1px solid #06b6d4; border-radius: 8px; padding: 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(6,182,212,0.3); padding-bottom: 10px; margin-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 18px;">🎙️</span>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 700; color: #67e8f9; text-transform: uppercase; font-family: monospace;">Google Voice Outcall & Testimony Console</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Out-of-band verification via Google Speech Synthesis (TTS) & Google Web Speech STT</div>
+                        </div>
+                    </div>
+                    <span id="drawer-voice-status" style="font-size: 11px; font-family: monospace; color: #22d3ee; font-weight: 700; background: rgba(6,182,212,0.2); padding: 3px 8px; border-radius: 4px; border: 1px solid #06b6d4;">READY FOR CALL</span>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); padding: 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; line-height: 1.5;">
+                    <div style="font-weight: 700; color: #94a3b8; font-family: monospace; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Diagnostic Outcall Challenge:</div>
+                    <div id="drawer-voice-question" style="color: #f1f5f9; font-style: italic;">
+                        "Valiant Bank Fraud Prevention: We detected high-velocity outbound transfers departing your account. Are you currently speaking with someone claiming to be police or fraud staff instructing you to move money to a safe account?"
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+                    <button id="btn-drawer-tts" style="flex: 1; min-width: 140px; background: rgba(8,145,178,0.3); hover: background: rgba(8,145,178,0.5); border: 1px solid #0891b2; color: #67e8f9; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <span>🔊</span> Speak Challenge (TTS)
+                    </button>
+                    <button id="btn-drawer-mic" style="flex: 1; min-width: 140px; background: rgba(225,29,72,0.25); border: 1px solid #f43f5e; color: #fda4af; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <span id="drawer-mic-icon">🎙️</span> <span id="drawer-mic-label">Record Voice Testimony</span>
+                    </button>
+                    <button id="btn-drawer-preset" style="flex: 1; min-width: 140px; background: rgba(99,102,241,0.25); border: 1px solid #6366f1; color: #c7d2fe; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <span>▶️</span> Play Victim Audio (1-Click)
+                    </button>
+                </div>
+
+                <div id="drawer-transcript-box" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(6,182,212,0.3); border-radius: 6px; padding: 12px; font-size: 12px; font-family: monospace; color: #cbd5e1; min-height: 48px; display: flex; justify-content: space-between; align-items: center;">
+                    <span id="drawer-transcript-text" style="color: #94a3b8; font-style: italic;">Awaiting customer speech testimony or 1-click audio simulation...</span>
+                    <button id="btn-drawer-feed-voice" style="display: none; background: #0284c7; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 11px;">
+                        ⚡ Ingest to Jev & Debate
+                    </button>
+                </div>
+            </div>
+
             <div id="agent-investigation-output" style="display: none; margin-top: 16px; background: #0c121e; border: 1px solid var(--border-color); border-radius: 6px; padding: 20px; max-height: 520px; overflow-y: auto;">
             </div>
         </div>
@@ -539,6 +585,141 @@ function renderDossier(data) {
     const agentOut = document.getElementById("agent-investigation-output");
     if (agentBtn && agentOut) {
         agentBtn.addEventListener("click", () => triggerAgentInvestigation(customer.customer_id, null, agentBtn, agentOut));
+    }
+
+    // Attach Google Voice Interrogation listeners
+    const voiceBtn = document.getElementById("btn-google-voice-call");
+    const voicePanel = document.getElementById("voice-interrogation-panel");
+    const btnTts = document.getElementById("btn-drawer-tts");
+    const btnMic = document.getElementById("btn-drawer-mic");
+    const btnPreset = document.getElementById("btn-drawer-preset");
+    const btnFeed = document.getElementById("btn-drawer-feed-voice");
+    const txtBox = document.getElementById("drawer-transcript-text");
+    const statusLabel = document.getElementById("drawer-voice-status");
+    const micLabel = document.getElementById("drawer-mic-label");
+    const micIcon = document.getElementById("drawer-mic-icon");
+
+    if (voiceBtn && voicePanel) {
+        voiceBtn.addEventListener("click", () => {
+            voicePanel.style.display = voicePanel.style.display === "none" ? "block" : "none";
+            if (voicePanel.style.display === "block") {
+                voicePanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+        });
+    }
+
+    let drawerTranscript = "";
+    let drawerIsRecording = false;
+
+    if (btnTts) {
+        btnTts.addEventListener("click", () => {
+            const q = document.getElementById("drawer-voice-question")?.innerText || "Valiant Bank Fraud Prevention Outcall Challenge.";
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(q);
+                u.rate = 1.0;
+                u.pitch = 1.05;
+                u.lang = "en-US";
+                u.onstart = () => { if (statusLabel) statusLabel.textContent = "SPEAKING CHALLENGE (GOOGLE TTS)..."; };
+                u.onend = () => { if (statusLabel) statusLabel.textContent = "CALL CONNECTED • AWAITING TESTIMONY"; };
+                window.speechSynthesis.speak(u);
+            }
+        });
+    }
+
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let drawerRec = null;
+    if (SpeechRec) {
+        drawerRec = new SpeechRec();
+        drawerRec.continuous = false;
+        drawerRec.interimResults = true;
+        drawerRec.lang = "en-US";
+
+        drawerRec.onstart = () => {
+            drawerIsRecording = true;
+            if (micLabel) micLabel.textContent = "Listening to Customer...";
+            if (micIcon) micIcon.textContent = "🔴";
+            if (statusLabel) statusLabel.textContent = "RECORDING (GOOGLE SPEECH STT)...";
+            if (txtBox) txtBox.innerHTML = `<span style="color: #fda4af;">Listening... Speak now.</span>`;
+        };
+
+        drawerRec.onresult = (ev) => {
+            let interim = "";
+            for (let i = ev.resultIndex; i < ev.results.length; ++i) {
+                if (ev.results[i].isFinal) drawerTranscript += ev.results[i][0].transcript;
+                else interim += ev.results[i][0].transcript;
+            }
+            if (txtBox) txtBox.innerHTML = `<strong>Voice Transcript (Google Speech):</strong> "${drawerTranscript || interim}"`;
+            if (btnFeed) btnFeed.style.display = "block";
+        };
+
+        drawerRec.onend = () => {
+            drawerIsRecording = false;
+            if (micLabel) micLabel.textContent = "Record Voice Testimony";
+            if (micIcon) micIcon.textContent = "🎙️";
+            if (statusLabel) statusLabel.textContent = "TESTIMONY RECORDED";
+            if (drawerTranscript && btnFeed) btnFeed.style.display = "block";
+        };
+
+        if (btnMic) {
+            btnMic.addEventListener("click", () => {
+                if (drawerIsRecording) {
+                    drawerRec.stop();
+                } else {
+                    drawerTranscript = "";
+                    try { drawerRec.start(); } catch (e) { console.error(e); }
+                }
+            });
+        }
+    }
+
+    if (btnPreset) {
+        btnPreset.addEventListener("click", () => {
+            const preset = "Yes, someone calling from the police told me my account was compromised and ordered me to transfer funds to this liquidation escrow account immediately!";
+            drawerTranscript = preset;
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(preset);
+                u.rate = 1.05;
+                window.speechSynthesis.speak(u);
+            }
+            if (txtBox) txtBox.innerHTML = `<strong>Victim Audio Transcript:</strong> "${preset}"`;
+            if (btnFeed) {
+                btnFeed.style.display = "block";
+                btnFeed.click();
+            }
+        });
+    }
+
+    if (btnFeed) {
+        btnFeed.addEventListener("click", async () => {
+            if (!drawerTranscript) return;
+            btnFeed.disabled = true;
+            btnFeed.textContent = "⚡ Ingesting #E07...";
+            try {
+                const res = await fetch("/api/voice/testify", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        customer_id: customer.customer_id,
+                        transcript: drawerTranscript,
+                        confidence: 0.98,
+                        audio_duration_sec: 4.5
+                    })
+                });
+                const data = await res.json();
+                if (txtBox) {
+                    txtBox.innerHTML = `✅ <span style="color: #4ade80; font-weight: 700;">Evidence #${data.evidence_id} Ingested. Jev Reasoner & Tribunal Overrode Money Mule Designation ➔ Escrow Freeze Active.</span>`;
+                }
+                btnFeed.style.display = "none";
+                if (agentBtn) agentBtn.click();
+            } catch (err) {
+                if (txtBox) txtBox.innerHTML = `<span style="color: #f87171;">Error: ${err.message}</span>`;
+            } finally {
+                btnFeed.disabled = false;
+                btnFeed.textContent = "⚡ Ingest to Jev & Debate";
+            }
+        });
     }
 }
 

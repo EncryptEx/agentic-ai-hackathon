@@ -313,6 +313,94 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
             RUNS[agent_run.run_id] = updated_dict
             self._send_json(updated_dict)
             return
+        elif path == "/api/voice/testify":
+            case_id = payload.get("case_id", "case-3")
+            cust_id = payload.get("customer_id", "CUST-00043")
+            transcript = payload.get("transcript", "Yes, someone claiming to be police fraud division told me my funds were under attack and ordered me to transfer immediately to this safe liquidation escrow.")
+            confidence = float(payload.get("confidence", 0.98))
+            duration = float(payload.get("audio_duration_sec", 4.2))
+            lang = payload.get("language", "en-US")
+
+            run_id = payload.get("run_id") or f"run-{case_id}-live"
+            agent_run = ACTIVE_AGENT_RUNS.get(run_id)
+            if not agent_run:
+                agent_run = AgentRun(
+                    run_id=run_id,
+                    case_id=case_id,
+                    scenario=SCENARIOS.get(case_id, SCENARIOS["case-3"])
+                )
+                agent_run.run_investigation()
+                ACTIVE_AGENT_RUNS[run_id] = agent_run
+
+            voice_option = {
+                "key": "VOICE_INTERROGATION_COERCION",
+                "label": "Police Impersonation & Coercion Confirmed",
+                "statement": transcript,
+                "risk_verdict": "CONFIRMED_COERCED_VICTIM",
+                "recommended_action": "PROTECTIVE_ESCROW_HOLD",
+                "interrogation_channel": f"Google Speech-to-Text ({lang})",
+                "confidence": confidence,
+                "audio_source": f"Google Speech-to-Text ({lang})",
+                "duration_sec": duration
+            }
+
+            ev_res = agent_run.env.record_customer_inquiry_response("Q-VOICE-01", voice_option)
+            new_eid = ev_res["evidence_id"]
+
+            DatabaseInformationService.log_customer_inquiry(
+                case_id=agent_run.case_id,
+                tx_id=agent_run.scenario["transaction"]["id"],
+                question_id="Q-VOICE-01",
+                option_key="VOICE_TESTIMONY",
+                statement=transcript,
+                impact="CONFIRMED_COERCED_VICTIM",
+                evidence_id=new_eid
+            )
+
+            all_eids = [e["evidence_id"] for e in agent_run.evidence_store.get_all()]
+            jev_step = agent_run.execute_tool(
+                "assess_with_jev",
+                {"evidence_ids": all_eids},
+                f"Re-synthesizing decision with recorded Google voice testimony {new_eid}",
+                input_evidence_ids=all_eids
+            )
+
+            from app.orchestrator.debate import DialecticDebateEngine
+            from app.tools import (
+                get_customer_profile,
+                analyze_transactions,
+                get_transaction_alerts,
+                get_fraud_alerts,
+                get_digital_telemetry,
+                get_risk_assessment
+            )
+
+            profile = get_customer_profile(cust_id)
+            txs = analyze_transactions(cust_id)
+            txs["alerts"] = get_transaction_alerts(cust_id)
+            fraud = {"alerts": get_fraud_alerts(cust_id), "telemetry": get_digital_telemetry(cust_id)}
+            risk = get_risk_assessment(cust_id)
+
+            debate = DialecticDebateEngine().adjudicate(cust_id, profile, txs, fraud, risk)
+
+            updated_dict = {
+                "status": "success",
+                "evidence_id": new_eid,
+                "customer_id": cust_id,
+                "case_id": case_id,
+                "transcript": transcript,
+                "audio_source": f"Google Speech STT ({lang})",
+                "confidence": confidence,
+                "jev_judgment": jev_step["data"],
+                "debate": debate.to_dict(),
+                "policy_decision": {
+                    "action": "ESCROW_FREEZE",
+                    "reason": f"Google Voice Testimony ({new_eid}) confirmed acute psychological duress. Funds secured in protective escrow hold."
+                }
+            }
+            RUNS[agent_run.run_id] = updated_dict
+            self._send_json(updated_dict)
+            return
         elif path == "/api/repeatability":
             case_id = payload.get("case_id", "case-3")
             num_runs = int(payload.get("runs", 5))

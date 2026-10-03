@@ -245,6 +245,9 @@ async function init() {
 
   // Initialize Live Stream Feed & Controls
   initLiveStream();
+
+  // Initialize Google Multimodal Voice Interrogation
+  initGoogleVoiceInterrogation();
 }
 
 // 2. Live Stream Management
@@ -1052,13 +1055,207 @@ async function handleCustomerInquirySelection(runId, questionId, selectedOption)
   }
 }
 
+// ==========================================
+// GOOGLE MULTIMODAL VOICE INTERROGATION & STT
+// ==========================================
+
+let speechRecognitionInstance = null;
+let isRecordingVoice = false;
+let recordedTranscript = "";
+
+function initGoogleVoiceInterrogation() {
+  const btnAgentVoice = document.getElementById("btn-agent-voice-call");
+  const btnMic = document.getElementById("btn-mic-testify");
+  const btnPreset = document.getElementById("btn-audio-preset");
+  const btnSubmitVoice = document.getElementById("btn-submit-voice");
+  const transcriptText = document.getElementById("voice-transcript-text");
+  const voiceStatusLabel = document.getElementById("voice-call-label");
+  const micLabel = document.getElementById("mic-label");
+  const micIcon = document.getElementById("mic-icon");
+
+  if (!btnAgentVoice || !btnMic) return;
+
+  // 1. Google Web Speech TTS (Agent Voice Outcall)
+  btnAgentVoice.addEventListener("click", () => {
+    const questionEl = document.getElementById("context-check-question");
+    const rawQuestion = questionEl ? questionEl.innerText.replace(/"/g, "").trim() : 
+      "Has someone asked you to move this money to a safe account, keep the transfer secret, or act urgently?";
+    
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance("Valiant Bank Automated Fraud Defense. " + rawQuestion);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.05;
+      utterance.lang = "en-US";
+      
+      utterance.onstart = () => {
+        if (voiceStatusLabel) voiceStatusLabel.textContent = "AGENT SPEAKING OUT-OF-BAND CHALLENGE (GOOGLE TTS)...";
+        btnAgentVoice.classList.add("ring-2", "ring-cyan-400");
+      };
+      utterance.onend = () => {
+        if (voiceStatusLabel) voiceStatusLabel.textContent = "AI VOICE CALL ACTIVE (AWAITING CUSTOMER TESTIMONY)";
+        btnAgentVoice.classList.remove("ring-2", "ring-cyan-400");
+      };
+      window.speechSynthesis.speak(utterance);
+    } else {
+      alert("Web SpeechSynthesis not supported on this browser.");
+    }
+  });
+
+  // 2. Google Web Speech STT (Customer Voice Testimony)
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    speechRecognitionInstance = new SpeechRecognition();
+    speechRecognitionInstance.continuous = false;
+    speechRecognitionInstance.interimResults = true;
+    speechRecognitionInstance.lang = "en-US";
+
+    speechRecognitionInstance.onstart = () => {
+      isRecordingVoice = true;
+      if (micLabel) micLabel.textContent = "Listening to Customer Testimony...";
+      if (micIcon) micIcon.textContent = "🔴";
+      btnMic.classList.add("animate-pulse", "ring-2", "ring-rose-500");
+      if (voiceStatusLabel) voiceStatusLabel.textContent = "RECORDING LIVE VOICE TESTIMONY (GOOGLE SPEECH STT)...";
+      if (transcriptText) transcriptText.innerHTML = `<span class="text-rose-300 font-bold">Listening... Speak now into microphone.</span>`;
+    };
+
+    speechRecognitionInstance.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          recordedTranscript += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      const display = recordedTranscript || interim;
+      if (transcriptText) {
+        transcriptText.innerHTML = `<strong>Voice Transcript (Google Speech):</strong> "${display}"`;
+      }
+      if (btnSubmitVoice) btnSubmitVoice.classList.remove("hidden");
+    };
+
+    speechRecognitionInstance.onerror = (event) => {
+      console.warn("Speech recognition notice/error:", event.error);
+      isRecordingVoice = false;
+      if (micLabel) micLabel.textContent = "Record Voice Testimony";
+      if (micIcon) micIcon.textContent = "🎙️";
+      btnMic.classList.remove("animate-pulse", "ring-2", "ring-rose-500");
+      if (event.error === 'not-allowed') {
+        if (transcriptText) transcriptText.innerHTML = `<span class="text-amber-400">Microphone permission blocked. Please enable mic or click 'Play Victim Audio (1-Click)'!</span>`;
+      }
+    };
+
+    speechRecognitionInstance.onend = () => {
+      isRecordingVoice = false;
+      if (micLabel) micLabel.textContent = "Record Voice Testimony";
+      if (micIcon) micIcon.textContent = "🎙️";
+      btnMic.classList.remove("animate-pulse", "ring-2", "ring-rose-500");
+      if (voiceStatusLabel) voiceStatusLabel.textContent = "TESTIMONY RECORDED • READY FOR JEV INGESTION";
+      if (recordedTranscript && btnSubmitVoice) {
+        btnSubmitVoice.classList.remove("hidden");
+      }
+    };
+
+    btnMic.addEventListener("click", () => {
+      if (isRecordingVoice) {
+        speechRecognitionInstance.stop();
+      } else {
+        recordedTranscript = "";
+        try {
+          speechRecognitionInstance.start();
+        } catch (e) {
+          console.error("STT start error:", e);
+        }
+      }
+    });
+  } else {
+    btnMic.addEventListener("click", () => {
+      alert("Google Web Speech API not supported in this browser. Please use Google Chrome or click 'Play Victim Audio (1-Click)'!");
+    });
+  }
+
+  // 3. Preset Victim Audio Simulation (1-Click Demo)
+  btnPreset.addEventListener("click", () => {
+    const presetTranscript = "Yes! A caller claiming to be from the police fraud squad told me my account was under attack and ordered me to transfer funds to this liquidation escrow account immediately. Please help me!";
+    recordedTranscript = presetTranscript;
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const victimUtterance = new SpeechSynthesisUtterance(presetTranscript);
+      victimUtterance.rate = 1.05;
+      victimUtterance.pitch = 0.95;
+      victimUtterance.lang = "en-US";
+      window.speechSynthesis.speak(victimUtterance);
+    }
+
+    if (transcriptText) {
+      transcriptText.innerHTML = `<strong>Victim Audio Transcript (Synthesized Speech):</strong> "${presetTranscript}"`;
+    }
+    if (btnSubmitVoice) {
+      btnSubmitVoice.classList.remove("hidden");
+      btnSubmitVoice.click(); // Auto-submit to Jev!
+    }
+  });
+
+  // 4. Submit Voice Testimony to /api/voice/testify
+  if (btnSubmitVoice) {
+    btnSubmitVoice.addEventListener("click", async () => {
+      if (!recordedTranscript) return;
+      btnSubmitVoice.disabled = true;
+      btnSubmitVoice.textContent = "⚡ Ingesting #E07...";
+
+      try {
+        const res = await fetch("/api/voice/testify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            run_id: currentRun ? currentRun.run_id : null,
+            case_id: currentScenario ? currentScenario.id : "case-3",
+            customer_id: currentScenario && currentScenario.customer ? currentScenario.customer.customer_id : "CUST-00043",
+            transcript: recordedTranscript,
+            confidence: 0.98,
+            audio_duration_sec: 4.5,
+            language: "en-US"
+          })
+        });
+
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+
+        // Feed into Jev & timeline pipeline
+        const voiceOption = {
+          key: "VOICE_INTERROGATION",
+          statement: recordedTranscript,
+          risk_verdict: "CONFIRMED_COERCED_VICTIM"
+        };
+        await handleCustomerInquirySelection(currentRun?.run_id, "Q-VOICE-01", voiceOption);
+
+        if (transcriptText) {
+          transcriptText.innerHTML = `✅ <span class="text-emerald-400 font-bold">Voice Evidence #${data.evidence_id} Confirmed Coercion. Escrow Hold Active.</span>`;
+        }
+        btnSubmitVoice.classList.add("hidden");
+      } catch (err) {
+        console.error("Voice testify error:", err);
+        if (transcriptText) transcriptText.innerHTML = `<span class="text-rose-400">Voice submission error: ${err.message}</span>`;
+      } finally {
+        btnSubmitVoice.disabled = false;
+        btnSubmitVoice.textContent = "⚡ Feed to Jev (#E07)";
+      }
+    });
+  }
+}
+
 function renderConclusiveHumanDossier(updatedRun, selectedOption) {
   if (!humanDossierCard) return;
 
   const jevEvidence = [...updatedRun.evidence].reverse().find(e => e.type === "jev_assessment");
   const jevData = jevEvidence ? jevEvidence.payload : {};
 
-  const isCoerced = selectedOption.risk_verdict === "CONFIRMED_COERCION" || selectedOption.risk_verdict === "CONFIRMED_ATO" || selectedOption.risk_verdict === "INVESTMENT_TRAP";
+  const isCoerced = selectedOption.risk_verdict === "CONFIRMED_COERCION" || 
+                    selectedOption.risk_verdict === "CONFIRMED_ATO" || 
+                    selectedOption.risk_verdict === "INVESTMENT_TRAP" ||
+                    selectedOption.risk_verdict === "CONFIRMED_COERCED_VICTIM";
   
   if (dossierStatusBadge) {
     dossierStatusBadge.textContent = isCoerced ? "FRAUD CONFIRMED • ESCROW FROZEN" : "VOLUNTARY CLEARANCE";

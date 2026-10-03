@@ -845,3 +845,8 @@ td {
 
 /* ---------- Hand-off ---------- */
 .inv-input { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 7px 10px; font-size: 12px; min-width: 220px; }
+
+/* ---------- Seed data ---------- */
+.inv-controls #inv-source { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 9px 12px; font-size: 13px; max-width: 220px; }
+#inv-case { max-width: 420px; }
+.inv-link { background: none; border: none; color: var(--accent-blue); cursor: pointer; font-size: 12px; text-decoration: underline; padding: 0; }

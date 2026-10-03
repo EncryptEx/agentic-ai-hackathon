@@ -6,6 +6,7 @@ from .alerts import SEVERITY_RANK, STATUSES
 from .config import MAX_TOOL_CALLS
 from .runs import RunManager
 from .scenarios import list_scenarios
+from .seed import get_seed
 
 _manager = None  # created on first use so importing the module has no side effects
 _RUN = re.compile(r"^/api/investigations/([\w-]+)(/evaluate|/context-answer|/export)?$")
@@ -28,7 +29,7 @@ def _mgr():
 
 def handles(path):
     return path in ("/api/scenarios", "/api/investigations") or path.startswith(
-        ("/api/investigations/", "/api/experiments/", "/api/evidencetrail/alerts"))
+        ("/api/investigations/", "/api/experiments/", "/api/evidencetrail/alerts", "/api/evidencetrail/seed"))
 
 
 def _int(payload, key, default, lo, hi):
@@ -57,6 +58,15 @@ def handle_get(path, query=None):
             return 400, {"error": "severity must be one of low, medium, high or 'all'"}
         alerts = _mgr().list_alerts(status=status, severity=severity)
         return 200, {"total": len(alerts), "alerts": alerts}
+    if path == "/api/evidencetrail/seed/transactions":
+        seed = get_seed()
+        if not seed.available():
+            return 200, {"available": False, "items": [], "total": 0,
+                         "note": "The FRAML data seed (data/kyc_aml.db) is not available."}
+        items = seed.candidates()
+        return 200, {"available": True, "total": len(items), "items": items,
+                     "note": ("A mixed sample of outbound transfers in a shuffled order that carries no information. "
+                              "Ground-truth tags are hidden from the agents and shown only after a run.")}
     if path == "/api/scenarios":
         return 200, {"scenarios": list_scenarios(), "max_tool_calls": MAX_TOOL_CALLS}
     m = _RUN.match(path)
@@ -88,6 +98,12 @@ def handle_post(path, payload):
                 raise ValueError("'patch' must be an object")
             exp = _mgr().start_counterfactual(payload.get("caseId"), patch,
                                                 _int(payload, "repetitions", 3, 1, 20))
+            return 202, {"experimentId": exp}
+        if path == "/api/experiments/seed-batch":
+            case_ids = payload.get("caseIds")
+            if case_ids is not None and (not isinstance(case_ids, list) or not all(isinstance(c, str) for c in case_ids)):
+                raise ValueError("'caseIds' must be a list of seed case ids")
+            exp = _mgr().start_seed_batch(case_ids, _int(payload, "limit", 20, 1, 80))
             return 202, {"experimentId": exp}
         if path == "/api/experiments/ablation":
             case_ids = payload.get("caseIds")

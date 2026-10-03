@@ -14,6 +14,7 @@ from .evidence import EvidenceStore
 from .gemini import GeminiClient
 from .jev import JevClient
 from .metrics import summarize_runs
+from . import seed as _seed
 from .scenarios import SCENARIOS, apply_counterfactual, get_case
 from .trace import verify_chain
 
@@ -73,8 +74,11 @@ class RunManager:
                 result = investigate(case, self._model_factory(), self._jev_factory(), run_id,
                                            run_mode=run_mode, on_event=on_event,
                                            enable_jev=(arm != "no_jev"), store=store,
-                                           triage=alerts_enabled)
-                self._persist_alert(run, result.get("alert"))  # before the state flips to completed
+                                           triage=bool(alerts_enabled))
+                if alerts_enabled is True:  # "triage_only" keeps the alert on the run without saving it to the queue
+                    self._persist_alert(run, result.get("alert"))
+                else:
+                    run["alert"] = result.get("alert")  # before the state flips to completed
                 run.update({"events": result["events"], "evidence": result["evidence"],
                             "final": result["final"], "run_header": result["run_header"],
                             "failure": result["failure"], "tool_call_count": result["tool_call_count"],
@@ -115,6 +119,9 @@ class RunManager:
         view = dict(run)
         view["jev_model_requested"] = JEV_MODEL
         view["recorded_audit_trail_verified"] = verify_chain(run["events"]) if run["events"] else None
+        if run["state"] in _DONE and _seed.is_seed_case(run["case_id"]):  # evaluator-side, after the run is over
+            from .seed_labels import ground_truth
+            view["seed_ground_truth"] = ground_truth(run["case_id"][len(_seed.CASE_PREFIX):])
         return view
 
     def case_for(self, run_id):
@@ -193,6 +200,25 @@ class RunManager:
             self._runs[r]["experiment_id"] = exp_id
         return exp_id
 
+    def start_seed_batch(self, case_ids, limit):
+        """Run seed transactions (a neutral mixed sample by default) through the agent team, with Jev alert
+        triage but without saving alerts, and score them against the generator's answer key."""
+        seed = _seed.get_seed()
+        if not seed.available():
+            raise ValueError("the FRAML data seed (data/kyc_aml.db) is not available")
+        if case_ids is None:
+            case_ids = [c["case_id"] for c in seed.candidates()][:limit]
+        if not case_ids:
+            raise ValueError("no seed transactions selected")
+        if any(not _seed.is_seed_case(c) or get_case(c) is None for c in case_ids):
+            raise KeyError("unknown seed case")
+        run_ids = [self.start(c, {"seed_batch": True}, alerts_enabled="triage_only") for c in case_ids]
+        exp_id = self._register({"kind": "seed_batch", "case_ids": case_ids, "repetitions": 1, "configuration": {},
+                                 "run_ids": run_ids, "label": "Fresh runs on FRAML seed transactions"})
+        for r in run_ids:
+            self._runs[r]["experiment_id"] = exp_id
+        return exp_id
+
     def _start_fixed_evidence(self, case_id, repetitions, config):
         exp_id = self._register({"kind": "fixed_evidence", "case_id": case_id, "repetitions": repetitions,
                                  "configuration": config, "state": "running", "progress": 0,
@@ -247,4 +273,8 @@ class RunManager:
                     "summary": experiments.summarize_ablation(exp, self._runs, exp["rules_results"])}
         runs = [self._runs[r] for r in exp["run_ids"]]
         done = all(r["state"] in _DONE for r in runs)
+        if kind == "seed_batch":
+            return {**exp, "state": "completed" if done else "running",
+                    "progress": {"done": sum(r["state"] in _DONE for r in runs), "total": len(runs)},
+                    "summary": experiments.summarize_seed_batch(runs)}
         return {**exp, "state": "completed" if done else "running", "summary": summarize_runs(runs)}

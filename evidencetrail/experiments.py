@@ -134,6 +134,51 @@ def fixed_evidence_experiment(case, model, jev, repetitions, on_progress=None):
     }
 
 
+def summarize_seed_batch(runs):
+    """Aggregate a batch of seed-transaction runs against the generator's answer key (evaluator only).
+    Reports raw counts, never invented percentages; a sample is not a population."""
+    from .seed import CASE_PREFIX
+    from .seed_labels import ground_truth
+    rows, by_tag = [], {}
+    for r in runs:
+        tx_id = r["case_id"][len(CASE_PREFIX):]
+        truth = ground_truth(tx_id) or {"flagged": False, "tag": None}
+        final = r.get("final") or {}
+        done = r["state"] == "completed" and bool(final)
+        action = final.get("simulated_action") if done else None
+        alert = r.get("alert") or {}
+        triage = alert.get("jev_triage") or {}
+        rows.append({"run_id": r["run_id"], "case_id": r["case_id"], "transaction_id": tx_id, "state": r["state"],
+                     "action": action, "status": final.get("status") if done else None,
+                     "alert_sources": alert.get("sources"), "alert_severity": alert.get("severity"),
+                     "jev_suspicion": triage.get("suspicion"), "seed_flagged": truth["flagged"], "seed_tag": truth["tag"],
+                     "failure": r.get("failure") or r.get("error")})
+    ok = [x for x in rows if x["state"] == "completed" and x["action"]]
+    flagged = [x for x in ok if x["seed_flagged"]]
+    clean = [x for x in ok if not x["seed_flagged"]]
+    for x in flagged:
+        t = by_tag.setdefault(x["seed_tag"], {"runs": 0, "non_allow": 0, "alerted": 0})
+        t["runs"] += 1
+        t["non_allow"] += x["action"] != "ALLOW"
+        t["alerted"] += bool(x["alert_sources"])
+    return {
+        "attempted": len(rows), "completed": len(ok),
+        "failed": sum(1 for x in rows if x["state"] == "failed"),
+        "pending": sum(1 for x in rows if x["state"] in ("queued", "running")),
+        "answer_key_flagged": {"runs": len(flagged), "non_allow": sum(x["action"] != "ALLOW" for x in flagged),
+                               "alerted": sum(bool(x["alert_sources"]) for x in flagged),
+                               "alerted_by_jev": sum("jev" in (x["alert_sources"] or []) for x in flagged),
+                               "alerted_by_policy": sum("policy" in (x["alert_sources"] or []) for x in flagged)},
+        "answer_key_clean": {"runs": len(clean), "allowed": sum(x["action"] == "ALLOW" for x in clean),
+                             "non_allow": sum(x["action"] != "ALLOW" for x in clean),
+                             "alerted": sum(bool(x["alert_sources"]) for x in clean)},
+        "by_tag": by_tag, "rows": rows,
+        "failures": [{"run_id": x["run_id"], "reason": x["failure"]} for x in rows if x["state"] == "failed"],
+        "note": ("Counts against the data generator's tags, which the agents never saw. A sample of synthetic "
+                 "transactions says nothing about precision, recall or real-world fraud."),
+    }
+
+
 def summarize_ablation(exp, runs_by_id, rules_results):
     """Per-arm, per-case results with raw counts. Labels are illustrative, on synthetic cases."""
     out = {"kind": "ablation", "arms": {}, "label_status": "illustrative policy labels on synthetic cases"}

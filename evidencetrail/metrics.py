@@ -77,7 +77,9 @@ def _usage_totals(runs):
 def deterministic_checks(run):
     """Policy-label match, reference validity and trace facts. Labels never reach the agent."""
     final = run.get("final") or {}
-    expected = EXPECTED_ACTIONS.get(run["case_id"].replace("-cf", ""))
+    base_id = run["case_id"][:-3] if run["case_id"].endswith("-cf") else run["case_id"]
+    expected = EXPECTED_ACTIONS.get(base_id)
+    seed_check = _seed_check(base_id, final)
     # Labels describe the decision before any simulated customer answer.
     compared = final.get("action_before_context_answer") or final.get("simulated_action")
     validity = final.get("reference_validity")
@@ -93,4 +95,20 @@ def deterministic_checks(run):
         "tool_call_count": run.get("tool_call_count"),
         "error_count": sum(1 for e in run.get("events", []) if e["event_type"] in ("tool_error", "run_failed")),
         "elapsed_ms_recorded": elapsed,
+        "seed_check": seed_check,
     }
+
+
+def _seed_check(case_id, final):
+    """For seed transactions: compare the system's outcome with the generator's answer key (evaluator only)."""
+    from . import seed as _seed
+    if not _seed.is_seed_case(case_id):
+        return None
+    from .seed_labels import ground_truth
+    truth = ground_truth(case_id[len(_seed.CASE_PREFIX):])
+    if truth is None or not final:
+        return None
+    flagged_by_system = final.get("simulated_action") not in (None, "ALLOW")
+    return {"seed_tag": truth["tag"], "seed_flagged": truth["flagged"], "system_flagged": flagged_by_system,
+            "agrees": truth["flagged"] == flagged_by_system,
+            "note": "Seed generator tag (an answer key the agents never see). Not real-world accuracy."}

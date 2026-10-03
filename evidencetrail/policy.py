@@ -49,8 +49,9 @@ def derive_signals(store, transaction):
     if recipient:
         p = recipient["payload"]
         reasons = []
-        if p["account_age_days"] <= 7 and p["incoming_transfers_last_90_min"] >= 10:
-            reasons.append(f"{p['account_age_days']}-day-old account with "
+        age = p.get("account_age_days")  # None = unknown, which is not evidence that the account is young
+        if age is not None and age <= 7 and p["incoming_transfers_last_90_min"] >= 10:
+            reasons.append(f"{age}-day-old account with "
                            f"{p['incoming_transfers_last_90_min']} incoming transfers in 90 min")
         if p["prior_synthetic_flags"] > 0:
             reasons.append("prior synthetic flags")

@@ -6,6 +6,7 @@ from `world`. Display names live here; expected labels live only in eval_fixture
 
 import copy
 
+from . import seed as _seed
 from .config import SCENARIO_VERSION
 
 _T = "2026-10-03T09:41:00Z"
@@ -108,6 +109,10 @@ SCENARIOS = {c["case_id"]: c for c in _CASES}
 
 
 def get_case(case_id):
+    """A hand-built scenario, or a transaction from the FRAML data seed (case id 'seed:TXN-...')."""
+    if _seed.is_seed_case(case_id):
+        seed = _seed.get_seed()
+        return seed.build_case(case_id[len(_seed.CASE_PREFIX):]) if seed.available() else None
     case = SCENARIOS.get(case_id)
     return copy.deepcopy(case) if case else None
 

@@ -6,6 +6,7 @@ const inv = {
     selected: [], replayCount: null, replayTimer: null, pollTimer: null,
     reviewOpen: false, contextOpen: false, exp: null, expKind: null, expTimer: null, error: null,
     alerts: [], alertFilter: "open", alertsError: null, architecture: "team", handoffAsk: {}, alertTimer: null,
+    source: "scenarios", seedCases: [], seedNote: null, seedLoading: false, seedExp: null, seedTimer: null,
 };
 
 const TOOL_LABELS = {
@@ -54,7 +55,14 @@ function svgEl(tag, attrs, ...kids) {
 }
 
 const json = o => JSON.stringify(o, null, 2);
-const fmtSek = n => `${Number(n).toLocaleString("en-US")} SEK`;
+const fmtMoney = (n, cur) => `${Number(n).toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2, maximumFractionDigits: 2 })} ${cur || "SEK"}`;
+const allCases = () => inv.scenarios.concat(inv.seedCases);
+const findCase = id => allCases().find(x => x.case_id === id);
+const currentList = () => (inv.source === "seed" ? inv.seedCases : inv.scenarios);
+function runTransaction() {
+    const started = ((inv.run && inv.run.events) || []).find(e => e.event_type === "run_started");
+    return started && started.result_snapshot && started.result_snapshot.transaction;
+}
 const isRunning = r => !r || r.state === "queued" || r.state === "running";
 
 async function invApi(path, body) {
@@ -104,7 +112,7 @@ function initInvestigator() {
             el("div", { class: "inv-col" }, el("div", { id: "inv-graph", class: "inv-card" }), el("div", { id: "inv-evidence", class: "inv-card" }))),
         el("div", { id: "inv-alerts", class: "inv-card inv-alerts" }),
         el("div", { class: "inv-quality" },
-            el("div", { id: "inv-risk", class: "inv-card" }), el("div", { id: "inv-quality", class: "inv-card" }), el("div", { id: "inv-consistency", class: "inv-card" })));
+            el("div", { id: "inv-seedbatch", class: "inv-card" }), el("div", { id: "inv-risk", class: "inv-card" }), el("div", { id: "inv-quality", class: "inv-card" }), el("div", { id: "inv-consistency", class: "inv-card" })));
     loadAlerts();
     invApi("/api/scenarios").then(d => {
         inv.scenarios = d.scenarios;
@@ -116,7 +124,7 @@ function initInvestigator() {
 
 function renderAll() {
     renderControls(); renderTx(); renderTrace(); renderGraph(); renderFinal(); renderClaims();
-    renderEvidence(); renderRisk(); renderQuality(); renderConsistency(); renderAlerts();
+    renderEvidence(); renderRisk(); renderQuality(); renderConsistency(); renderAlerts(); renderSeedBatch();
 }
 
 // ---------------------------------------------------------------- controls
@@ -125,7 +133,7 @@ function renderControls() {
     if (!box) return;
     const busy = inv.starting || (inv.run && isRunning(inv.run));
     const select = el("select", { id: "inv-case", disabled: busy, onchange: e => { inv.caseId = e.target.value; resetRun(); renderAll(); } },
-        inv.scenarios.map(s => el("option", { value: s.case_id, selected: s.case_id === inv.caseId }, s.name)));
+        currentList().map(s => el("option", { value: s.case_id, selected: s.case_id === inv.caseId }, s.name)));
     const start = el("button", { class: "btn-primary inv-start", type: "button", disabled: busy || !inv.caseId, onclick: startRun },
         busy ? "Investigating…" : (inv.run && inv.run.state === "failed" ? "Retry investigation" : "Start investigation"));
     const replay = el("button", { class: "page-btn", type: "button", disabled: !inv.run || isRunning(inv.run) || !(inv.run.events || []).length, onclick: startReplay },
@@ -136,7 +144,10 @@ function renderControls() {
         onchange: e => { inv.architecture = e.target.value; } },
         el("option", { value: "team", selected: inv.architecture === "team" }, "Agent team"),
         el("option", { value: "single", selected: inv.architecture === "single" }, "Single agent"));
-    const kids = [el("label", { class: "inv-label" }, "Case"), select, arch, start, replay, exportBtn, runBadges()];
+    const source = el("select", { id: "inv-source", disabled: busy, "aria-label": "Data source", title: "Data source", onchange: e => switchSource(e.target.value) },
+        el("option", { value: "scenarios", selected: inv.source === "scenarios" }, "Hand-built scenarios"),
+        el("option", { value: "seed", selected: inv.source === "seed" }, "FRAML data seed"));
+    const kids = [el("label", { class: "inv-label" }, "Data"), source, el("label", { class: "inv-label" }, "Case"), select, arch, start, replay, exportBtn, runBadges()];
     if (inv.error) kids.push(el("div", { class: "inv-error", role: "alert" }, inv.error));
     box.replaceChildren(...kids);
 }
@@ -165,6 +176,23 @@ async function exportTrace() {
         const a = el("a", { href: url, download: `evidencetrail-${inv.runId}.json` });
         document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     } catch (e) { inv.error = `Export failed: ${e.message}`; renderControls(); }
+}
+
+async function switchSource(source) {
+    inv.source = source;
+    resetRun();
+    if (source === "seed" && !inv.seedCases.length) {
+        inv.seedLoading = true; renderAll();
+        try {
+            const d = await invApi("/api/evidencetrail/seed/transactions");
+            inv.seedCases = d.items; inv.seedNote = d.available ? d.note : d.note;
+            if (!d.available) inv.error = d.note;
+        } catch (e) { inv.error = `Could not load seed transactions: ${e.message}`; }
+        inv.seedLoading = false;
+    }
+    const list = currentList();
+    inv.caseId = list.length ? list[0].case_id : null;
+    renderAll();
 }
 
 function resetRun() {
@@ -221,13 +249,19 @@ function stopReplay() {
 function renderTx() {
     const box = document.getElementById("inv-tx");
     if (!box) return;
-    const s = inv.scenarios.find(x => x.case_id === inv.caseId);
-    if (!s) { box.replaceChildren(el("h3", {}, "Transaction"), el("p", { class: "inv-muted" }, "Loading scenarios…")); return; }
-    const t = s.transaction;
-    box.replaceChildren(el("h3", {}, "Transaction summary"), el("div", { class: "inv-amount" }, fmtSek(t.amount)),
-        kv([["Transaction", t.transaction_id], ["Customer", t.customer_id], ["Recipient", t.recipient_id], ["Channel", t.channel],
-            ["Reference", t.payment_reference], ["Time (UTC)", t.timestamp]]),
-        el("p", { class: "inv-muted" }, "Synthetic scenario. Expected outcomes are hidden from the agent."));
+    const s = findCase(inv.caseId);
+    if (!s) { box.replaceChildren(el("h3", {}, "Transaction"), el("p", { class: "inv-muted" }, inv.seedLoading ? "Loading seed transactions…" : "Pick a case to begin.")); return; }
+    const t = Object.assign({}, s.transaction, runTransaction() || {});
+    const rows = [["Transaction", t.transaction_id], ["Customer", t.customer_id], ["Recipient", t.recipient_name || t.recipient_id], ["Channel", t.channel]];
+    if (t.transaction_type) rows.push(["Type", t.transaction_type.replaceAll("_", " ").toLowerCase()]);
+    if (t.recipient_category) rows.push(["Recipient kind", `${t.recipient_category.toLowerCase()} · ${t.recipient_country || "n/a"}`]);
+    if (t.payment_reference) rows.push(["Reference", t.payment_reference]);
+    rows.push(["Time (UTC)", t.timestamp]);
+    box.replaceChildren(el("h3", {}, "Transaction summary"), el("div", { class: "inv-amount" }, fmtMoney(t.amount, t.currency)), kv(rows),
+        el("span", { class: "inv-tag" + (inv.source === "seed" ? " recorded" : "") }, inv.source === "seed" ? "FRAML data seed (synthetic)" : "Hand-built scenario (synthetic)"),
+        el("p", { class: "inv-muted" }, inv.source === "seed"
+            ? "A real row from the project's data seed. The agents see only what happened before this transaction; the generator's answer key stays hidden until the run is over."
+            : "Synthetic scenario. Expected outcomes are hidden from the agent."));
 }
 
 function kv(pairs) {
@@ -251,6 +285,14 @@ function renderFinal() {
     else box.append(el("p", { class: "inv-explain" }, f.explanation));
     if (r.failure && !(f.explanation || "").includes(r.failure)) box.append(el("div", { class: "inv-error", role: "alert" }, r.failure));
     box.append(...alertBanner(r));
+    if (r.seed_ground_truth && !isRunning(r) && inv.replayCount == null) {
+        const g = r.seed_ground_truth, said = f.simulated_action !== "ALLOW";
+        box.append(el("details", { class: "inv-details" }, el("summary", {}, "Seed answer key (hidden from the agents)"),
+            kv([["Generator tag", g.tag || "none: ordinary activity"], ["Seed says suspicious", g.flagged ? "yes" : "no"],
+                ["System flagged it", said ? `yes (${ACTION_TEXT[f.simulated_action]})` : "no (Allow)"],
+                ["Verdict", g.flagged === said ? "agrees with the seed" : (g.flagged ? "missed (nothing suspicious was knowable at that moment, or the policy thresholds did not fire)" : "false alarm")]]),
+            el("p", { class: "inv-muted" }, "Tags come from the synthetic data generator. They say nothing about real-world accuracy.")));
+    }
     const actions = el("div", { class: "inv-actions" });
     if (f.simulated_action === "ALLOW") actions.append(el("button", { class: "btn-primary", type: "button", onclick: () => { inv.reviewOpen = !inv.reviewOpen; renderFinal(); } }, inv.reviewOpen ? "Hide decision" : "View decision"));
     if (f.simulated_action === "CONTEXT_CHECK" || (f.context_check && f.context_check.answer)) actions.append(el("button", { class: "btn-primary", type: "button", onclick: () => { inv.contextOpen = !inv.contextOpen; renderFinal(); } }, "Open context check"));
@@ -380,7 +422,7 @@ function renderGraph() {
     box.replaceChildren(el("h3", {}, "Recipient relationships"));
     const vis = visibleEvidenceIds();
     const ev = ((inv.run && inv.run.evidence) || []).filter(e => e.type === "relationship_graph" && vis.has(e.evidence_id)).pop();
-    const recipient = (inv.scenarios.find(s => s.case_id === inv.caseId) || { transaction: {} }).transaction.recipient_id;
+    const recipient = (findCase(inv.caseId) || { transaction: {} }).transaction.recipient_id;
     if (!ev) { box.append(el("p", { class: "inv-muted" }, "Relationships not searched yet. The agent decides whether to check them.")); return; }
     const p = ev.payload, nodes = p.nodes || [], links = p.links || [];
     if (!links.length) {
@@ -496,6 +538,7 @@ function renderQuality() {
         ["Matches policy label", d.policy_label_match == null ? "n/a" : (d.policy_label_match ? "yes" : "no") + " (1 synthetic case; illustrative label)"],
         ["Evidence references valid", d.reference_validity ? `${d.reference_validity.valid}/${d.reference_validity.cited}` : "n/a"],
         ["Tool calls", d.tool_call_count], ["Errors", d.error_count]]),
+        d.seed_check ? kv([["Seed answer key", `${d.seed_check.seed_tag || "ordinary"} · ${d.seed_check.agrees ? "agrees" : "disagrees"} with the system`]]) : null,
         el("details", { class: "inv-details" }, el("summary", {}, "Technical details"),
             el("pre", { class: "inv-pre" }, json({ rubric_version: evalState.rubric_version, judge: evalState.judge, note: evalState.judge_note,
                 scores: Object.fromEntries(Object.entries(evalState.geval).map(([k, m]) => [k, m.scores])),
@@ -578,7 +621,7 @@ function renderAblation(box) {
     const table = el("table", { class: "inv-table" }, el("thead", {}, el("tr", {}, el("th", {}, "Case"), Object.keys(names).map(k => el("th", {}, names[k])))));
     const body = el("tbody");
     e.case_ids.forEach(cid => {
-        const sc = (inv.scenarios.find(x => x.case_id === cid) || {}).name || cid;
+        const sc = (findCase(cid) || {}).name || cid;
         const rules = s.arms.rules.cases[cid];
         const cell = arm => {
             const c = s.arms[arm].cases[cid], x = c.summary;
@@ -667,7 +710,7 @@ function renderAlerts() {
     if (!inv.alerts.length) { box.append(el("p", { class: "inv-muted" }, "No alerts in this view.")); return; }
     const list = el("ul", { class: "inv-alert-list" });
     inv.alerts.forEach(a => {
-        const name = (inv.scenarios.find(x => x.case_id === a.case_id) || {}).name || a.case_id;
+        const name = (findCase(a.case_id) || {}).name || a.case_id;
         list.append(el("li", { class: "inv-alert-row sev-" + a.severity },
             el("div", { class: "inv-alert-head" }, el("strong", {}, a.title), el("span", { class: "inv-tag" }, SEVERITY_TEXT[a.severity]),
                 a.sources.map(src => el("span", { class: "inv-tag" }, SOURCE_TEXT[src])), el("span", { class: "inv-tag" }, a.status)),
@@ -684,6 +727,74 @@ function renderAlerts() {
     box.append(list);
     clearTimeout(inv.alertTimer);
     if (inv.alerts.some(x => x.handoff && x.handoff.status === "running")) inv.alertTimer = setTimeout(loadAlerts, 2000);
+}
+
+// ---------------------------------------------------------------- seed batch
+function renderSeedBatch() {
+    const box = document.getElementById("inv-seedbatch");
+    if (!box) return;
+    const busy = inv.seedExp && inv.seedExp.state === "running";
+    const n = el("select", { id: "inv-seed-n", disabled: busy, "aria-label": "Batch size" }, [10, 20, 40, 58].map(v => el("option", { value: v, selected: v === 20 }, `${v} transactions`)));
+    box.replaceChildren(el("h3", {}, "FRAML seed batch"),
+        el("p", { class: "inv-muted" }, "Runs a mixed sample of real seed transactions through the agent team and Jev triage, then compares with the generator's hidden answer key. Counts only; a sample says nothing about real-world accuracy."),
+        el("div", { class: "inv-actions" }, n, el("button", { class: "page-btn", type: "button", disabled: busy, onclick: startSeedBatch }, busy ? "Running…" : "Run seed batch")));
+    const e = inv.seedExp;
+    if (!e) return;
+    if (e.error) { box.append(el("div", { class: "inv-error", role: "alert" }, e.error)); return; }
+    const s = e.summary;
+    if (!s) { box.append(el("p", { class: "inv-muted" }, "Starting runs…")); return; }
+    const prog = e.progress ? `${e.progress.done}/${e.progress.total} finished` : "";
+    const f = s.answer_key_flagged, c = s.answer_key_clean;
+    box.append(el("span", { class: "inv-tag fresh" }, e.state === "running" ? `Running… ${prog}` : "Completed"),
+        kv([["Attempted / completed / failed", `${s.attempted} / ${s.completed} / ${s.failed}` + (s.pending ? ` (${s.pending} pending)` : "")],
+            ["Seed says suspicious: not allowed", `${f.non_allow} of ${f.runs}`],
+            ["…and an alert was raised", `${f.alerted} of ${f.runs} (Jev ${f.alerted_by_jev}, policy ${f.alerted_by_policy})`],
+            ["Seed says ordinary: allowed", `${c.allowed} of ${c.runs}`],
+            ["…and no alert raised", `${c.runs - c.alerted} of ${c.runs}`]]));
+    if (Object.keys(s.by_tag).length) {
+        box.append(el("h4", {}, "By seed tag"), kv(Object.entries(s.by_tag).map(([tag, v]) => [tag.replaceAll("_", " ").toLowerCase(), `${v.non_allow}/${v.runs} not allowed · ${v.alerted}/${v.runs} alerted`])));
+    }
+    const table = el("table", { class: "inv-table" }, el("thead", {}, el("tr", {}, ["Transaction", "System", "Alert", "Seed answer key"].map(h => el("th", {}, h)))));
+    const body = el("tbody");
+    s.rows.forEach(r => {
+        const c0 = findCase(r.case_id), tx = c0 && c0.transaction;
+        const verdict = r.action == null ? "–" : (r.seed_flagged === (r.action !== "ALLOW") ? "✓" : "✗");
+        body.append(el("tr", {}, el("td", {}, el("button", { class: "inv-link", type: "button", onclick: () => openSeedRun(r) }, r.transaction_id), tx ? ` ${fmtMoney(tx.amount, tx.currency)}` : ""),
+            el("td", {}, r.action ? `${ACTION_TEXT[r.action]}${r.status === "INCOMPLETE" ? " (incomplete)" : ""}` : (r.state === "failed" ? "failed" : "running")),
+            el("td", {}, r.alert_sources ? `${r.alert_severity} · ${r.alert_sources.map(x => SOURCE_TEXT[x]).join("+")}` : "none"),
+            el("td", {}, `${verdict} ${r.seed_tag ? r.seed_tag.replaceAll("_", " ").toLowerCase() : "ordinary"}`)));
+    });
+    table.append(body);
+    box.append(el("div", { class: "inv-table-wrap" }, table));
+    if (s.failures.length) box.append(el("div", { class: "inv-error", role: "alert" }, `${s.failures.length} run(s) failed: ${s.failures[0].reason}`));
+    box.append(el("p", { class: "inv-muted" }, s.note));
+}
+
+function openSeedRun(row) {
+    inv.source = "seed"; stopReplay(); clearInterval(inv.pollTimer);
+    Object.assign(inv, { caseId: row.case_id, runId: row.run_id, run: { state: "running", events: [], evidence: [] }, selected: [], reviewOpen: false, contextOpen: false, exp: null, error: null });
+    pollRun(); renderAll();
+    document.getElementById("inv-controls").scrollIntoView({ behavior: "smooth" });
+}
+
+async function startSeedBatch() {
+    inv.error = null;
+    try {
+        if (!inv.seedCases.length) {
+            const d = await invApi("/api/evidencetrail/seed/transactions"); inv.seedCases = d.items;
+        }
+        const limit = Number(document.getElementById("inv-seed-n").value);
+        const d = await invApi("/api/experiments/seed-batch", { limit });
+        inv.seedExp = { state: "running", summary: null };
+        clearInterval(inv.seedTimer);
+        const tick = async () => {
+            try { inv.seedExp = await invApi(`/api/experiments/${d.experimentId}`); if (inv.seedExp.state !== "running") clearInterval(inv.seedTimer); }
+            catch (e) { inv.seedExp = { state: "failed", error: e.message }; clearInterval(inv.seedTimer); }
+            renderSeedBatch();
+        };
+        inv.seedTimer = setInterval(tick, 2500); tick();
+    } catch (e) { inv.error = `Seed batch failed to start: ${e.message}`; }
+    renderAll();
 }
 
 document.addEventListener("DOMContentLoaded", initInvestigator);

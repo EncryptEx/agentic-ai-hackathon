@@ -846,14 +846,16 @@
             }
             return;
         } else if (payload.msg_type === 'investigation_started') {
-            const li = document.getElementById('case-' + payload.customer_id);
+            const id = payload.tx_id || payload.customer_id;
+            const li = document.getElementById('case-' + id);
             if (li) {
                 li.querySelector('.cstat').innerText = 'INVESTIGATING';
                 li.querySelector('.row2').innerText = 'Agents are analyzing evidence...';
             }
             return;
         } else if (payload.msg_type === 'investigation_finished') {
-            const li = document.getElementById('case-' + payload.customer_id);
+            const id = payload.tx_id || payload.customer_id;
+            const li = document.getElementById('case-' + id);
             if (li) {
                 li.querySelector('.cstat').innerText = 'CLOSED';
                 li.querySelector('.cstat').style.background = 'rgba(79, 224, 160, 0.14)';

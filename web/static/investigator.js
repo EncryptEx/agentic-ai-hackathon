@@ -140,7 +140,7 @@ function renderControls() {
     const replay = el("button", { class: "page-btn", type: "button", disabled: !inv.run || isRunning(inv.run) || !(inv.run.events || []).length, onclick: startReplay },
         "▶ Replay recorded trace");
     const exportBtn = el("button", { class: "page-btn", type: "button", disabled: !inv.runId || !inv.run || isRunning(inv.run), onclick: exportTrace,
-        title: "Redacted JSON of the recorded audit trail" }, "⬇ Export trace");
+        title: "The complete saved record of this investigation, for audit or technical review" }, "⬇ Full record");
     const source = el("select", { id: "inv-source", disabled: busy, "aria-label": "Data source", title: "Data source", onchange: e => switchSource(e.target.value) },
         el("option", { value: "scenarios", selected: inv.source === "scenarios" }, "Hand-built scenarios"),
         el("option", { value: "seed", selected: inv.source === "seed" }, "FRAML data seed"));
@@ -297,14 +297,12 @@ function renderFinal() {
     box.append(actions);
     if (inv.contextOpen && f.context_check) box.append(contextCheck(f));
     if (inv.reviewOpen) box.append(decisionDetails(f));
-    box.append(el("details", { class: "inv-details" }, el("summary", {}, "Technical details"),
-        kv([["Policy version", f.policy_version], ["Rule", f.rule], ["Reason code", f.reason_code], ["Status", f.status],
-            ["Agent recommended", f.agent_recommendation && f.agent_recommendation.recommended_action],
-            ["Agent vs policy", f.agent_escalation ? "agent was more cautious and was kept (escalation enabled)" :
-                f.agent_disagreement === "agent_more_cautious" ? "agent was more cautious; policy took precedence" :
-                f.agent_disagreement === "agent_less_cautious" ? "agent was less cautious; policy took precedence" : "agree"],
-            ["Reference validity", f.reference_validity ? `${f.reference_validity.valid}/${f.reference_validity.cited} cited IDs exist` : "n/a"]]),
-        el("p", { class: "inv-muted" }, "Valid evidence IDs do not establish that a claim is semantically supported.")));
+    const agentSaid = f.agent_recommendation && f.agent_recommendation.recommended_action;
+    if (f.agent_disagreement === "agent_more_cautious") box.append(el("p", { class: "inv-muted" }, `The investigating agents recommended ${ACTION_TEXT[agentSaid] || agentSaid}, which is more cautious than the bank's policy rules. The policy outcome stands.`));
+    else if (f.agent_disagreement === "agent_less_cautious") box.append(el("p", { class: "inv-muted" }, `The investigating agents recommended ${ACTION_TEXT[agentSaid] || agentSaid}, which is less cautious than the bank's policy rules. The policy outcome stands.`));
+    else if (f.agent_escalation) box.append(el("p", { class: "inv-muted" }, `The investigating agents recommended ${ACTION_TEXT[agentSaid] || agentSaid}, which is more cautious than the policy rules, and that recommendation was kept.`));
+    const badRefs = (f.claims || []).filter(c => c.invalid_evidence_ids.length).length;
+    if (badRefs) box.append(el("div", { class: "inv-warn", role: "alert" }, `${plural(badRefs, "claim")} cited evidence that does not exist in this investigation and cannot be relied on.`));
 }
 
 function contextCheck(f) {
@@ -333,7 +331,7 @@ function decisionDetails(f) {
 // ---------------------------------------------------------------- trace
 // ---------------------------------------------------------------- plain-language evidence
 // Bank staff should never have to read field names or JSON. Each evidence record is turned into a one-line
-// finding, a few labelled facts and short lists. The raw record stays under "Technical details".
+// finding, a few labelled facts and short lists. The complete raw record is saved on the server and available through "Full record".
 const EVIDENCE_LABEL = {
     behavior_profile: "Customer behavior", device_inspection: "Device and session", recipient_inspection: "Recipient account",
     relationship_graph: "Recipient relationships", jev_assessment: "Jev risk assessment", alert_triage: "Jev alert triage",
@@ -534,9 +532,7 @@ function renderTrace() {
                 (e.input_evidence_ids || []).map(i => chip(i)),
                 (e.output_evidence_ids || []).length ? el("span", { class: "inv-muted" }, " produced ") : null,
                 (e.output_evidence_ids || []).map(i => chip(i))),
-            el("details", { class: "inv-details" }, el("summary", {}, "Technical details"),
-                el("pre", { class: "inv-pre" }, json({ arguments: e.validated_arguments, result: e.result_snapshot, error: e.error,
-                    provider: e.provider, returned_model_version: e.returned_model_version, reason_code: e.reason_code, event_hash: e.event_hash }))));
+            );
         list.append(li);
     });
     box.append(list);
@@ -655,9 +651,7 @@ function renderEvidence() {
             el("strong", {}, `${e.evidence_id} · ${EVIDENCE_LABEL[e.type] || sentence(words(e.type))}`),
             el("div", { class: "inv-muted" }, `Checked ${shortTime(e.observed_at)} UTC${CHECK_LABEL[e.source] ? ` · ${CHECK_LABEL[e.source]} check` : ""}`),
             factsView(facts),
-            el("details", { class: "inv-details" }, el("summary", {}, "Technical details"),
-                kv([["Evidence ID", e.evidence_id], ["Type", e.type], ["Source tool", e.source], ["Source record", e.source_record_id], ["Snapshot hash", e.snapshot_hash]]),
-                el("pre", { class: "inv-pre" }, json(e.payload)))));
+            ));
     });
 }
 
@@ -681,8 +675,7 @@ function renderRisk() {
         ["Suggested next step", n.next_step ? n.next_step.replaceAll("_", " ").toLowerCase() : "not asked"],
         ["Manipulation indicators", n.manipulation_indicators != null ? String(n.manipulation_indicators) : "not asked"]]),
         chip(jev.evidence_id),
-        el("p", { class: "inv-muted" }, "Jev informs the investigation; it never approves or blocks a transfer by itself. Probabilities are uncalibrated model outputs."),
-        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), el("pre", { class: "inv-pre" }, json({ model: jev.payload.model, usage: jev.payload.usage, raw: jev.payload.raw }))));
+        el("p", { class: "inv-muted" }, "Jev informs the investigation; it never approves or blocks a transfer by itself. Its scores are model judgments, not calibrated fraud probabilities."));
 }
 
 // ---------------------------------------------------------------- explanation quality (G-Eval)
@@ -713,14 +706,11 @@ function renderQuality() {
     });
     const d = evalState.deterministic;
     box.append(el("h4", {}, "Deterministic checks"), kv([
-        ["Matches policy label", d.policy_label_match == null ? "n/a" : (d.policy_label_match ? "yes" : "no") + " (1 synthetic case; illustrative label)"],
-        ["Evidence references valid", d.reference_validity ? `${d.reference_validity.valid}/${d.reference_validity.cited}` : "n/a"],
-        ["Tool calls", d.tool_call_count], ["Errors", d.error_count]]),
+        ["Matches the expected outcome for this scenario", d.policy_label_match == null ? "Not applicable" : (d.policy_label_match ? "Yes" : "No")],
+        ["Evidence references that check out", d.reference_validity ? `${d.reference_validity.valid} of ${d.reference_validity.cited}` : "Not applicable"],
+        ["Checks run", d.tool_call_count], ["Problems during the run", d.error_count]]),
         d.seed_check ? kv([["Seed answer key", `${d.seed_check.seed_tag || "ordinary"} · ${d.seed_check.agrees ? "agrees" : "disagrees"} with the system`]]) : null,
-        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"),
-            el("pre", { class: "inv-pre" }, json({ rubric_version: evalState.rubric_version, judge: evalState.judge, note: evalState.judge_note,
-                scores: Object.fromEntries(Object.entries(evalState.geval).map(([k, m]) => [k, m.scores])),
-                steps: Object.fromEntries(Object.entries(evalState.geval).map(([k, m]) => [k, m.evaluation_steps])) }))));
+        el("p", { class: "inv-muted" }, "Scores come from a model-based judge that reads the explanation against the recorded evidence. They are an aid for review, not ground truth."));
 }
 
 async function runEvaluation() {
@@ -805,8 +795,7 @@ function renderConsistency() {
                 ["Agent team with Jev", `${a.with_jev.matched_runs}/${a.with_jev.eligible_runs} runs matched`]]));
     }
     box.append(el("p", { class: "inv-muted" }, r.interpretation),
-        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), el("pre", { class: "inv-pre" }, json(r))),
-        el("p", { class: "inv-muted" }, "Re-run on the server with: ", el("code", {}, inv.reportCmd || "python -m evidencetrail.consistency")));
+        el("p", { class: "inv-muted" }, "The complete report is saved on the server. Re-run it there with: ", el("code", {}, inv.reportCmd || "python -m evidencetrail.consistency")));
 }
 
 // ---------------------------------------------------------------- alerts

@@ -70,7 +70,7 @@ class PolicyOutcomes(unittest.TestCase):
         self.assertEqual(f["simulated_action"], "ALLOW")
         self.assertFalse(f["agent_escalation"])
         self.assertEqual(f["agent_disagreement"], "agent_more_cautious")
-        self.assertIn("policy v1 outcome (ALLOW) takes precedence", f["explanation"])
+        self.assertNotIn("policy v1", f["explanation"])  # plain explanation; the disagreement is a structured flag
 
     def test_escalation_is_an_explicit_opt_in(self):
         os.environ["EVIDENCETRAIL_AGENT_ESCALATION"] = "1"

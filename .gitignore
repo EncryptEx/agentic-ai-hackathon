@@ -224,3 +224,6 @@ credentials*.json
 
 # Recorded decision-consistency reports (python -m evidencetrail.consistency)
 data/consistency/
+
+# Complete saved records of investigations
+data/investigations/

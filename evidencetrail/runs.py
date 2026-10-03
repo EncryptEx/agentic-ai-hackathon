@@ -6,7 +6,7 @@ import uuid
 
 import sqlite3
 
-from . import evaluator, experiments, policy, team
+from . import evaluator, experiments, policy, records, team
 from .alerts import AlertStore
 from .canon import now_utc, redact
 from .config import JEV_MODEL
@@ -51,7 +51,8 @@ class RunManager:
                                   "created_at": now_utc(), "configuration": configuration or {},
                                   "events": [], "evidence": [], "final": None, "error": None,
                                   "experiment_id": experiment_id, "evaluation": None, "arm": arm,
-                                  "alert": None, "alert_error": None, "architecture": "team"}
+                                  "alert": None, "alert_error": None, "architecture": "team", "record": alerts_enabled is True,
+                                  "record_error": None}
             self._cases[run_id] = case
         threading.Thread(target=self._execute, args=(run_id, case, run_mode, arm, alerts_enabled), daemon=True).start()
         return run_id
@@ -87,6 +88,27 @@ class RunManager:
                 run["error"] = f"{type(e).__name__}: {e}"
                 run["final"] = policy.incomplete("Run crashed before a decision was reached.")
             run["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+            self._save_record(run_id)
+
+    def _save_record(self, run_id):
+        """Write the complete record to disk. A full disk must never break an investigation."""
+        run = self._runs.get(run_id)
+        if not run or not run.get("record"):
+            return
+        try:
+            records.save_record(run, self._cases.get(run_id))
+            run["record_error"] = None
+        except OSError as e:
+            run["record_error"] = f"the saved record could not be written: {e}"
+
+    def _restored(self, run_id):
+        """A finished investigation from a previous server session, read from its saved record."""
+        saved = records.load_record(run_id)
+        if not saved:
+            return None
+        run = dict(saved["run"])
+        run.update({"restored_from_record": True, "record": False, "record_error": None})
+        return run
 
     def _persist_alert(self, run, alert):
         if not alert:
@@ -110,7 +132,7 @@ class RunManager:
         return self._alerts.set_status(alert_id, status, note)
 
     def get(self, run_id):
-        run = self._runs.get(run_id)
+        run = self._runs.get(run_id) or self._restored(run_id)
         if run is None:
             return None
         view = dict(run)
@@ -126,7 +148,7 @@ class RunManager:
 
     def export_run(self, run_id):
         """Redacted trace export. A stored log, not an immutable or compliance-certified record."""
-        run = self._runs.get(run_id)
+        run = self._runs.get(run_id) or self._restored(run_id)
         if run is None:
             return None
         final = run.get("final") or {}
@@ -140,6 +162,8 @@ class RunManager:
 
     def start_evaluation(self, run_id, repeats=1):
         """Evaluate a finished run in the background; poll GET /api/investigations/{id}."""
+        if run_id not in self._runs:
+            raise ValueError("this investigation was restored from its saved record and can no longer be re-evaluated")
         run = self._runs[run_id]
         if run["state"] not in _DONE:
             raise ValueError("run is still in progress")
@@ -156,12 +180,17 @@ class RunManager:
             run["evaluation"] = evaluator.evaluate(run, self._cases[run_id], self._judge_factory, repeats=repeats)
         except Exception as e:
             run["evaluation"] = {"state": "failed", "error": f"{type(e).__name__}: {e}"}
+        self._save_record(run_id)
 
     def answer_context_check(self, run_id, answer):
+        if run_id not in self._runs:
+            raise ValueError("this investigation was restored from its saved record and can no longer be changed")
         run = self._runs[run_id]
         if run["state"] not in _DONE or not run["final"]:
             raise ValueError("run has no final decision yet")
-        return policy.apply_context_answer(run["final"], answer)
+        final = policy.apply_context_answer(run["final"], answer)
+        self._save_record(run_id)
+        return final
 
     # ---- experiments -----------------------------------------------------------
     def start_repeat(self, case_id, mode, repetitions, configuration=None):

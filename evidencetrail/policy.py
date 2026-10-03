@@ -110,9 +110,7 @@ def decide(store, transaction, finish):
                 explanation += " Agent recommendation was more cautious than policy and was kept."
                 action, escalated = agent["recommended_action"], True
             else:
-                disagreement = "agent_more_cautious"
-                explanation += (f" The agent recommended {agent['recommended_action']}, which is more cautious; "
-                                f"policy v1 outcome ({action}) takes precedence.")
+                disagreement = "agent_more_cautious"  # shown to the user from this flag, not from the explanation text
         elif status == "COMPLETE" and SEVERITY.get(agent["recommended_action"], 0) < SEVERITY[action]:
             disagreement = "agent_less_cautious"
         return {"policy_version": POLICY_VERSION, "status": status, "simulated_action": action,

@@ -19,6 +19,15 @@ All data is synthetic. Nothing moves or blocks real money.
   time-causal and the generator's answer key is hidden from the agents (`seed_labels.py` is evaluator-only).
 - **Explanation quality**: the three official DeepEval G-Eval metrics, run after the decision.
 
+## Saved records
+
+Every investigation started from the UI or API is saved in full to `data/investigations/<run id>.json` (gitignored,
+override with `EVIDENCETRAIL_RECORD_DIR`, credentials redacted): every trace event with the exact request and response,
+all evidence payloads and hashes, the policy decision, the alert and any evaluation. The working screen shows plain
+language only; the **Full record** button (or `GET /api/investigations/<run id>/export`) gives the complete record to
+whoever audits or debugs. A saved investigation can still be opened and exported after a server restart, read-only. It
+is a stored log, not an immutable or compliance-certified record.
+
 ## Run it
 
 ```bash

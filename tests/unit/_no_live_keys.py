@@ -16,3 +16,5 @@ for _name in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "TYPESAFE_API_KEY"):
 os.environ["EVIDENCETRAIL_DISABLE_LIVE"] = "1"
 os.environ["DEEPEVAL_DISABLE_DOTENV"] = "1"
 os.environ["EVIDENCETRAIL_ALERT_DB"] = ":memory:"
+import tempfile
+os.environ.setdefault("EVIDENCETRAIL_RECORD_DIR", tempfile.mkdtemp(prefix="et-records-"))

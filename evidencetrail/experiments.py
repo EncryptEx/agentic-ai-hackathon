@@ -10,7 +10,8 @@ import json
 import time
 
 from . import policy
-from .agent import SYSTEM_PROMPT, _validate_finish
+from .runtime import _validate_finish
+from .team import _GUARD
 from .canon import sha256
 from .config import MAX_GRAPH_HOPS
 from .eval_fixtures import EXPECTED_ACTIONS
@@ -25,6 +26,13 @@ _DATA_PLAN = (("get_behavior_profile", lambda tx: {"customer_id": tx["customer_i
               ("search_relationship_graph",
                lambda tx: {"recipient_id": tx["recipient_id"], "max_hops": MAX_GRAPH_HOPS}))
 _FINISH_DECL = [d for d in TOOL_DECLARATIONS if d["name"] == FINISH]
+
+DECISION_PROMPT = (
+    "You decide a synthetic financial-transfer investigation from a frozen evidence bundle. No further tools are "
+    "available. Finish with recommended_action ALLOW, CONTEXT_CHECK or REVIEW; status COMPLETE or INCOMPLETE; "
+    "claims that each cite evidence IDs from the bundle; and remaining uncertainty. Recommendations are subject "
+    "to backend policy. " + _GUARD
+)
 
 
 def gather_all(case):
@@ -88,7 +96,7 @@ def fixed_evidence_experiment(case, model, jev, repetitions, on_progress=None):
         t0 = time.monotonic()
         row = {"attempt": i + 1}
         try:
-            turn = model.generate(SYSTEM_PROMPT, [{"type": "user_input", "content": _decision_prompt(case, store)}],
+            turn = model.generate(DECISION_PROMPT, [{"type": "user_input", "content": _decision_prompt(case, store)}],
                                   _FINISH_DECL)
             call = next((c for c in turn.calls if c["name"] == FINISH), None)
             if call is None:

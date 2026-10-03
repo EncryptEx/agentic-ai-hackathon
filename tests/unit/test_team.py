@@ -11,110 +11,14 @@ os.environ["EVIDENCETRAIL_ALERT_DB"] = ":memory:"
 from evidencetrail import api, evaluator, team
 from evidencetrail.alerts import AlertStore
 from evidencetrail.config import MAX_CONSULTATIONS, MAX_TOOL_CALLS
-from evidencetrail.gemini import ModelTurn
-from evidencetrail.jev import ProviderUnavailable
 from evidencetrail.metrics import summarize_runs
 from evidencetrail.runs import RunManager
 from evidencetrail.scenarios import get_case
 from evidencetrail.tools import FINISH
 from evidencetrail.trace import verify_chain
-from test_evidencetrail import FakeJev
+from fakes import AutoTeam, FakeJev, run_team
 
 SUSPICIOUS = {"suspicion": "SUSPICIOUS", "severity": 2}
-
-
-def _results(steps):
-    out = []
-    for s in steps:
-        if s.get("type") == "function_result":
-            out.append((s["name"], json.loads(s["result"][0]["text"])))
-    return out
-
-
-def _turn(name, args, call_id):
-    call = {"id": call_id, "name": name, "arguments": args}
-    return ModelTurn([{"type": "function_call", **call}], [call], "", "scripted-team-1", None)
-
-
-class AutoTeam:
-    """Role-aware scripted model. The role is inferred from the registered tool declarations."""
-    provider = "scripted"
-    requested_model = "scripted-team"
-
-    def __init__(self, action="ALLOW", order=None, extra_orch_calls=(), specialist_hook=None,
-                 fail_role=None, no_report_roles=(), bad_ids_role=None):
-        self.action, self.order = action, order
-        self.extra_orch_calls = list(extra_orch_calls)
-        self.specialist_hook = specialist_hook
-        self.fail_role, self.no_report_roles, self.bad_ids_role = fail_role, set(no_report_roles), bad_ids_role
-        self.seen, self.turns = [], 0
-
-    def _role(self, names):
-        if team.CONSULT in names:
-            return "orchestrator"
-        for role, spec in team.SPECIALISTS.items():
-            if set(spec["tools"]) & names:
-                return role
-
-    def generate(self, system, steps, tools):
-        self.turns += 1
-        names = {t["name"] for t in tools}
-        role = self._role(names)
-        self.seen.append((role, system, steps, tools))
-        if role == self.fail_role:
-            raise ProviderUnavailable("fake outage")
-        res = _results(steps)
-        if role == "orchestrator":
-            return self._orchestrate(tools, steps, res)
-        return self._specialist(role, steps, res)
-
-    def _orchestrate(self, tools, steps, res):
-        if self.extra_orch_calls:
-            name, args = self.extra_orch_calls.pop(0)
-            return _turn(name, args, f"o{len(res)}x")
-        available = next(t for t in tools if t["name"] == team.CONSULT)["parameters"]["properties"]["specialist"]["enum"]
-        order = [r for r in (self.order or ["behavior_device", "recipient_network", "risk_judge"]) if r in available]
-        done = [r for r in res if r[0] == team.CONSULT and "error" not in r[1]]
-        if len(done) < len(order):
-            return _turn(team.CONSULT, {"specialist": order[len(done)], "question": f"Please assess via {order[len(done)]}."},
-                         f"o{len(res)}")
-        ids = [e["evidence_id"] for _, r in done for e in r["new_evidence"] if e["type"] not in ("jev_assessment", "tool_error")]
-        return _turn(FINISH, {"recommended_action": self.action, "status": "COMPLETE",
-                              "claims": [{"text": "Specialist evidence reviewed.", "supporting_evidence_ids": ids[:3]}],
-                              "remaining_uncertainty": "none material"}, "ofin")
-
-    def _specialist(self, role, steps, res):
-        opening = json.loads(steps[0]["content"])
-        tx = opening["transaction"]
-        plans = {
-            "behavior_device": [("get_behavior_profile", {"customer_id": tx["customer_id"]}),
-                                ("inspect_device", {"transaction_id": tx["transaction_id"]})],
-            "recipient_network": [("inspect_recipient", {"recipient_id": tx["recipient_id"]}),
-                                  ("search_relationship_graph", {"recipient_id": tx["recipient_id"], "max_hops": 2})],
-            "risk_judge": [("assess_with_jev", {"evidence_ids": [e["evidence_id"] for e in opening.get("available_evidence", [])]})],
-        }
-        plan = list(plans[role])
-        if self.specialist_hook:
-            plan = self.specialist_hook(role, plan, tx)
-        done = [r for r in res if r[0] != team.REPORT]
-        if len(done) < len(plan):
-            name, args = plan[len(done)]
-            return _turn(name, args, f"{role}{len(res)}")
-        if role in self.no_report_roles:
-            return ModelTurn([], [], "I am done.", "scripted-team-1", None)
-        ids = [r["evidence_id"] for _, r in done if "evidence_id" in r]
-        if role == self.bad_ids_role:
-            ids = ids + ["EV-999"]
-        return _turn(team.REPORT, {"summary": f"{role} finished", "remaining_uncertainty": "none",
-                                   "findings": [{"text": f"{role} evidence collected", "supporting_evidence_ids": ids}]},
-                     f"{role}rep")
-
-
-def run_team(case_id, model=None, jev=None, enable_jev=True, triage=False, **kw):
-    case = get_case(case_id)
-    model = model or AutoTeam(**kw)
-    r = team.investigate_team(case, model, jev or FakeJev(), "run-team", enable_jev=enable_jev, triage=triage)
-    return case, model, r
 
 
 class TeamFlow(unittest.TestCase):

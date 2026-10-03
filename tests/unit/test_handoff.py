@@ -21,7 +21,7 @@ from evidencetrail import api, handoff
 from evidencetrail.alerts import AlertStore
 from evidencetrail.runs import RunManager
 from test_alerts import SUSPICIOUS, run
-from test_evidencetrail import FakeJev
+from fakes import FakeJev
 
 REPORT_TEXT = "FAKE ADK 11-SECTION REPORT"
 

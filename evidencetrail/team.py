@@ -16,7 +16,7 @@ import json
 import time
 
 from . import policy
-from .agent import (_alert_step, _result_step, _run_tool, _validate_finish, run_header)
+from .runtime import _alert_step, _result_step, _run_tool, _validate_finish, run_header
 from .canon import now_utc, redact, sha256
 from .config import (GENERATION_SETTINGS, MAX_CONSULTATIONS, MAX_TOOL_CALLS, POLICY_VERSION,
                      RUN_TIMEOUT_S, SPECIALIST_MAX_TURNS, TEAM_PROMPT_VERSION)
@@ -238,7 +238,7 @@ def _consult(run, specialist, question):
 
 def investigate_team(case, model, jev, run_id, run_mode="live", on_event=None, enable_jev=True, store=None,
                      triage=False):
-    """Run one investigation with the agent team. Same return shape as agent.investigate."""
+    """Run one investigation with the agent team. Returns events, evidence, the final decision and any alert."""
     store = store if store is not None else EvidenceStore()
     trace = TraceRecorder(run_id, case["case_id"], {"prompt_version": TEAM_PROMPT_VERSION,
                                                     "policy_version": POLICY_VERSION})

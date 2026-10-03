@@ -14,8 +14,7 @@ from evidencetrail.experiments import gather_all, rules_baseline
 from evidencetrail.runs import RunManager
 from evidencetrail.scenarios import apply_counterfactual, get_case
 from evidencetrail.seed import CASE_PREFIX, get_seed, pseudo, recipient_id, slug
-from test_evidencetrail import FakeJev
-from test_team import AutoTeam
+from fakes import AutoTeam, FakeJev
 
 SEED = get_seed()
 HAVE_SEED = SEED.available()

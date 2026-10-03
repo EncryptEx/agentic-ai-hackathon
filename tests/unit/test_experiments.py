@@ -6,48 +6,15 @@ import json
 import time
 import unittest
 
-from evidencetrail import agent, api, evaluator
+from evidencetrail import api, evaluator, team
 from evidencetrail.eval_fixtures import EXPECTED_ACTIONS
 from evidencetrail.experiments import fixed_evidence_experiment, gather_all, rules_baseline
-from evidencetrail.gemini import ModelTurn
-from evidencetrail.jev import ProviderUnavailable
 from evidencetrail.runs import RunManager
 from evidencetrail.scenarios import SCENARIOS, get_case
 from evidencetrail.evidence import EvidenceStore
 from evidencetrail.tools import FINISH
-from test_evidencetrail import FakeJev, ScriptedFor, ScriptedModel, finisher, full_plan
+from fakes import AutoTeam, FakeJev, FrozenDecider, VaryingJev, run_team
 from test_geval import HAVE_DEEPEVAL
-
-
-class FrozenDecider:
-    """Decision model for experiment B: cites every evidence ID in the frozen bundle."""
-    provider = "scripted"
-    requested_model = "frozen-decider"
-
-    def __init__(self, actions=("REVIEW",), fail_at=()):
-        self.actions, self.fail_at, self.calls, self.seen = list(actions), set(fail_at), 0, []
-
-    def generate(self, system, steps, tools):
-        self.seen.append((steps, tools))
-        i = self.calls
-        self.calls += 1
-        if i in self.fail_at:
-            raise ProviderUnavailable("fake outage")
-        bundle = json.loads(steps[0]["content"])["evidence"]
-        args = {"recommended_action": self.actions[i % len(self.actions)], "status": "COMPLETE",
-                "claims": [{"text": "Frozen bundle reviewed.",
-                            "supporting_evidence_ids": [e["evidence_id"] for e in bundle]}],
-                "remaining_uncertainty": "none"}
-        call = {"id": f"f{i}", "name": FINISH, "arguments": args}
-        return ModelTurn([{"type": "function_call", **call}], [call], "", "frozen-1", None)
-
-
-class VaryingJev(FakeJev):
-    def assess(self, state, questions=None):
-        self.states.append(state)
-        risk = "HIGH" if len(self.states) % 2 else "ELEVATED"
-        return {"raw": {"answers": {}}, "normalized": {"recipient_risk": risk, "manipulation_indicators": 0.5},
-                "model": "jev-fake-1", "usage": None}
 
 
 class FixedEvidence(unittest.TestCase):
@@ -110,26 +77,8 @@ class Ablation(unittest.TestCase):
         store = gather_all(get_case("case-missing-tool"))
         self.assertEqual([e["source"] for e in store.by_type("tool_error")], ["inspect_recipient"])
 
-    def test_no_jev_arm_unregisters_only_the_jev_tool(self):
-        names_with = [d["name"] for d in agent.registered_tools(True)]
-        names_without = [d["name"] for d in agent.registered_tools(False)]
-        self.assertEqual(set(names_with) - set(names_without), {"assess_with_jev"})
-
-    def test_no_jev_arm_rejects_a_jev_call_and_records_the_arm(self):
-        case = get_case("case-familiar")
-        plan = full_plan(case) + [("assess_with_jev", {"evidence_ids": ["EV-001"]})]
-        model = ScriptedModel(plan, finisher())
-        jev = FakeJev()
-        r = agent.investigate(case, model, jev, "run-nojev", enable_jev=False)
-        self.assertEqual(jev.states, [])
-        errs = [e for e in r["evidence"] if e["type"] == "tool_error"]
-        self.assertIn("not registered", errs[0]["payload"]["error"])
-        self.assertEqual(r["run_header"]["arm"], "no_jev")
-        self.assertNotEqual(r["run_header"]["tool_snapshot_hash"],
-                            agent.run_header(case, "live", model)["tool_snapshot_hash"])
-
     def test_ablation_api_reports_all_arms_with_denominators(self):
-        api.set_manager(RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=FakeJev))
+        api.set_manager(RunManager(model_factory=AutoTeam, jev_factory=FakeJev))
         status, body = api.handle_post("/api/experiments/ablation",
                                        {"caseIds": ["case-familiar", "case-takeover"], "repetitions": 2})
         self.assertEqual(status, 202)
@@ -145,7 +94,7 @@ class Ablation(unittest.TestCase):
             self.assertEqual((arms[arm]["matched_runs"], arms[arm]["eligible_runs"]), (4, 4))
 
     def test_incomplete_outcome_counts_for_missing_tool_case_but_provider_outage_does_not(self):
-        api.set_manager(RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=FakeJev))
+        api.set_manager(RunManager(model_factory=AutoTeam, jev_factory=FakeJev))
         _, body = api.handle_post("/api/experiments/ablation", {"caseIds": ["case-missing-tool"], "repetitions": 2})
         for _ in range(200):
             _, exp = api.handle_get(f"/api/experiments/{body['experimentId']}")
@@ -191,8 +140,7 @@ class FailureReasons(unittest.TestCase):
 
 class TraceExportAndProvenance(unittest.TestCase):
     def _run(self):
-        case = get_case("case-familiar")
-        return agent.investigate(case, ScriptedModel(full_plan(case), finisher()), FakeJev(), "run-x")
+        return run_team("case-familiar")[2]
 
     def test_run_header_records_code_commit_state(self):
         header = self._run()["run_header"]
@@ -202,15 +150,15 @@ class TraceExportAndProvenance(unittest.TestCase):
             self.assertIn(key, header)
 
     def test_model_turns_keep_exact_redacted_request_and_response(self):
-        events = [e for e in self._run()["events"] if e["event_type"] == "model_turn"]
-        snap = events[1]["result_snapshot"]
+        events = [e for e in self._run()["events"] if e["event_type"] == "model_turn" and e["agent"] == "orchestrator"]
+        snap = events[1]["result_snapshot"]  # the orchestrator's second turn has seen the first consultation
         self.assertEqual(len(snap["request_hash"]), 64)
         self.assertTrue(snap["request_steps"])
         self.assertTrue(snap["response_steps"])
         self.assertGreater(len(snap["request_steps"]), len(events[0]["result_snapshot"]["request_steps"]))
 
     def test_export_is_redacted_and_labelled_not_immutable(self):
-        mgr = RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=FakeJev)
+        mgr = RunManager(model_factory=AutoTeam, jev_factory=FakeJev)
         api.set_manager(mgr)
         _, body = api.handle_post("/api/investigations", {"caseId": "case-familiar"})
         for _ in range(100):
@@ -229,11 +177,11 @@ class TraceExportAndProvenance(unittest.TestCase):
     def test_evidence_streams_while_run_is_in_progress(self):
         case = get_case("case-familiar")
         store, seen = EvidenceStore(), []
-        agent.investigate(case, ScriptedModel(full_plan(case), finisher()), FakeJev(), "run-s",
-                          on_event=lambda e: seen.append(len(store.all())), store=store)
+        team.investigate_team(case, AutoTeam(), FakeJev(), "run-s",
+                              on_event=lambda e: seen.append(len(store.all())), store=store)
         self.assertEqual(seen[0], 0)
-        self.assertTrue(any(0 < n < 4 for n in seen))  # partial evidence visible mid-run
-        self.assertEqual(seen[-1], 4)
+        self.assertTrue(any(0 < n < 5 for n in seen))  # partial evidence visible mid-run
+        self.assertEqual(seen[-1], 5)  # four data tools plus the risk judge's Jev assessment
 
 
 @unittest.skipUnless(HAVE_DEEPEVAL, "deepeval not installed")
@@ -241,7 +189,7 @@ class JudgeRepeats(unittest.TestCase):
     def test_repeated_judge_passes_report_each_score_and_spread(self):
         from test_geval import StubJudge
         case = get_case("case-manipulated")
-        run = agent.investigate(case, ScriptedModel(full_plan(case), finisher("CONTEXT_CHECK")), FakeJev(), "run-j")
+        run = run_team("case-manipulated", action="CONTEXT_CHECK")[2]
         judge = StubJudge()
         out = evaluator.evaluate(run, case, judge_factory=lambda: judge, repeats=3)
         m = out["geval"]["evidence_grounding"]
@@ -251,7 +199,7 @@ class JudgeRepeats(unittest.TestCase):
         self.assertEqual(out["judge_passes_requested"], 3)
 
     def test_api_validates_repeats(self):
-        api.set_manager(RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=FakeJev))
+        api.set_manager(RunManager(model_factory=AutoTeam, jev_factory=FakeJev))
         _, body = api.handle_post("/api/investigations", {"caseId": "case-familiar"})
         status, _ = api.handle_post(f"/api/investigations/{body['runId']}/evaluate", {"repeats": 9})
         self.assertEqual(status, 400)

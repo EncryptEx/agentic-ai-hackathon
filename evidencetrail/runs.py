@@ -6,7 +6,7 @@ import uuid
 
 import sqlite3
 
-from . import agent, evaluator, experiments, policy, team
+from . import evaluator, experiments, policy, team
 from .alerts import AlertStore
 from .canon import now_utc, redact
 from .config import JEV_MODEL
@@ -24,8 +24,7 @@ _DONE = ("completed", "failed")
 
 class RunManager:
     def __init__(self, model_factory=GeminiClient, jev_factory=JevClient, judge_factory=None,
-                 run_mode="live", alert_store=None, architecture="team"):
-        self._architecture = architecture  # "team" (orchestrator + specialists) or "single"
+                 run_mode="live", alert_store=None):
         self._run_mode = run_mode  # "live", or "development" when providers are stand-ins
         self._model_factory = model_factory
         self._jev_factory = jev_factory
@@ -39,11 +38,10 @@ class RunManager:
 
     # ---- single investigations -------------------------------------------------
     def start(self, case_id, configuration=None, case=None, run_mode=None, experiment_id=None,
-              arm="with_jev", alerts_enabled=True, architecture=None):
+              arm="with_jev", alerts_enabled=True):
         run_mode = run_mode or self._run_mode
-        architecture = architecture or (configuration or {}).get("architecture") or self._architecture
-        if architecture not in ("team", "single"):
-            raise ValueError("architecture must be 'team' or 'single'")
+        if (configuration or {}).get("architecture") not in (None, "team"):
+            raise ValueError("single-agent mode was removed; investigations always use the agent team")
         case = case or get_case(case_id)
         if case is None:
             raise KeyError(case_id)
@@ -53,12 +51,12 @@ class RunManager:
                                   "created_at": now_utc(), "configuration": configuration or {},
                                   "events": [], "evidence": [], "final": None, "error": None,
                                   "experiment_id": experiment_id, "evaluation": None, "arm": arm,
-                                  "alert": None, "alert_error": None, "architecture": architecture}
+                                  "alert": None, "alert_error": None, "architecture": "team"}
             self._cases[run_id] = case
-        threading.Thread(target=self._execute, args=(run_id, case, run_mode, arm, alerts_enabled, architecture), daemon=True).start()
+        threading.Thread(target=self._execute, args=(run_id, case, run_mode, arm, alerts_enabled), daemon=True).start()
         return run_id
 
-    def _execute(self, run_id, case, run_mode, arm, alerts_enabled, architecture):
+    def _execute(self, run_id, case, run_mode, arm, alerts_enabled):
         run = self._runs[run_id]
         with self._slots:
             run["state"] = "running"
@@ -70,8 +68,7 @@ class RunManager:
                 run["evidence"] = store.all()
 
             try:
-                investigate = team.investigate_team if architecture == "team" else agent.investigate
-                result = investigate(case, self._model_factory(), self._jev_factory(), run_id,
+                result = team.investigate_team(case, self._model_factory(), self._jev_factory(), run_id,
                                            run_mode=run_mode, on_event=on_event,
                                            enable_jev=(arm != "no_jev"), store=store,
                                            triage=bool(alerts_enabled))

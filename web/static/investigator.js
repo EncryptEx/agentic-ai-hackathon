@@ -5,7 +5,7 @@ const inv = {
     scenarios: [], caseId: null, run: null, runId: null, starting: false,
     selected: [], replayCount: null, replayTimer: null, pollTimer: null,
     reviewOpen: false, contextOpen: false, exp: null, expKind: null, expTimer: null, error: null,
-    alerts: [], alertFilter: "open", alertsError: null, architecture: "team", handoffAsk: {}, alertTimer: null,
+    alerts: [], alertFilter: "open", alertsError: null, handoffAsk: {}, alertTimer: null,
     source: "scenarios", seedCases: [], seedNote: null, seedLoading: false, seedExp: null, seedTimer: null,
 };
 
@@ -140,14 +140,10 @@ function renderControls() {
         "▶ Replay recorded trace");
     const exportBtn = el("button", { class: "page-btn", type: "button", disabled: !inv.runId || !inv.run || isRunning(inv.run), onclick: exportTrace,
         title: "Redacted JSON of the recorded audit trail" }, "⬇ Export trace");
-    const arch = el("select", { id: "inv-arch", disabled: busy, "aria-label": "Agent architecture", title: "Agent architecture",
-        onchange: e => { inv.architecture = e.target.value; } },
-        el("option", { value: "team", selected: inv.architecture === "team" }, "Agent team"),
-        el("option", { value: "single", selected: inv.architecture === "single" }, "Single agent"));
     const source = el("select", { id: "inv-source", disabled: busy, "aria-label": "Data source", title: "Data source", onchange: e => switchSource(e.target.value) },
         el("option", { value: "scenarios", selected: inv.source === "scenarios" }, "Hand-built scenarios"),
         el("option", { value: "seed", selected: inv.source === "seed" }, "FRAML data seed"));
-    const kids = [el("label", { class: "inv-label" }, "Data"), source, el("label", { class: "inv-label" }, "Case"), select, arch, start, replay, exportBtn, runBadges()];
+    const kids = [el("label", { class: "inv-label" }, "Data"), source, el("label", { class: "inv-label" }, "Case"), select, start, replay, exportBtn, runBadges()];
     if (inv.error) kids.push(el("div", { class: "inv-error", role: "alert" }, inv.error));
     box.replaceChildren(...kids);
 }
@@ -162,7 +158,6 @@ function runBadges() {
     const hdr = r.run_header;
     if (hdr && hdr.architecture === "team") wrap.append(el("span", { class: "inv-tag", title: Object.keys(hdr.roster).map(k => AGENT_LABELS[k]).join(", ") },
         `Agent team: orchestrator + ${Object.keys(hdr.roster).length} specialists` + (r.consultation_count != null ? ` · ${r.consultation_count} consultations` : "")));
-    else if (hdr && hdr.architecture === "single") wrap.append(el("span", { class: "inv-tag" }, "Single agent"));
     const mc = r.run_header && r.run_header.model_configuration;
     if (mc) wrap.append(el("span", { class: "inv-tag" + (r.failure ? " bad" : "") }, r.failure ? "Provider unavailable" : `${r.run_header.run_mode}: ${mc.provider} / ${mc.requested_model || "n/a"}`));
     if (r.recorded_audit_trail_verified === true) wrap.append(el("span", { class: "inv-tag" }, "Recorded audit trail – hash chain verified"));
@@ -204,7 +199,7 @@ async function startRun() {
     if (inv.starting || (inv.run && isRunning(inv.run))) return; // prevent duplicate starts
     resetRun(); inv.starting = true; renderAll();
     try {
-        const d = await invApi("/api/investigations", { caseId: inv.caseId, configuration: { architecture: inv.architecture } });
+        const d = await invApi("/api/investigations", { caseId: inv.caseId, configuration: {} });
         inv.runId = d.runId;
         inv.run = { state: "queued", events: [], evidence: [] };
         inv.starting = false;

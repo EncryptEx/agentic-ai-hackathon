@@ -11,4 +11,8 @@ import evidencetrail.config  # noqa: F401  (loads .env once, so it cannot re-add
 
 for _name in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "TYPESAFE_API_KEY"):
     os.environ.pop(_name, None)
+# Stripping once is not enough: DeepEval loads .env into the environment when it is imported. The kill switch
+# makes the key getters return None no matter what the environment holds.
+os.environ["EVIDENCETRAIL_DISABLE_LIVE"] = "1"
+os.environ["DEEPEVAL_DISABLE_DOTENV"] = "1"
 os.environ["EVIDENCETRAIL_ALERT_DB"] = ":memory:"

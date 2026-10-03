@@ -6,10 +6,10 @@ import _no_live_keys  # noqa: F401  (strips real provider keys loaded from .env)
 import os
 import unittest
 
-from evidencetrail import agent, evaluator
+from evidencetrail import evaluator
 from evidencetrail.eval_fixtures import EXPECTED_ACTIONS
 from evidencetrail.scenarios import get_case
-from test_evidencetrail import FakeJev, ScriptedModel, finisher, full_plan
+from fakes import FakeJev, run_team
 
 try:
     from deepeval.models import DeepEvalBaseLLM
@@ -19,9 +19,8 @@ except ImportError:  # pragma: no cover
 
 
 def _run(case_id="case-manipulated"):
-    case = get_case(case_id)
-    model = ScriptedModel(full_plan(case), finisher("CONTEXT_CHECK"))
-    return case, agent.investigate(case, model, FakeJev(), "run-geval")
+    case, _, result = run_team(case_id, jev=FakeJev(), action="CONTEXT_CHECK")
+    return case, result
 
 
 if HAVE_DEEPEVAL:

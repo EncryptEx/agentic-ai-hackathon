@@ -135,15 +135,17 @@ class LiveCheckLogic(unittest.TestCase):
 
     def test_key_report_never_contains_a_key_value(self):
         os.environ["GEMINI_API_KEY"] = "sk-test-visible?"
+        del os.environ["EVIDENCETRAIL_DISABLE_LIVE"]  # let the getter see the fake key for this one test
         try:
             text = str(live_check.check_keys())
         finally:
+            os.environ["EVIDENCETRAIL_DISABLE_LIVE"] = "1"
             del os.environ["GEMINI_API_KEY"]
         self.assertNotIn("sk-test-visible", text)
         self.assertIn("set", text)
 
     def test_e2e_runs_every_scenario_and_reports_action_vs_label(self):
-        from test_team import AutoTeam
+        from fakes import AutoTeam
         model = AutoTeam()
         model.available = lambda: True
         res = live_check.check_e2e(model, FakeJev())
@@ -165,8 +167,10 @@ class LiveCheckLogic(unittest.TestCase):
 class Isolation(unittest.TestCase):
     def test_unit_tests_never_see_real_provider_keys(self):
         from evidencetrail.config import gemini_key, jev_key
-        self.assertIsNone(gemini_key())
-        self.assertIsNone(jev_key())
+        # Never assert on the key value itself: a failing assertion would print it.
+        self.assertTrue(gemini_key() is None, "a real Gemini key is visible to unit tests")
+        self.assertTrue(jev_key() is None, "a real TypeSafe key is visible to unit tests")
+        self.assertEqual(os.environ["EVIDENCETRAIL_DISABLE_LIVE"], "1")
         self.assertEqual(os.environ["EVIDENCETRAIL_ALERT_DB"], ":memory:")
 
 

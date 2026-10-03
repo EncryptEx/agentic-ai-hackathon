@@ -8,20 +8,19 @@ import unittest
 import _no_live_keys  # noqa: F401  (strips real provider keys loaded from .env)
 os.environ["EVIDENCETRAIL_ALERT_DB"] = ":memory:"
 
-from evidencetrail import agent, alerts, api, evaluator
+from evidencetrail import alerts, api, evaluator, team
 from evidencetrail.alerts import AlertStore, decide_alert
 from evidencetrail.evidence import EvidenceStore
 from evidencetrail.runs import RunManager
 from evidencetrail.scenarios import get_case
-from test_evidencetrail import FakeJev, ScriptedFor, ScriptedModel, finisher, full_plan
+from fakes import AutoTeam, FakeJev, run_team
 
 SUSPICIOUS = {"suspicion": "SUSPICIOUS", "severity": 2}
 
 
 def run(case_id, jev, agent_action="ALLOW", triage=True):
-    case = get_case(case_id)
-    model = ScriptedModel(full_plan(case), finisher(agent_action))
-    return case, agent.investigate(case, model, jev, "run-alert", triage=triage)
+    case, _, result = run_team(case_id, jev=jev, action=agent_action, triage=triage)
+    return case, result
 
 
 class AlertDecision(unittest.TestCase):
@@ -85,7 +84,7 @@ class AlertDecision(unittest.TestCase):
         saved = {k: os.environ.pop(k, None) for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY")}
         try:
             jev = FakeJev()
-            r = agent.investigate(get_case("case-familiar"), GeminiClient(), jev, "run-out", triage=True)
+            r = team.investigate_team(get_case("case-familiar"), GeminiClient(), jev, "run-out", triage=True)
         finally:
             for k, v in saved.items():
                 if v:
@@ -169,7 +168,7 @@ class AlertStoreTests(unittest.TestCase):
 class AlertApi(unittest.TestCase):
     def setUp(self):
         self.jev = FakeJev(triage=SUSPICIOUS)
-        self.mgr = RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=lambda: self.jev,
+        self.mgr = RunManager(model_factory=AutoTeam, jev_factory=lambda: self.jev,
                               alert_store=AlertStore(":memory:"))
         api.set_manager(self.mgr)
 
@@ -234,7 +233,7 @@ class AlertApi(unittest.TestCase):
             def create(self, alert):
                 import sqlite3
                 raise sqlite3.OperationalError("disk full")
-        mgr = RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=lambda: self.jev, alert_store=BrokenStore(":memory:"))
+        mgr = RunManager(model_factory=AutoTeam, jev_factory=lambda: self.jev, alert_store=BrokenStore(":memory:"))
         api.set_manager(mgr)
         _, body = api.handle_post("/api/investigations", {"caseId": "case-takeover"})
         view = self._finish(body["runId"])

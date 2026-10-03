@@ -33,7 +33,6 @@ def load_env_file(path, environ=None):
 
 load_env_file(os.path.join(_ROOT, ".env"))
 
-PROMPT_VERSION = "investigator-prompt-v1"
 TEAM_PROMPT_VERSION = "investigator-team-prompt-v1"
 POLICY_VERSION = "policy-v1-demo"
 JEV_SPEC_VERSION = "jev-questions-v1"
@@ -61,9 +60,19 @@ def agent_may_escalate():
     return os.environ.get("EVIDENCETRAIL_AGENT_ESCALATION") == "1"
 
 
+def _live_disabled():
+    """Kill switch used by unit tests: other libraries (e.g. DeepEval) load .env into the environment on
+    import, so stripping keys once is not enough. When set, no provider key is ever returned."""
+    return os.environ.get("EVIDENCETRAIL_DISABLE_LIVE") == "1"
+
+
 def gemini_key():
+    if _live_disabled():
+        return None
     return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 
 
 def jev_key():
+    if _live_disabled():
+        return None
     return os.environ.get("TYPESAFE_API_KEY")

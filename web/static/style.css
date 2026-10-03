@@ -837,7 +837,6 @@ td {
 
 
 /* ---------- Agent team ---------- */
-.inv-controls #inv-arch { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 9px 12px; font-size: 13px; }
 .inv-tag.agent-orchestrator { color: var(--accent-blue); border-color: var(--accent-blue); }
 .inv-tag.agent-behavior_device { color: var(--tier-low); border-color: var(--tier-low); }
 .inv-tag.agent-recipient_network { color: var(--tier-med); border-color: var(--tier-med); }

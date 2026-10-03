@@ -13,6 +13,7 @@ from generator.transaction_generator import TransactionGenerator
 from engine.risk_engine import RiskEngine
 from models.customer import CustomerProfile, PEPStatus, AdverseMedia, SanctionStatus
 from models.transaction import Transaction, TransactionType, TransactionDirection
+from evidencetrail import api as evidencetrail_api
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 EXPORTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "exports"))
@@ -27,6 +28,11 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
         parsed_url = urllib.parse.urlparse(self.path)
         path = parsed_url.path
         query = urllib.parse.parse_qs(parsed_url.query)
+
+        if evidencetrail_api.handles(path):
+            status, body = evidencetrail_api.handle_get(path)
+            self._send_json(body, status)
+            return
 
         if path == "/api/portfolio":
             self._handle_portfolio()
@@ -60,6 +66,11 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
             payload = json.loads(body.decode("utf-8")) if body else {}
         except Exception as e:
             self._send_error(400, f"Invalid JSON payload: {str(e)}")
+            return
+
+        if evidencetrail_api.handles(path):
+            status, body = evidencetrail_api.handle_post(path, payload)
+            self._send_json(body, status)
             return
 
         if path == "/api/simulate":

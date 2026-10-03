@@ -8,7 +8,7 @@ The deterministic policy engine, not the model, decides the simulated interventi
 import json
 import time
 
-from . import policy
+from . import alerts, policy
 from .canon import now_utc, redact, sha256
 from .config import (GENERATION_SETTINGS, JEV_SPEC_VERSION, MAX_TOOL_CALLS, POLICY_VERSION,
                      PROMPT_VERSION, RUN_TIMEOUT_S, SCENARIO_VERSION)
@@ -76,7 +76,8 @@ def run_header(case, run_mode, model, decls=None, arm="with_jev"):
     }
 
 
-def investigate(case, model, jev, run_id, run_mode="live", on_event=None, enable_jev=True, store=None):
+def investigate(case, model, jev, run_id, run_mode="live", on_event=None, enable_jev=True, store=None,
+                triage=False):
     """Run one investigation. Returns a dict with events, evidence, claims and the final decision.
 
     `store` may be supplied so callers can stream evidence while the run is in progress.
@@ -178,9 +179,34 @@ def investigate(case, model, jev, run_id, run_mode="live", on_event=None, enable
     else:
         fail("Agent exceeded the step limit without finishing.")
 
+    alert = _alert_step(case, run_id, store, final, jev, rec) if triage and final else None
     return {"run_id": run_id, "case_id": case["case_id"], "run_header": run_header(case, run_mode, model, decls, "with_jev" if enable_jev else "no_jev"),
             "events": trace.events, "evidence": store.all(), "final": final, "failure": failure,
-            "tool_call_count": tool_calls, "finished_at": now_utc()}
+            "tool_call_count": tool_calls, "finished_at": now_utc(), "alert": alert}
+
+
+def _alert_step(case, run_id, store, final, jev, rec):
+    """After the policy decision: Jev triages the case and an alert is created when warranted.
+    Runs strictly after `final` is set, so it can never change the simulated action."""
+    t0 = time.monotonic()
+    triage, ev = alerts.run_triage(case, store, jev)
+    rec(event_type="alert_triage", actor="jev", tool_name="alert_triage", input_evidence_ids=[
+            e["evidence_id"] for e in store.all() if e["type"] not in ("tool_error", "jev_assessment", "alert_triage")],
+        output_evidence_ids=[ev["evidence_id"]], result_snapshot={k: v for k, v in triage.items() if k != "raw"},
+        reason_code="TRIAGE_" + triage["status"].upper(), provider="jev",
+        returned_model_version=triage.get("model"), duration_ms=int((time.monotonic() - t0) * 1000),
+        brief_justification="Jev triage of the finished investigation; independent of the policy result.",
+        error=triage.get("reason") if triage["status"] in ("unavailable", "error") else None)
+    alert = alerts.build_alert(case, run_id, store, final, triage, ev)
+    if alert:
+        rec(event_type="alert_created", actor="system", reason_code="ALERT_" + "_".join(s.upper() for s in alert["sources"]),
+            result_snapshot={"alert_id": alert["alert_id"], "severity": alert["severity"], "sources": alert["sources"],
+                             "disagreement": alert["disagreement"]},
+            output_evidence_ids=[], input_evidence_ids=alert["evidence_ids"], brief_justification=alert["title"])
+    else:
+        rec(event_type="alert_not_created", actor="system", reason_code="NO_ALERT",
+            brief_justification="Neither Jev nor the deterministic policy flagged this case.")
+    return alert
 
 
 def _result_step(name, call_id, payload):
@@ -228,7 +254,7 @@ def _jev_evidence(args, store, jev):
         item = store.get(eid)
         if item is None:
             raise ToolError(f"unknown evidence id '{eid}'")
-        if item["type"] in ("jev_assessment", "tool_error"):
+        if item["type"] in ("jev_assessment", "tool_error", "alert_triage"):
             raise ToolError(f"evidence '{eid}' ({item['type']}) cannot be assessed")
         items.append(item)
     result = jev.assess(build_state(items))

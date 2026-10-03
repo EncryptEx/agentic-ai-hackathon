@@ -30,7 +30,7 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
         query = urllib.parse.parse_qs(parsed_url.query)
 
         if evidencetrail_api.handles(path):
-            status, body = evidencetrail_api.handle_get(path)
+            status, body = evidencetrail_api.handle_get(path, query)
             self._send_json(body, status)
             return
 

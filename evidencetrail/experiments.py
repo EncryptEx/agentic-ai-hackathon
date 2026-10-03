@@ -65,7 +65,7 @@ def _decision_prompt(case, store):
 
 
 def _jev_state(store):
-    return build_state([e for e in store.all() if e["type"] not in ("tool_error", "jev_assessment")])
+    return build_state([e for e in store.all() if e["type"] not in ("tool_error", "jev_assessment", "alert_triage")])
 
 
 def _summarize_values(values):

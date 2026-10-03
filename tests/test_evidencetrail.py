@@ -1,7 +1,10 @@
 """EvidenceTrail tests. Scripted fake model and fake Jev: no network, no credentials."""
 
+import os
 import time
 import unittest
+
+os.environ["EVIDENCETRAIL_ALERT_DB"] = ":memory:"  # never touch the real alert database in tests
 
 from evidencetrail import agent, api, policy
 from evidencetrail.canon import redact
@@ -16,11 +19,19 @@ from evidencetrail.trace import verify_chain
 
 
 class FakeJev:
-    def __init__(self, fail=False):
+    def __init__(self, fail=False, triage=None):
         self.fail = fail
         self.states = []
+        self.triage_states = []
+        self.triage = triage or {"suspicion": "NOT_SUSPICIOUS", "severity": 0}
 
-    def assess(self, state):
+    def assess(self, state, questions=None):
+        if questions is not None and "suspicion" in questions:  # alert triage call
+            self.triage_states.append(state)
+            if self.fail:
+                raise ProviderUnavailable("fake outage")
+            return {"raw": {"answers": {"suspicion": {"type": "choice", "choice": self.triage["suspicion"]}}},
+                    "normalized": dict(self.triage), "model": "jev-fake-1", "usage": None}
         self.states.append(state)
         if self.fail:
             raise ProviderUnavailable("fake outage")

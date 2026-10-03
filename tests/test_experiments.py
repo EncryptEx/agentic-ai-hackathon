@@ -41,7 +41,7 @@ class FrozenDecider:
 
 
 class VaryingJev(FakeJev):
-    def assess(self, state):
+    def assess(self, state, questions=None):
         self.states.append(state)
         risk = "HIGH" if len(self.states) % 2 else "ELEVATED"
         return {"raw": {"answers": {}}, "normalized": {"recipient_risk": risk, "manipulation_indicators": 0.5},

@@ -5,6 +5,7 @@ const inv = {
     scenarios: [], caseId: null, run: null, runId: null, starting: false,
     selected: [], replayCount: null, replayTimer: null, pollTimer: null,
     reviewOpen: false, contextOpen: false, exp: null, expKind: null, expTimer: null, error: null,
+    alerts: [], alertFilter: "open", alertsError: null,
 };
 
 const TOOL_LABELS = {
@@ -14,6 +15,14 @@ const TOOL_LABELS = {
     search_relationship_graph: "Searched recipient relationships",
     assess_with_jev: "Requested Jev risk assessment",
     finish_investigation: "Submitted recommendation",
+    alert_triage: "Jev alert triage",
+};
+const SEVERITY_TEXT = { high: "High", medium: "Medium", low: "Low" };
+const SOURCE_TEXT = { jev: "Jev", policy: "Policy" };
+const DISAGREEMENT_TEXT = {
+    jev_suspicious_policy_allow: "Jev found this suspicious but policy v1 would allow it. The alert comes from Jev alone and the simulated action is unchanged.",
+    policy_flagged_jev_not_suspicious: "Policy routed this for attention although Jev did not find it suspicious. The alert stands: Jev cannot suppress a policy alert.",
+    jev_unavailable: "Jev triage was unavailable, so this alert comes from the policy alone.",
 };
 const ACTION_TEXT = { ALLOW: "Allow", CONTEXT_CHECK: "Context check", REVIEW: "Review" };
 
@@ -89,8 +98,10 @@ function initInvestigator() {
             el("div", { class: "inv-col" }, el("div", { id: "inv-tx", class: "inv-card" }), el("div", { id: "inv-final", class: "inv-card" }), el("div", { id: "inv-claims", class: "inv-card" })),
             el("div", { class: "inv-col" }, el("div", { id: "inv-trace", class: "inv-card" })),
             el("div", { class: "inv-col" }, el("div", { id: "inv-graph", class: "inv-card" }), el("div", { id: "inv-evidence", class: "inv-card" }))),
+        el("div", { id: "inv-alerts", class: "inv-card inv-alerts" }),
         el("div", { class: "inv-quality" },
             el("div", { id: "inv-risk", class: "inv-card" }), el("div", { id: "inv-quality", class: "inv-card" }), el("div", { id: "inv-consistency", class: "inv-card" })));
+    loadAlerts();
     invApi("/api/scenarios").then(d => {
         inv.scenarios = d.scenarios;
         inv.caseId = inv.caseId || (d.scenarios[0] && d.scenarios[0].case_id);
@@ -101,7 +112,7 @@ function initInvestigator() {
 
 function renderAll() {
     renderControls(); renderTx(); renderTrace(); renderGraph(); renderFinal(); renderClaims();
-    renderEvidence(); renderRisk(); renderQuality(); renderConsistency();
+    renderEvidence(); renderRisk(); renderQuality(); renderConsistency(); renderAlerts();
 }
 
 // ---------------------------------------------------------------- controls
@@ -170,7 +181,7 @@ function pollRun() {
         try {
             inv.run = await invApi(`/api/investigations/${inv.runId}`);
             const evalRunning = inv.run.evaluation && inv.run.evaluation.state === "running";
-            if (!isRunning(inv.run) && !evalRunning) clearInterval(inv.pollTimer);
+            if (!isRunning(inv.run) && !evalRunning) { clearInterval(inv.pollTimer); loadAlerts(); }
         } catch (e) { inv.error = `Lost contact with the run: ${e.message}`; clearInterval(inv.pollTimer); }
         renderAll();
     };
@@ -227,6 +238,7 @@ function renderFinal() {
     if (incomplete) box.append(el("div", { class: "inv-warn", role: "alert" }, "Investigation incomplete – routed to review. Missing evidence is not treated as reassuring. ", f.explanation));
     else box.append(el("p", { class: "inv-explain" }, f.explanation));
     if (r.failure && !(f.explanation || "").includes(r.failure)) box.append(el("div", { class: "inv-error", role: "alert" }, r.failure));
+    box.append(...alertBanner(r));
     const actions = el("div", { class: "inv-actions" });
     if (f.simulated_action === "ALLOW") actions.append(el("button", { class: "btn-primary", type: "button", onclick: () => { inv.reviewOpen = !inv.reviewOpen; renderFinal(); } }, inv.reviewOpen ? "Hide decision" : "View decision"));
     if (f.simulated_action === "CONTEXT_CHECK" || (f.context_check && f.context_check.answer)) actions.append(el("button", { class: "btn-primary", type: "button", onclick: () => { inv.contextOpen = !inv.contextOpen; renderFinal(); } }, "Open context check"));
@@ -277,7 +289,8 @@ function renderTrace() {
     events.forEach((e, idx) => {
         const isErr = e.event_type === "tool_error" || e.event_type === "run_failed";
         const title = e.event_type === "run_started" ? "Investigation started" : e.event_type === "run_failed" ? "Investigation stopped"
-            : e.event_type === "final_decision" ? "Policy decision" : (TOOL_LABELS[e.tool_name] || e.tool_name);
+            : e.event_type === "final_decision" ? "Policy decision" : e.event_type === "alert_created" ? "Alert created"
+            : e.event_type === "alert_not_created" ? "No alert raised" : (TOOL_LABELS[e.tool_name] || e.tool_name);
         const li = el("li", { class: "inv-step" + (isErr ? " err" : "") },
             el("div", { class: "inv-step-head" }, el("span", { class: "inv-step-n", title: `trace event ${e.sequence}` }, idx + 1), el("strong", {}, title),
                 isErr ? el("span", { class: "inv-tag bad" }, "error / missing evidence") : null,
@@ -537,6 +550,72 @@ async function startExperiment(kind) {
         inv.expTimer = setInterval(tick, 1200); tick();
     } catch (e) { inv.error = `Experiment failed to start: ${e.message}`; }
     renderAll();
+}
+
+// ---------------------------------------------------------------- alerts
+function alertBanner(r) {
+    const evs = visibleEvents();
+    const created = evs.some(e => e.event_type === "alert_created");
+    const none = evs.some(e => e.event_type === "alert_not_created");
+    if (created && r.alert) {
+        const a = r.alert;
+        return [el("div", { class: "inv-alert sev-" + a.severity, role: "status" },
+            el("div", { class: "inv-alert-head" }, el("strong", {}, `Alert raised · ${SEVERITY_TEXT[a.severity]} severity`),
+                a.sources.map(src => el("span", { class: "inv-tag" }, SOURCE_TEXT[src])), el("span", { class: "inv-muted" }, a.alert_id)),
+            el("div", {}, a.title), el("div", { class: "inv-muted" }, a.summary),
+            a.disagreement ? el("div", { class: "inv-muted" }, DISAGREEMENT_TEXT[a.disagreement]) : null,
+            r.alert_error ? el("div", { class: "inv-error", role: "alert" }, r.alert_error) : null,
+            el("div", { class: "inv-muted" }, a.notice))];
+    }
+    if (none) return [el("div", { class: "inv-alert none" }, "No alert raised: neither Jev nor the deterministic policy flagged this case.")];
+    return [];
+}
+
+async function loadAlerts() {
+    try {
+        const q = inv.alertFilter === "all" ? "" : `?status=${inv.alertFilter}`;
+        inv.alerts = (await invApi(`/api/evidencetrail/alerts${q}`)).alerts; inv.alertsError = null;
+    } catch (e) { inv.alertsError = `Could not load alerts: ${e.message}`; }
+    renderAlerts();
+}
+
+async function setAlertStatus(id, status) {
+    try { await invApi(`/api/evidencetrail/alerts/${id}/status`, { status }); }
+    catch (e) { inv.alertsError = `Could not update alert: ${e.message}`; }
+    loadAlerts();
+}
+
+function openAlertRun(a) {
+    stopReplay(); clearInterval(inv.pollTimer);
+    Object.assign(inv, { caseId: a.case_id, runId: a.run_id, run: { state: "running", events: [], evidence: [] }, selected: [], reviewOpen: false, contextOpen: false, exp: null, error: null });
+    pollRun(); renderAll();
+    document.getElementById("inv-controls").scrollIntoView({ behavior: "smooth" });
+}
+
+function renderAlerts() {
+    const box = document.getElementById("inv-alerts");
+    if (!box) return;
+    const filter = el("select", { "aria-label": "Alert filter", onchange: e => { inv.alertFilter = e.target.value; loadAlerts(); } },
+        [["open", "Open"], ["acknowledged", "Acknowledged"], ["dismissed", "Dismissed"], ["all", "All"]].map(([v, t]) => el("option", { value: v, selected: v === inv.alertFilter }, t)));
+    box.replaceChildren(el("div", { class: "inv-alert-bar" }, el("h3", {}, `Alert queue (${inv.alerts.length})`), filter),
+        el("p", { class: "inv-muted" }, "Alerts are raised when Jev finds a finished investigation suspicious or the policy routes it away from Allow. They are notifications for an analyst and never move or block money."));
+    if (inv.alertsError) box.append(el("div", { class: "inv-error", role: "alert" }, inv.alertsError));
+    if (!inv.alerts.length) { box.append(el("p", { class: "inv-muted" }, "No alerts in this view.")); return; }
+    const list = el("ul", { class: "inv-alert-list" });
+    inv.alerts.forEach(a => {
+        const name = (inv.scenarios.find(x => x.case_id === a.case_id) || {}).name || a.case_id;
+        list.append(el("li", { class: "inv-alert-row sev-" + a.severity },
+            el("div", { class: "inv-alert-head" }, el("strong", {}, a.title), el("span", { class: "inv-tag" }, SEVERITY_TEXT[a.severity]),
+                a.sources.map(src => el("span", { class: "inv-tag" }, SOURCE_TEXT[src])), el("span", { class: "inv-tag" }, a.status)),
+            el("div", { class: "inv-muted" }, `${name} · ${a.transaction.amount.toLocaleString("en-US")} ${a.transaction.currency} to ${a.transaction.recipient_id} · ${a.created_at.replace("T", " ").slice(0, 19)} UTC`),
+            el("div", { class: "inv-muted" }, a.summary),
+            a.disagreement ? el("div", { class: "inv-muted" }, DISAGREEMENT_TEXT[a.disagreement]) : null,
+            el("div", { class: "inv-actions" },
+                el("button", { class: "page-btn", type: "button", onclick: () => openAlertRun(a) }, "Open investigation"),
+                a.status === "open" ? el("button", { class: "page-btn", type: "button", onclick: () => setAlertStatus(a.alert_id, "acknowledged") }, "Acknowledge") : null,
+                a.status !== "dismissed" ? el("button", { class: "page-btn", type: "button", onclick: () => setAlertStatus(a.alert_id, "dismissed") }, "Dismiss") : null)));
+    });
+    box.append(list);
 }
 
 document.addEventListener("DOMContentLoaded", initInvestigator);

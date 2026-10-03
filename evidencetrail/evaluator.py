@@ -59,7 +59,7 @@ def evidence_context(run):
             available_at[eid] = e["sequence"]
     return [f"[{ev['evidence_id']}] (available from trace step {available_at.get(ev['evidence_id'], '?')}) "
             f"type={ev['type']} source={ev['source']} payload={json.dumps(ev['payload'], sort_keys=True)}"
-            for ev in run["evidence"]]
+            for ev in run["evidence"] if ev["type"] != "alert_triage"]
 
 
 def trace_context(run):

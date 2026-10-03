@@ -4,7 +4,10 @@ import threading
 import time
 import uuid
 
+import sqlite3
+
 from . import agent, evaluator, experiments, policy
+from .alerts import AlertStore
 from .canon import now_utc, redact
 from .config import JEV_MODEL
 from .evidence import EvidenceStore
@@ -20,7 +23,7 @@ _DONE = ("completed", "failed")
 
 class RunManager:
     def __init__(self, model_factory=GeminiClient, jev_factory=JevClient, judge_factory=None,
-                 run_mode="live"):
+                 run_mode="live", alert_store=None):
         self._run_mode = run_mode  # "live", or "development" when providers are stand-ins
         self._model_factory = model_factory
         self._jev_factory = jev_factory
@@ -28,12 +31,13 @@ class RunManager:
         self._runs = {}
         self._cases = {}  # run_id -> case snapshot (counterfactual clones keep the original intact)
         self._experiments = {}
+        self._alerts = alert_store or AlertStore()
         self._lock = threading.Lock()
         self._slots = threading.BoundedSemaphore(MAX_CONCURRENT_RUNS)
 
     # ---- single investigations -------------------------------------------------
     def start(self, case_id, configuration=None, case=None, run_mode=None, experiment_id=None,
-              arm="with_jev"):
+              arm="with_jev", alerts_enabled=True):
         run_mode = run_mode or self._run_mode
         case = case or get_case(case_id)
         if case is None:
@@ -43,12 +47,13 @@ class RunManager:
             self._runs[run_id] = {"run_id": run_id, "case_id": case["case_id"], "state": "queued",
                                   "created_at": now_utc(), "configuration": configuration or {},
                                   "events": [], "evidence": [], "final": None, "error": None,
-                                  "experiment_id": experiment_id, "evaluation": None, "arm": arm}
+                                  "experiment_id": experiment_id, "evaluation": None, "arm": arm,
+                                  "alert": None, "alert_error": None}
             self._cases[run_id] = case
-        threading.Thread(target=self._execute, args=(run_id, case, run_mode, arm), daemon=True).start()
+        threading.Thread(target=self._execute, args=(run_id, case, run_mode, arm, alerts_enabled), daemon=True).start()
         return run_id
 
-    def _execute(self, run_id, case, run_mode, arm):
+    def _execute(self, run_id, case, run_mode, arm, alerts_enabled):
         run = self._runs[run_id]
         with self._slots:
             run["state"] = "running"
@@ -62,7 +67,9 @@ class RunManager:
             try:
                 result = agent.investigate(case, self._model_factory(), self._jev_factory(), run_id,
                                            run_mode=run_mode, on_event=on_event,
-                                           enable_jev=(arm != "no_jev"), store=store)
+                                           enable_jev=(arm != "no_jev"), store=store,
+                                           triage=alerts_enabled)
+                self._persist_alert(run, result.get("alert"))  # before the state flips to completed
                 run.update({"events": result["events"], "evidence": result["evidence"],
                             "final": result["final"], "run_header": result["run_header"],
                             "failure": result["failure"], "tool_call_count": result["tool_call_count"],
@@ -73,6 +80,24 @@ class RunManager:
                 run["error"] = f"{type(e).__name__}: {e}"
                 run["final"] = policy.incomplete("Run crashed before a decision was reached.")
             run["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+
+    def _persist_alert(self, run, alert):
+        if not alert:
+            return
+        try:
+            run["alert"] = self._alerts.create(alert)
+        except sqlite3.Error as e:  # the alert is still shown on the run, but we say it was not saved
+            run["alert"], run["alert_error"] = alert, f"alert could not be saved: {e}"
+
+    # ---- alerts ----------------------------------------------------------------
+    def list_alerts(self, status=None, severity=None):
+        return self._alerts.list(status=status, severity=severity)
+
+    def get_alert(self, alert_id):
+        return self._alerts.get(alert_id)
+
+    def set_alert_status(self, alert_id, status, note=None):
+        return self._alerts.set_status(alert_id, status, note)
 
     def get(self, run_id):
         run = self._runs.get(run_id)
@@ -97,7 +122,7 @@ class RunManager:
                              "compliance certified. Provider credentials are never included.",
             "run_id": run_id, "case_id": run["case_id"], "state": run["state"],
             "run_header": run.get("run_header"), "events": run["events"], "evidence": run["evidence"],
-            "claims": final.get("claims"), "final": run.get("final"), "failure": run.get("failure"),
+            "claims": final.get("claims"), "final": run.get("final"), "alert": run.get("alert"), "failure": run.get("failure"),
             "evaluation": run.get("evaluation"), "hash_chain_verified": verify_chain(run["events"]) if run["events"] else None})
 
     def start_evaluation(self, run_id, repeats=1):
@@ -151,7 +176,7 @@ class RunManager:
         return exp_id
 
     def _start_experiment(self, kind, case_id, repetitions, config, cases):
-        run_ids = [self.start(case_id, config, case=c) for c in cases]
+        run_ids = [self.start(case_id, config, case=c, alerts_enabled=False) for c in cases]
         exp_id = self._register({"kind": kind, "case_id": case_id, "repetitions": repetitions,
                                  "configuration": config, "run_ids": run_ids,
                                  "label": "Fresh runs (not recorded replay)"})
@@ -186,7 +211,8 @@ class RunManager:
         arms = {"no_jev": {}, "with_jev": {}}
         for arm in arms:
             for cid in case_ids:
-                arms[arm][cid] = [self.start(cid, {"arm": arm}, arm=arm) for _ in range(repetitions)]
+                arms[arm][cid] = [self.start(cid, {"arm": arm}, arm=arm, alerts_enabled=False)
+                                  for _ in range(repetitions)]
         rules = {cid: experiments.rules_baseline(get_case(cid)) for cid in case_ids}
         exp_id = self._register({"kind": "ablation", "case_ids": case_ids, "repetitions": repetitions,
                                  "configuration": {}, "arms": arms, "rules_results": rules,

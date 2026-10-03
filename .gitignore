@@ -49,3 +49,6 @@ data/test_*.db
 
 # DeepEval local cache
 .deepeval/
+
+# EvidenceTrail alert queue (separate from the committed host database)
+data/evidencetrail*.db

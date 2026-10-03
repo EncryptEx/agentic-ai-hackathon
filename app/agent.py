@@ -67,7 +67,6 @@ from app.tools import (
     RISK_TOOLS,
     TRANSACTION_TOOLS,
 )
-from app.orchestrator.agent import arbiter_agent
 
 MODEL = "gemini-3.8-flash"
 
@@ -337,7 +336,6 @@ consolidator_agent = Agent(
    - Relevant risk indicators & FRAML score
    - Evidence supporting each finding
    - Contradictory or mitigating evidence
-   - Multi-specialist cross-debate & contradiction resolution (Arbiter Tribunal ruling)
    - Missing information
    - Suggested next investigative questions
    - Overall case summary
@@ -346,7 +344,6 @@ consolidator_agent = Agent(
    - Case overview: Executive case summary at the top:
      * Case Identifier / Reference (e.g. Case CUST-00015)
      * Subject Under Review (Customer Name, ID, Entity Type, Jurisdiction)
-     * Dynamic Triage Classification & Topology
      * Investigation Trigger / Rationale (Specific alert IDs: e.g. TM-01 Structuring, FR-01 ATO, or High-Risk Influx)
      * Investigation Scope & Timeline (Transaction window, count, and dollar volume)
      * Primary Typologies Identified (Core AML or Fraud typologies suspected)
@@ -360,9 +357,6 @@ consolidator_agent = Agent(
    - Relevant risk indicators & FRAML score: Composite score (0-100), risk tier, 5-pillar breakdown, and overrides.
    - Evidence supporting each finding: Specific transaction dates, IDs, devices, IPs, channels, and records cited.
    - Contradictory or mitigating evidence: Clean history factors, legitimate explanations, or lack of derogatory hits.
-   - Multi-specialist cross-debate & contradiction resolution: Report the Arbiter Agent's
-     cross-examination findings, whether Money Mule vs APP Coercion or ATO vs Friendly Fraud
-     tension was detected, the calibrated confidence score, and the Tribunal's final consensus verdict.
    - Missing information: Data gaps, pending source-of-wealth documentation, or unverified counterparties.
    - Suggested next investigative questions: Concrete audit checklist steps for the compliance team.
    - Overall case summary: Final concluding recommendation (e.g. SAR filing, account freeze, EDD review),

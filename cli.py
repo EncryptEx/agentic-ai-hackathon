@@ -21,18 +21,9 @@ try:
 except ImportError:
     HAS_RICH = False
 
-try:
-    from engine.risk_engine import RiskEngine
-except ImportError:
-    RiskEngine = None
-
-try:
-    from generator.customer_generator import CustomerGenerator
-    from generator.transaction_generator import TransactionGenerator
-except ImportError:
-    CustomerGenerator = None
-    TransactionGenerator = None
-
+from engine.risk_engine import RiskEngine
+from generator.customer_generator import CustomerGenerator
+from generator.transaction_generator import TransactionGenerator
 from storage.database import DatabaseManager
 
 
@@ -330,6 +321,8 @@ def handle_investigate(args):
     cust_id = args.customer_id.upper().strip()
     from app.alert_feed import AlertDispatcher
     from app.agent import root_agent
+    from app.app_utils import services
+    from google.adk.runners import Runner
 
     dispatcher = AlertDispatcher()
     try:
@@ -352,46 +345,40 @@ def handle_investigate(args):
     else:
         print(f"Investigating {cust_id}: {prompt}")
 
-    if HAS_RICH:
-        console.print("[bold cyan]Dynamic Triage Orchestrator:[/bold cyan] Analyzing alert telemetry & dispatching specialist swarm...")
-        console.print("[dim]Pipeline: customer_agent -> transaction_agent -> fraud_agent -> ownership_agent -> risk_agent -> [bold yellow]arbiter_agent (Tribunal Cross-Debate)[/bold yellow] -> consolidator_agent[/dim]\n")
-    else:
-        print("\nDynamic Triage Orchestrator: Analyzing alert telemetry & dispatching specialist swarm...")
-        print("Pipeline: customer_agent -> transaction_agent -> fraud_agent -> ownership_agent -> risk_agent -> arbiter_agent (Tribunal Cross-Debate) -> consolidator_agent...\n")
+    print("\nRunning specialist agents: customer_agent -> transaction_agent -> fraud_agent -> ownership_agent -> risk_agent -> consolidator_agent...")
 
     # Initialize ADK Runner
     from app.agent import app as adk_app
     from app.alert_feed import generate_specialist_investigation_report
+    from google.genai import types
+
+    runner = Runner(
+        app=adk_app,
+        session_service=services.get_session_service(),
+        artifact_service=services.get_artifact_service(),
+        auto_create_session=True,
+    )
+
+    async def _run():
+        session = await runner.session_service.create_session(
+            app_name=adk_app.name,
+            user_id="compliance_officer"
+        )
+        new_message = types.Content(
+            role="user",
+            parts=[types.Part.from_text(text=prompt)]
+        )
+        events = []
+        async for event in runner.run_async(
+            user_id="compliance_officer",
+            session_id=session.id,
+            new_message=new_message,
+        ):
+            events.append(event)
+        return events
+
     final_text = ""
     try:
-        from google.genai import types
-        from app.app_utils import services
-        from google.adk.runners import Runner
-        runner = Runner(
-            app=adk_app,
-            session_service=services.get_session_service(),
-            artifact_service=services.get_artifact_service(),
-            auto_create_session=True,
-        )
-
-        async def _run():
-            session = await runner.session_service.create_session(
-                app_name=adk_app.name,
-                user_id="compliance_officer"
-            )
-            new_message = types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=prompt)]
-            )
-            events = []
-            async for event in runner.run_async(
-                user_id="compliance_officer",
-                session_id=session.id,
-                new_message=new_message,
-            ):
-                events.append(event)
-            return events
-
         events = asyncio.run(_run())
         for ev in events:
             if hasattr(ev, "content") and ev.content and hasattr(ev.content, "parts"):
@@ -442,7 +429,7 @@ def handle_investigate(args):
                 title="[bold blue]Compliance Audit Trail Verification[/bold blue]"
             ))
         else:
-            print("\n=== FINAL 13-SECTION MULTI-AGENT CASE DOSSIER (WITH ARBITER RULING & SELF-EVOLUTION LOOP) ===")
+            print("\n=== FINAL INVESTIGATIVE REPORT ===")
             print(final_text)
             print(f"\nAudit Log ID: {inv_id}")
             print(f"SHA-256 Digest: {sha}")

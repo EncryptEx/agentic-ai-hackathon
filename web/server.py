@@ -224,9 +224,13 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
             filename = query.get("file", [""])[0]
             self._handle_download(filename)
         else:
-            # Fall back to static files
-            if path == "/" or not os.path.exists(os.path.join(STATIC_DIR, path.lstrip("/"))):
+            # Fall back to static files (support both /file.js and /static/file.js)
+            rel_path = path[8:] if path.startswith("/static/") else path.lstrip("/")
+            disk_path = os.path.join(STATIC_DIR, rel_path)
+            if path == "/" or not os.path.exists(disk_path):
                 self.path = "/index.html"
+            else:
+                self.path = "/" + rel_path
             super().do_GET()
 
     def do_POST(self):

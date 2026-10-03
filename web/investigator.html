@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EvidenceTrail Investigator Backlog</title>
+    <style>
+        :root {
+            --bg-color: #05070c;
+            --panel-bg: #101726;
+            --card-bg: rgba(90, 130, 190, 0.05);
+            --border-color: rgba(90, 130, 190, 0.2);
+            --text-main: #cfe0ff;
+            --text-muted: rgba(150, 180, 220, 0.7);
+        }
+        body { 
+            background: var(--bg-color); 
+            color: var(--text-main); 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            margin: 0; padding: 20px; 
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 20px; font-weight: 500; }
+        .queue { display: flex; flex-direction: column; gap: 15px; }
+        .case { 
+            background: var(--panel-bg); 
+            padding: 20px; 
+            border-radius: 8px; 
+            border: 1px solid var(--border-color);
+            border-left: 4px solid #6fb3ff;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .case.suspicious { border-left-color: #ff5f6d; }
+        .case.ongoing { border-left-color: #ffc857; }
+        .case.closed { border-left-color: #4fe0a0; }
+        .case-header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 12px; font-weight: 600; font-size: 1.1em; 
+        }
+        .case-body { 
+            font-size: 0.95em; line-height: 1.5; white-space: pre-wrap; 
+            color: var(--text-muted); background: var(--card-bg); 
+            padding: 12px; border-radius: 4px; 
+        }
+        .status-badge { 
+            padding: 4px 10px; border-radius: 4px; font-size: 0.75em; 
+            letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700;
+        }
+        .status-suspicious { background: rgba(255, 95, 109, 0.15); color: #ff5f6d; border: 1px solid rgba(255, 95, 109, 0.3); }
+        .status-ongoing { background: rgba(255, 200, 87, 0.15); color: #ffc857; border: 1px solid rgba(255, 200, 87, 0.3); }
+        .status-closed { background: rgba(79, 224, 160, 0.15); color: #4fe0a0; border: 1px solid rgba(79, 224, 160, 0.3); }
+        .btn-action { 
+            margin-top: 15px; background: rgba(111, 179, 255, 0.15); 
+            color: #9ccbff; border: 1px solid rgba(111, 179, 255, 0.3); 
+            padding: 6px 12px; border-radius: 4px; cursor: pointer; 
+            font-size: 0.85em; font-weight: 600;
+        }
+        .btn-action:hover { background: rgba(111, 179, 255, 0.25); }
+        
+        
+        .case-body h1, .case-body h2, .case-body h3 { margin-top: 0; color: #fff; }
+        .case-body p { margin-top: 0; }
+        .case-body ul, .case-body ol { margin-top: 0; padding-left: 20px; }
+        .case-body code { background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 3px; }
+        .case-body blockquote { border-left: 3px solid #3b82f6; margin-left: 0; padding-left: 10px; color: #94a3b8; }
+        .no-cases { color: var(--text-muted); text-align: center; padding: 40px; font-style: italic; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <h1>Investigation Backlog</h1>
+    <div class="queue" id="backlog-queue">
+        <div class="no-cases" id="empty-state">Waiting for real-time transactions...</div>
+    </div>
+
+    <script>
+        const queue = document.getElementById('backlog-queue');
+        const emptyState = document.getElementById('empty-state');
+        const cases = {};
+
+        function renderCase(c) {
+            if (emptyState) emptyState.style.display = 'none';
+            
+            let el = document.getElementById('inv-case-' + c.id);
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'inv-case-' + c.id;
+                queue.prepend(el); // latest on top
+            }
+            let statusClass = 'status-suspicious';
+            let statusText = 'JEV TRIAGED';
+            if (c.status === 'ongoing') {
+                statusClass = 'status-ongoing';
+                statusText = 'INVESTIGATING';
+            } else if (c.status === 'closed') {
+                statusClass = 'status-closed';
+                statusText = 'CLOSED';
+            }
+
+            el.className = 'case ' + c.status;
+            el.innerHTML = `
+                <div class="case-header">
+                    <span>Customer ${c.id} &middot; $${c.amount}</span>
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                </div>
+                <div class="case-body">${c.report ? marked.parse(c.report) : 'Waiting for agent investigation...'}</div>
+                ${c.status === 'closed' ? '<button class="btn-action">Review & Sign-off</button>' : ''}
+            `;
+        }
+
+        const ws = new WebSocket(`ws://${window.location.host}/ws/transactions?speed_ms=1000`);
+        ws.onmessage = (event) => {
+            try {
+                const payload = JSON.parse(event.data);
+                if (payload.msg_type === 'jev_triage' && payload.suspicion === 'SUSPICIOUS') {
+                    const id = payload.customer_id;
+                    if (!cases[id]) {
+                        cases[id] = { 
+                            id: id, 
+                            amount: parseFloat(payload.row.amount || payload.row.amount_usd || 0).toLocaleString(undefined, {minimumFractionDigits: 2}),
+                            status: 'suspicious', 
+                            report: 'Jev triaged as suspicious. Severity score: ' + payload.severity.toFixed(2)
+                        };
+                        renderCase(cases[id]);
+                    }
+                } else if (payload.msg_type === 'investigation_started') {
+                    const id = payload.customer_id;
+                    if (cases[id]) {
+                        cases[id].status = 'ongoing';
+                        renderCase(cases[id]);
+                    }
+                } else if (payload.msg_type === 'investigation_finished') {
+                    const id = payload.customer_id;
+                    if (cases[id]) {
+                        cases[id].status = 'closed';
+                        cases[id].report = payload.report;
+                        renderCase(cases[id]);
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        };
+
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'highlight_case') {
+                const el = document.getElementById('inv-case-' + event.data.customer_id);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.style.transition = 'box-shadow 0.5s, transform 0.5s';
+                    el.style.transform = 'scale(1.02)';
+                    el.style.boxShadow = '0 0 20px rgba(111, 179, 255, 0.5)';
+                    setTimeout(() => {
+                        el.style.transform = 'scale(1)';
+                        el.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
+                    }, 2000);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

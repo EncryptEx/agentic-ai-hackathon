@@ -1,0 +1,17 @@
+--- web/sentinel.html
++++ web/sentinel.html
+@@ -825,8 +825,12 @@
+           srcCust.signals.velocity = (srcCust.signals.velocity || 0) + 0.3;
+         }
+         
+-        srcCust.outTo.add(dstCust);
+-        dstCust.inFrom.add(srcCust);
++        if (!srcCust.outTo) srcCust.outTo = new Set();
++        if (!dstCust.inFrom) dstCust.inFrom = new Set();
++        if (!srcCust.counterparties) srcCust.counterparties = new Set();
++        if (!dstCust.counterparties) dstCust.counterparties = new Set();
++        srcCust.outTo.add(dstCust.id);
++        dstCust.inFrom.add(srcCust.id);
+         srcCust.counterparties.add(dstCust.id);
+         dstCust.counterparties.add(srcCust.id);
+         if (!srcCust.recent) srcCust.recent = [];

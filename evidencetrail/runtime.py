@@ -85,6 +85,12 @@ def _result_step(name, call_id, payload):
 def _run_tool(name, raw_args, case, store, jev, rec, registered):
     """Validate, execute, store as evidence, and return what the agent is allowed to see."""
     t0 = time.monotonic()
+    reason = None
+    if isinstance(raw_args, dict):
+        given = raw_args.get("reason")
+        if isinstance(given, str) and given.strip():
+            reason = " ".join(given.split())[:300]
+        raw_args = {k: v for k, v in raw_args.items() if k != "reason"}
     try:
         if name not in registered:
             raise ToolError(f"tool '{name}' is not registered in this run")
@@ -108,7 +114,7 @@ def _run_tool(name, raw_args, case, store, jev, rec, registered):
     rec(event_type="tool_error" if is_err else "tool_call", actor="backend", tool_name=name,
         validated_arguments=args, input_evidence_ids=(args.get("evidence_ids", []) if isinstance(args, dict) else []),
         output_evidence_ids=[ev["evidence_id"]], result_snapshot=ev["payload"],
-        reason_code="TOOL_ERROR" if is_err else "TOOL_OK",
+        reason_code="TOOL_ERROR" if is_err else "TOOL_OK", brief_justification=reason,
         provider="jev" if name == JEV_TOOL else "synthetic_store",
         returned_model_version=(ev["payload"].get("model") if name == JEV_TOOL and not is_err else None),
         duration_ms=int((time.monotonic() - t0) * 1000))

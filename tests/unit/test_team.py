@@ -50,7 +50,7 @@ class TeamFlow(unittest.TestCase):
         h = r["run_header"]
         self.assertEqual(h["architecture"], "team")
         self.assertEqual(set(h["roster"]), {"behavior_device", "recipient_network", "risk_judge"})
-        self.assertEqual(h["prompt_version"], "investigator-team-prompt-v1")
+        self.assertEqual(h["prompt_version"], "investigator-team-prompt-v2")
         self.assertEqual(h["budgets"]["max_consultations"], MAX_CONSULTATIONS)
 
     def test_no_case_identity_or_label_reaches_any_agent(self):

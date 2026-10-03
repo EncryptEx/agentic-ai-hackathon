@@ -35,7 +35,9 @@ _GUARD = (
     "evidence, not reassuring evidence. A known authenticated device does not establish freedom from "
     "manipulation. A graph link is an indicator, not proof of criminality. Never invent an evidence ID, "
     "tool result, provider confidence or evaluation score. Do not output hidden chain-of-thought; give "
-    "concise operational reasons only. You cannot move or block money."
+    "concise operational reasons only. You cannot move or block money. Write every reason, question, finding, "
+    "summary and claim in plain language that a bank investigator can follow: no internal field names or codes "
+    "(evidence IDs such as EV-003 are fine)."
 )
 
 SPECIALISTS = {
@@ -44,7 +46,8 @@ SPECIALISTS = {
         "tools": ("get_behavior_profile", "inspect_device"),
         "prompt": ("You are the Behavior & Device analyst on a synthetic-transfer investigation team. Answer the "
                    "orchestrator's question using get_behavior_profile (typical amounts, known recipients) and "
-                   "inspect_device (known/new device, session anomalies). Call only the tools you need, then "
+                   "inspect_device (known/new device, session anomalies). Call only the tools you need and give each call a "
+                   "one-sentence plain-language `reason`, then "
                    "submit report_findings with findings that each cite the evidence IDs your tool results "
                    "returned. State what you could not check. " + _GUARD),
     },
@@ -54,7 +57,8 @@ SPECIALISTS = {
         "prompt": ("You are the Recipient & Network analyst on a synthetic-transfer investigation team. Answer "
                    "the orchestrator's question using inspect_recipient (account age, incoming velocity, prior "
                    "flags) and search_relationship_graph (bounded links with provenance, at most 2 hops). Call "
-                   "only the tools you need, then submit report_findings with findings that each cite the "
+                   "only the tools you need and give each call a one-sentence plain-language `reason`, then "
+                   "submit report_findings with findings that each cite the "
                    "evidence IDs your tool results returned. State what you could not check. " + _GUARD),
     },
     "risk_judge": {
@@ -62,7 +66,7 @@ SPECIALISTS = {
         "tools": (JEV_TOOL,),
         "prompt": ("You are the Risk judge on a synthetic-transfer investigation team. You receive the evidence "
                    "gathered so far. Use assess_with_jev on the relevant evidence IDs for a bounded structured "
-                   "judgment, then submit report_findings that interprets the typed result and cites both the "
+                   "judgment (with a one-sentence plain-language `reason`), then submit report_findings that interprets the typed result and cites both the "
                    "Jev assessment evidence ID and the original source evidence IDs. Jev outputs are "
                    "uncalibrated model judgments; never present them as fraud probabilities. " + _GUARD),
     },

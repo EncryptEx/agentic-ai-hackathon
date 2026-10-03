@@ -221,3 +221,6 @@ tools/a2a-inspector/
 *.pem
 *-key.json
 credentials*.json
+
+# Recorded decision-consistency reports (python -m evidencetrail.consistency)
+data/consistency/

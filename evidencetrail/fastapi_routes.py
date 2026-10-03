@@ -44,6 +44,8 @@ async def _json_body(request: Request):
 
 @router.get("/api/scenarios")
 @router.get("/api/evidencetrail/seed/transactions")
+@router.get("/api/evidencetrail/consistency")
+@router.get("/api/evidencetrail/consistency/{rest:path}")
 @router.get("/api/investigations/{rest:path}")
 @router.get("/api/experiments/{rest:path}")
 @router.get("/api/evidencetrail/alerts")

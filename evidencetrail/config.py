@@ -33,7 +33,7 @@ def load_env_file(path, environ=None):
 
 load_env_file(os.path.join(_ROOT, ".env"))
 
-TEAM_PROMPT_VERSION = "investigator-team-prompt-v1"
+TEAM_PROMPT_VERSION = "investigator-team-prompt-v2"
 POLICY_VERSION = "policy-v1-demo"
 JEV_SPEC_VERSION = "jev-questions-v1"
 SCENARIO_VERSION = "scenarios-v1"

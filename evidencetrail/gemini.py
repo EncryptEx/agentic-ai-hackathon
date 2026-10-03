@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 
 from .config import GEMINI_BASE_URL, GEMINI_MODEL, GENERATION_SETTINGS, REQUEST_TIMEOUT_S, gemini_key
-from .jev import ProviderUnavailable, error_detail
+from .jev import ProviderUnavailable, post_json_with_retry
 
 
 class ModelTurn:
@@ -45,16 +45,10 @@ class GeminiClient:
             body["system_instruction"] = system_prompt
         if tools:
             body["tools"] = tools
-        req = urllib.request.Request(
-            GEMINI_BASE_URL, data=json.dumps(body).encode("utf-8"), method="POST",
-            headers={"x-goog-api-key": key, "Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_S) as resp:
-                raw = json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            raise ProviderUnavailable(f"Gemini HTTP {e.code}{error_detail(e, key)}") from None
-        except (urllib.error.URLError, TimeoutError, ValueError) as e:
-            raise ProviderUnavailable(f"Gemini request failed: {type(e).__name__}") from None
+        raw = post_json_with_retry(
+            lambda: urllib.request.Request(
+                GEMINI_BASE_URL, data=json.dumps(body).encode("utf-8"), method="POST",
+                headers={"x-goog-api-key": key, "Content-Type": "application/json"}), key, "Gemini")
         out_steps = raw.get("steps")
         if not isinstance(out_steps, list):
             raise ProviderUnavailable("Gemini response had no 'steps' list")

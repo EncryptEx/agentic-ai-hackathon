@@ -3,6 +3,7 @@
 import re
 
 from .alerts import SEVERITY_RANK, STATUSES
+from . import consistency
 from .config import MAX_TOOL_CALLS
 from .runs import RunManager
 from .scenarios import list_scenarios
@@ -29,7 +30,8 @@ def _mgr():
 
 def handles(path):
     return path in ("/api/scenarios", "/api/investigations") or path.startswith(
-        ("/api/investigations/", "/api/experiments/", "/api/evidencetrail/alerts", "/api/evidencetrail/seed"))
+        ("/api/investigations/", "/api/experiments/", "/api/evidencetrail/alerts", "/api/evidencetrail/seed",
+         "/api/evidencetrail/consistency"))
 
 
 def _int(payload, key, default, lo, hi):
@@ -58,6 +60,13 @@ def handle_get(path, query=None):
             return 400, {"error": "severity must be one of low, medium, high or 'all'"}
         alerts = _mgr().list_alerts(status=status, severity=severity)
         return 200, {"total": len(alerts), "alerts": alerts}
+    if path == "/api/evidencetrail/consistency":
+        return 200, {"reports": consistency.list_reports(), "latest": consistency.latest_report(),
+                     "run_command": "python -m evidencetrail.consistency"}
+    m = re.match(r"^/api/evidencetrail/consistency/([\w-]+)$", path)
+    if m:
+        report = consistency.load_report(m.group(1))
+        return (200, report) if report else (404, {"error": "report not found"})
     if path == "/api/evidencetrail/seed/transactions":
         seed = get_seed()
         if not seed.available():

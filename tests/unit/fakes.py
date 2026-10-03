@@ -69,12 +69,13 @@ class AutoTeam:
     requested_model = "scripted-team"
 
     def __init__(self, action="ALLOW", order=None, extra_orch_calls=(), specialist_hook=None, fail_role=None,
-                 no_report_roles=(), bad_ids_role=None, claims_override=None):
+                 no_report_roles=(), bad_ids_role=None, claims_override=None, reasons=False):
         self.action, self.order = action, order
         self.extra_orch_calls = list(extra_orch_calls)
         self.specialist_hook = specialist_hook
         self.fail_role, self.no_report_roles, self.bad_ids_role = fail_role, set(no_report_roles), bad_ids_role
         self.claims_override = claims_override
+        self.reasons = reasons
         self.seen, self.turns = [], 0
 
     def _role(self, names):
@@ -129,6 +130,8 @@ class AutoTeam:
         done = [r for r in res if r[0] != team.REPORT]
         if len(done) < len(plan):
             name, args = plan[len(done)]
+            if self.reasons:
+                args = dict(args, reason=f"Because the {role} needs to look at {name.replace('_', ' ')}.")
             return turn(name, args, f"{role}{len(res)}")
         if role in self.no_report_roles:
             return ModelTurn([], [], "I am done.", "scripted-team-1", None)
@@ -168,3 +171,32 @@ def run_team(case_id, model=None, jev=None, enable_jev=True, triage=False, **kw)
     model = model or AutoTeam(**kw)
     r = team.investigate_team(case, model, jev or FakeJev(), "run-team", enable_jev=enable_jev, triage=triage)
     return case, model, r
+
+
+class TeamAndDecider:
+    """One model for everything the consistency report runs: the agent team, plus the frozen-evidence decisions."""
+    provider = "scripted"
+    requested_model = "team-and-decider"
+
+    def __init__(self):
+        self._team, self._decider = AutoTeam(), FrozenDecider(["REVIEW"])
+
+    def generate(self, system, steps, tools):
+        if len(tools) == 1:  # frozen-evidence decision: only finish_investigation is registered
+            return self._decider.generate(system, steps, tools)
+        return self._team.generate(system, steps, tools)
+
+
+class FlakyTeam(TeamAndDecider):
+    """Every other model instance (i.e. every other run) suffers a provider outage."""
+    _count = 0
+
+    def __init__(self):
+        super().__init__()
+        FlakyTeam._count += 1
+        self.down = FlakyTeam._count % 2 == 0
+
+    def generate(self, system, steps, tools):
+        if self.down and len(tools) > 1:
+            raise ProviderUnavailable("fake outage")
+        return super().generate(system, steps, tools)

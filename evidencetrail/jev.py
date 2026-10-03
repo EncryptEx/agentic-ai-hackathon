@@ -5,6 +5,7 @@ no confidence is invented for fields whose schema lacks it.
 """
 
 import json
+import time
 import urllib.error
 import urllib.request
 
@@ -28,6 +29,32 @@ def error_detail(http_error, key=None, limit=300):
         body = body.replace(key, "[REDACTED]")
     body = " ".join(body.split())[:limit]
     return f": {body}" if body else ""
+
+
+RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
+MAX_ATTEMPTS = 3
+_sleep = time.sleep  # replaced in tests
+
+
+def post_json_with_retry(make_request, key, label, attempts=MAX_ATTEMPTS):
+    """POST and parse JSON. Transient failures (timeouts, connection errors, 408/429/5xx) are retried with a short
+    backoff; anything else (bad key, malformed request, bad JSON) fails immediately. Exhausted retries raise
+    ProviderUnavailable, so an outage stays visible and is never turned into a fabricated result."""
+    for attempt in range(attempts):
+        last = attempt == attempts - 1
+        try:
+            with urllib.request.urlopen(make_request(), timeout=REQUEST_TIMEOUT_S) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code not in RETRYABLE_STATUS or last:
+                raise ProviderUnavailable(f"{label} HTTP {e.code}{error_detail(e, key)}"
+                                          + (f" (after {attempts} attempts)" if last and attempts > 1 else "")) from None
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            if last:
+                raise ProviderUnavailable(f"{label} request failed after {attempts} attempts: {type(e).__name__}") from None
+        except ValueError as e:
+            raise ProviderUnavailable(f"{label} request failed: {type(e).__name__}") from None
+        _sleep(1.5 * (2 ** attempt))
 
 
 class ProviderUnavailable(Exception):
@@ -130,16 +157,10 @@ class JevClient:
         if not key:
             raise ProviderUnavailable("TYPESAFE_API_KEY is not configured")
         body = {"state": state, "model": JEV_MODEL, "questions": questions or JEV_QUESTIONS}
-        req = urllib.request.Request(
-            JEV_URL, data=json.dumps(body).encode("utf-8"), method="POST",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_S) as resp:
-                raw = json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            raise ProviderUnavailable(f"Jev HTTP {e.code}{error_detail(e, key)}") from None
-        except (urllib.error.URLError, TimeoutError, ValueError) as e:
-            raise ProviderUnavailable(f"Jev request failed: {type(e).__name__}") from None
+        raw = post_json_with_retry(
+            lambda: urllib.request.Request(
+                JEV_URL, data=json.dumps(body).encode("utf-8"), method="POST",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}), key, "Jev")
         answers = raw.get("answers")
         if not isinstance(answers, dict):
             raise ProviderUnavailable("Jev response had no 'answers' object")

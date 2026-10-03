@@ -849,3 +849,11 @@ td {
 .inv-controls #inv-source { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 9px 12px; font-size: 13px; max-width: 220px; }
 #inv-case { max-width: 420px; }
 .inv-link { background: none; border: none; color: var(--accent-blue); cursor: pointer; font-size: 12px; text-decoration: underline; padding: 0; }
+
+/* ---------- Plain-language evidence and trace ---------- */
+.inv-headline { font-size: 13px; line-height: 1.5; margin: 8px 0 4px; }
+.inv-facts { margin: 4px 0 8px 18px; font-size: 12px; line-height: 1.6; color: var(--text-primary); }
+.inv-why, .inv-found { font-size: 12px; line-height: 1.5; margin-top: 4px; }
+.inv-why { color: var(--text-secondary); }
+.inv-found { color: var(--text-primary); }
+.inv-why-label { font-weight: 600; color: var(--text-secondary); }

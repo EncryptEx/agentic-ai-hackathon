@@ -51,6 +51,13 @@ TOOL_DECLARATIONS = [
 ]
 
 
+_REASON = {"type": "string", "description": "One short plain-language sentence a bank investigator would "
+                                            "understand: why you are making this check."}
+for _decl in TOOL_DECLARATIONS:
+    if _decl["name"] != FINISH:
+        _decl["parameters"]["properties"]["reason"] = _REASON  # optional, deliberately not in "required"
+
+
 class ToolError(Exception):
     """Argument validation or lookup failure; becomes a visible tool_error evidence record."""
 

@@ -4,7 +4,7 @@
 const inv = {
     scenarios: [], caseId: null, run: null, runId: null, starting: false,
     selected: [], replayCount: null, replayTimer: null, pollTimer: null,
-    reviewOpen: false, contextOpen: false, exp: null, expKind: null, expTimer: null, error: null,
+    reviewOpen: false, contextOpen: false, error: null, reports: [], report: null, reportCmd: null, reportError: null,
     alerts: [], alertFilter: "open", alertsError: null, handoffAsk: {}, alertTimer: null,
     source: "scenarios", seedCases: [], seedNote: null, seedLoading: false, seedExp: null, seedTimer: null,
 };
@@ -94,7 +94,7 @@ function selectEvidence(ids) { inv.selected = ids; renderEvidence(); renderClaim
 function chip(id, onClick) {
     const known = evidenceById(id);
     const c = el("button", { class: "inv-chip" + (inv.selected.includes(id) ? " active" : "") + (known ? "" : " missing"),
-        type: "button", title: known ? `${known.type} (${known.source})` : "Not found in this run", text: id });
+        type: "button", title: known ? (EVIDENCE_LABEL[known.type] || known.type) : "Not found in this run", text: id });
     c.addEventListener("click", ev => { ev.stopPropagation(); (onClick || selectEvidence)([id]); });
     return c;
 }
@@ -114,6 +114,7 @@ function initInvestigator() {
         el("div", { class: "inv-quality" },
             el("div", { id: "inv-seedbatch", class: "inv-card" }), el("div", { id: "inv-risk", class: "inv-card" }), el("div", { id: "inv-quality", class: "inv-card" }), el("div", { id: "inv-consistency", class: "inv-card" })));
     loadAlerts();
+    loadConsistency();
     invApi("/api/scenarios").then(d => {
         inv.scenarios = d.scenarios;
         inv.caseId = inv.caseId || (d.scenarios[0] && d.scenarios[0].case_id);
@@ -191,8 +192,8 @@ async function switchSource(source) {
 }
 
 function resetRun() {
-    stopReplay(); clearInterval(inv.pollTimer); clearInterval(inv.expTimer);
-    Object.assign(inv, { run: null, runId: null, selected: [], reviewOpen: false, contextOpen: false, exp: null, expKind: null, error: null });
+    stopReplay(); clearInterval(inv.pollTimer);
+    Object.assign(inv, { run: null, runId: null, selected: [], reviewOpen: false, contextOpen: false, error: null });
 }
 
 async function startRun() {
@@ -330,6 +331,182 @@ function decisionDetails(f) {
 }
 
 // ---------------------------------------------------------------- trace
+// ---------------------------------------------------------------- plain-language evidence
+// Bank staff should never have to read field names or JSON. Each evidence record is turned into a one-line
+// finding, a few labelled facts and short lists. The raw record stays under "Technical details".
+const EVIDENCE_LABEL = {
+    behavior_profile: "Customer behavior", device_inspection: "Device and session", recipient_inspection: "Recipient account",
+    relationship_graph: "Recipient relationships", jev_assessment: "Jev risk assessment", alert_triage: "Jev alert triage",
+    tool_error: "A check that could not be completed",
+};
+const CHECK_LABEL = {
+    get_behavior_profile: "customer behavior", inspect_device: "device and session", inspect_recipient: "recipient account",
+    search_relationship_graph: "recipient relationships", assess_with_jev: "Jev risk assessment", alert_triage: "Jev alert triage",
+};
+const CHECK_PURPOSE = {
+    get_behavior_profile: "To see whether the amount and the recipient fit this customer's normal behavior.",
+    inspect_device: "To see whether the payment came from a familiar device and a normal session.",
+    inspect_recipient: "To see how old and how active the receiving account is.",
+    search_relationship_graph: "To see whether the recipient is connected to other customers, devices or flagged accounts.",
+    assess_with_jev: "To get Jev's structured judgment on the evidence gathered so far.",
+};
+const ANOMALY_TEXT = {
+    ip_country_differs_from_profile: "Signed in from a country that is not the customer's usual one",
+    rapid_country_change: "The location jumped to another country within minutes",
+    device_seen_on_other_customers: "The same device has been used by other customers",
+    repeated_micro_charges: "Several tiny, test-sized charges in a short time (typical of card testing)",
+    follows_micro_charge_probing: "A larger charge straight after tiny test charges (typical of card testing)",
+    issuer_declined_as_suspected_fraud: "The card issuer declined a charge as suspected fraud",
+    remote_access_tool_detected: "A remote-access tool was running on the device",
+    login_from_new_country: "Signed in from a new country",
+};
+const CHANNEL_TEXT = { WEB_PORTAL: "online banking (web)", MOBILE_APP: "mobile app", BRANCH_TELLER: "branch", ATM: "ATM", SWIFT: "international wire", ACH: "bank transfer" };
+const ENTRY_TEXT = { CNP_ECOMMERCE: "card not present (online purchase)", CHIP_EMV: "card chip", CONTACTLESS: "contactless card", MAGSTRIPE: "magnetic stripe" };
+function howPaid(auth) {
+    return String(auth || "").split(" / ").map(x => CHANNEL_TEXT[x] || ENTRY_TEXT[x] || words(x)).join(", ");
+}
+const NEXT_STEP_TEXT = { CHECK_BEHAVIOR: "check the customer's behavior", CHECK_DEVICE: "check the device and session",
+    CHECK_RECIPIENT: "check the recipient account", CHECK_GRAPH: "check the recipient's connections", FINISH: "finish: enough has been checked" };
+
+const sentence = s => s.charAt(0).toUpperCase() + s.slice(1);
+const words = s => String(s || "").replaceAll("_", " ").toLowerCase();
+const shortTime = ts => (ts || "").replace("T", " ").slice(0, 16);
+const plural = (n, one, many) => `${n} ${n === 1 ? one : (many || one + "s")}`;
+const currentTx = () => Object.assign({}, (findCase(inv.caseId) || {}).transaction, runTransaction() || {});
+
+function ageText(days) {
+    if (days == null) return null;
+    if (days < 1 / 24) return "under an hour";
+    if (days < 1) return plural(Math.round(days * 24), "hour");
+    return plural(Math.round(days), "day");
+}
+
+function anomalyText(a) {
+    const base = ANOMALY_TEXT[a.type] || sentence(words(a.type));
+    const detail = a.detail && !/^[A-Z0-9_]+$/.test(a.detail) ? ` (${a.detail})` : "";
+    return `${a.severity === "meaningful" ? "Important" : "Minor"}: ${base}${detail}.`;
+}
+
+function entityLabel(id, kinds, tx) {
+    if (id === tx.recipient_id) return tx.recipient_name ? `the recipient (${tx.recipient_name})` : "the recipient";
+    const kind = kinds[id];
+    return kind === "customer" ? `customer ${id}` : kind === "device" ? `device ${id}` : kind === "account" ? `account ${id}` : id;
+}
+
+function linkSentence(l, kinds, flagged, tx) {
+    const prov = l.provenance ? ` (transaction ${l.provenance.record_id}, ${shortTime(l.provenance.observed_at)})` : "";
+    let text;
+    if (l.via === "also_paid_recipient") text = `${sentence(entityLabel(l.to, kinds, tx))} also paid this recipient`;
+    else if (l.via === "used_device") text = `${sentence(entityLabel(l.from, kinds, tx))} used ${entityLabel(l.to, kinds, tx)}`;
+    else if (l.via === "shared_device") text = `${sentence(entityLabel(l.from, kinds, tx))} shares a device with ${entityLabel(l.to, kinds, tx)}`;
+    else text = `${sentence(entityLabel(l.from, kinds, tx))} is connected to ${entityLabel(l.to, kinds, tx)} (${words(l.via)})`;
+    const flaggedEnd = [l.from, l.to].filter(x => flagged.includes(x));
+    return text + prov + (flaggedEnd.length ? `. Already flagged by the rule engine: ${flaggedEnd.join(", ")}` : "") + ".";
+}
+
+// returns { headline, rows: [[label, value]], lists: [{ title, items }] }
+function evidenceFacts(ev) {
+    const p = ev.payload || {}, tx = currentTx(), rows = [], lists = [];
+    const cur = tx.currency || p.currency || "";
+    switch (ev.type) {
+    case "behavior_profile": {
+        const amount = Number(tx.amount), max = p.typical_amount_max, min = p.typical_amount_min;
+        const known = (p.known_recipient_ids || []).includes(tx.recipient_id);
+        const cmp = !isFinite(amount) || max == null ? null : (amount > max ? `${(amount / Math.max(max, 0.01)).toFixed(1)}× the usual maximum` : (amount < min ? "below the usual minimum" : "within the usual range"));
+        rows.push(["Usual payment size", `${fmtMoney(min, cur)} to ${fmtMoney(max, cur)}`]);
+        if (cmp) rows.push(["This transfer", `${fmtMoney(amount, cur)}: ${cmp}`]);
+        rows.push(["Recipients the customer has paid before", String((p.known_recipient_ids || []).length)]);
+        rows.push(["Is this recipient one of them?", known ? "Yes" : "No, this is a new recipient for the customer"]);
+        if (p.history_summary) rows.push(["Recent history", sentence(p.history_summary)]);
+        if (p.declared_max_single_transaction) rows.push(["Largest single payment the customer declared", fmtMoney(p.declared_max_single_transaction, cur)]);
+        const inb = p.recent_inbound_48h;
+        if (inb) rows.push(["Money received in the last 2 days", inb.count ? `${plural(inb.count, "deposit")}, ${fmtMoney(inb.total_usd, "USD")} in total (largest ${fmtMoney(inb.largest_usd, "USD")})` : "None"]);
+        if (p.range_basis) rows.push(["How the usual range was worked out", sentence(p.range_basis)]);
+        return { headline: `Usually pays ${fmtMoney(min, cur)} to ${fmtMoney(max, cur)}; ${known ? "has paid this recipient before" : "has not paid this recipient before"}${cmp ? `. This transfer is ${cmp}` : ""}.`, rows, lists };
+    }
+    case "device_inspection": {
+        if (p.telemetry_available === false) {
+            rows.push(["Device information", "Not recorded for this channel"], ["Bank authorization", p.authorization_status === "AUTHORIZED" ? "Authorized" : sentence(words(p.authorization_status))]);
+            return { headline: "No device information is recorded for this channel, which is neither reassuring nor alarming on its own.", rows, lists };
+        }
+        const an = p.session_anomalies || [], important = an.filter(a => a.severity === "meaningful").length;
+        rows.push(["Device", p.device_known ? "Familiar: the customer has used it before" : "New for this customer" + (p.device_first_seen_hours_ago != null ? ` (first seen ${p.device_first_seen_hours_ago < 1 ? "under an hour" : Math.round(p.device_first_seen_hours_ago) + " hours"} before this transfer)` : "")]);
+        if (p.ip_country) rows.push(["Signed in from", `${p.ip_country}${p.profile_ip_country ? ` (the customer's usual country is ${p.profile_ip_country})` : ""}`]);
+        if (p.authentication) rows.push(["How the payment was made", sentence(howPaid(p.authentication))]);
+        if (p.authorization_status) rows.push(["Bank authorization", p.authorization_status === "AUTHORIZED" ? "Authorized" : p.authorization_status.startsWith("DECLINED") ? "Declined by the card issuer as suspected fraud" : sentence(words(p.authorization_status))]);
+        if (an.length) lists.push({ title: "Warning signs", items: an.map(anomalyText) });
+        return { headline: `${p.device_known ? "A device the customer has used before" : "A device the customer has not used before"}; ${an.length ? `${plural(an.length, "warning sign")}${important ? `, ${important} important` : ""}` : "no warning signs"}.`, rows, lists };
+    }
+    case "recipient_inspection": {
+        const age = ageText(p.account_age_days), n = p.incoming_transfers_last_90_min;
+        if (tx.recipient_name || p.category) rows.push(["Recipient", [tx.recipient_name, p.category && `${words(p.category)}${p.country ? ", " + p.country : ""}`].filter(Boolean).join(" · ")]);
+        rows.push(["Account age", age ? `${age}${p.age_basis && p.age_basis.startsWith("payee_first") ? "" : ""}` : "Not recorded"]);
+        rows.push(["Transfers received in the last 90 minutes", String(n)]);
+        if (p.distinct_other_payers_before != null) rows.push(["Other customers who have paid them", String(p.distinct_other_payers_before)]);
+        if (p.flagged_share_of_payers) rows.push(["Already-flagged customers among those payers", p.flagged_share_of_payers.endsWith("/0") ? "No other customers have paid them yet" : p.flagged_share_of_payers.replace("/", " of ") + (p.prior_synthetic_flags ? ": a significant share" : ": not a significant share")]);
+        else if (p.prior_synthetic_flags != null) rows.push(["Earlier fraud flags on this recipient", String(p.prior_synthetic_flags)]);
+        if (p.is_new_payee_for_customer != null) rows.push(["First payment from this customer?", p.is_new_payee_for_customer ? "Yes" : "No"]);
+        return { headline: `${age ? `The recipient was first seen ${age} ago` : "The recipient's age is not recorded"}; ${plural(n, "transfer")} received in the last 90 minutes${p.prior_synthetic_flags ? "; linked to previously flagged customers" : ""}.`, rows, lists };
+    }
+    case "relationship_graph": {
+        const nodes = p.nodes || [], links = p.links || [], flagged = p.synthetically_flagged_node_ids || [];
+        const kinds = Object.fromEntries(nodes.map(n => [n.id, n.kind]));
+        const customers = nodes.filter(n => n.kind === "customer"), devices = nodes.filter(n => n.kind === "device");
+        rows.push(["How far the search went", `Up to ${plural(p.max_hops, "step")} from the recipient`]);
+        rows.push(["Other customers connected to this recipient", customers.length ? `${customers.length} (${customers.slice(0, 6).map(n => n.id).join(", ")}${customers.length > 6 ? ", …" : ""})` : "None found"]);
+        if (devices.length) rows.push(["Devices connected", String(devices.length)]);
+        rows.push(["Already flagged by the rule engine", flagged.length ? flagged.join(", ") : "None"]);
+        if (links.length) lists.push({ title: "Connections found", items: links.slice(0, 8).map(l => linkSentence(l, kinds, flagged, tx)).concat(links.length > 8 ? [`…and ${links.length - 8} more`] : []) });
+        if (p.note) rows.push(["Please note", "These connections are indicators for an investigator to weigh. They are not proof that anyone is a criminal."]);
+        return { headline: links.length ? `${plural(customers.length || links.length, customers.length ? "other customer" : "connection")} linked to this recipient${flagged.length ? `, ${flagged.length} already flagged` : ""}.` : `No connections to other customers, devices or flagged accounts were found within ${plural(p.max_hops, "step")}.`, rows, lists };
+    }
+    case "jev_assessment": {
+        const n = p.normalized || {};
+        if (n.recipient_risk) rows.push(["Recipient risk", RISK_TEXT[n.recipient_risk] || n.recipient_risk]);
+        if (n.evidence_sufficiency) rows.push(["Enough evidence to recommend?", n.evidence_sufficiency === "SUFFICIENT_FOR_RECOMMENDATION" ? "Yes, enough to recommend" : "No, more evidence is needed"]);
+        if (n.next_step) rows.push(["Suggested next step", NEXT_STEP_TEXT[n.next_step] || words(n.next_step)]);
+        if (n.manipulation_indicators != null) rows.push(["Signs the payer is being manipulated", `${Number(n.manipulation_indicators).toFixed(2)} on a 0 to 1 scale (higher means more consistent with manipulation)`]);
+        rows.push(["Based on", (p.input_evidence_ids || []).join(", ") || "the evidence supplied"], ["Please note", "Jev's scores are model judgments, not calibrated fraud probabilities, and Jev never decides the outcome by itself."]);
+        return { headline: n.recipient_risk ? `Jev rates the recipient risk as ${(RISK_TEXT[n.recipient_risk] || n.recipient_risk).toLowerCase()}${n.manipulation_indicators != null ? `; signs of payer manipulation ${Number(n.manipulation_indicators).toFixed(2)} on a 0 to 1 scale` : ""}.` : "Jev's structured judgment on the evidence gathered.", rows, lists };
+    }
+    case "alert_triage": {
+        if (p.status !== "ok") return { headline: p.status === "skipped" ? "Jev triage was skipped because no evidence had been gathered." : "Jev triage could not be completed.", rows: [["Why", p.reason || "unknown"]], lists };
+        const sev = ["Routine", "Notable", "Serious"][p.severity_level] || "unrated";
+        return { headline: `Jev finds the case ${words(p.suspicion)}; urgency: ${sev.toLowerCase()}.`, rows: [["Jev's view", sentence(words(p.suspicion))], ["Urgency", sev]], lists };
+    }
+    case "tool_error": {
+        rows.push(["Check", sentence(CHECK_LABEL[p.tool] || words(p.tool))], ["What went wrong", p.error || "unknown"], ["What this means", "Treated as missing evidence, never as reassurance."]);
+        return { headline: `The ${CHECK_LABEL[p.tool] || "check"} could not be completed. ${p.error || ""}`.trim(), rows, lists };
+    }
+    default:
+        return { headline: sentence(words(ev.type)), rows: [["Source", ev.source]], lists };
+    }
+}
+
+function factsView(facts) {
+    return [el("p", { class: "inv-headline" }, facts.headline), kv(facts.rows),
+        facts.lists.map(l => [el("h4", {}, l.title), el("ul", { class: "inv-facts" }, l.items.map(i => el("li", {}, i)))])];
+}
+
+function foundLine(e) {
+    if (!["tool_call", "tool_error"].includes(e.event_type)) return null;
+    const ev = evidenceById((e.output_evidence_ids || [])[0]);
+    return ev ? evidenceFacts(ev).headline : null;
+}
+
+function whyLine(e) {
+    const text = e.brief_justification;
+    switch (e.event_type) {
+    case "consultation": return ["Asked", text];
+    case "specialist_report": return ["Reported", text];
+    case "final_decision": return ["Decision basis", text];
+    case "tool_call": case "tool_error": return ["Why", text || CHECK_PURPOSE[e.tool_name]];
+    case "run_failed": return ["What happened", text];
+    case "alert_triage": case "alert_created": case "alert_not_created": return ["Basis", text];
+    default: return [null, null];
+    }
+}
+
 function renderTrace() {
     const box = document.getElementById("inv-trace");
     if (!box) return;
@@ -345,20 +522,21 @@ function renderTrace() {
             : e.event_type === "consultation" ? `Orchestrator asked ${AGENT_LABELS[e.validated_arguments.specialist] || e.validated_arguments.specialist}`
             : e.event_type === "specialist_report" ? `${AGENT_LABELS[e.agent] || e.agent} reported findings`
             : (TOOL_LABELS[e.tool_name] || e.tool_name);
+        const why = whyLine(e), found = foundLine(e);
         const li = el("li", { class: "inv-step" + (isErr ? " err" : "") },
             el("div", { class: "inv-step-head" }, el("span", { class: "inv-step-n", title: `trace event ${e.sequence}` }, idx + 1), el("strong", {}, title),
                 e.agent && e.agent !== "investigator" && e.event_type !== "consultation" ? el("span", { class: "inv-tag agent-" + e.agent }, AGENT_LABELS[e.agent] || e.agent) : null,
-                isErr ? el("span", { class: "inv-tag bad" }, "error / missing evidence") : null,
+                isErr ? el("span", { class: "inv-tag bad" }, "could not be completed") : null,
                 e.duration_ms != null ? el("span", { class: "inv-muted" }, ` ${e.duration_ms} ms`) : null),
-            e.brief_justification ? el("div", { class: "inv-muted" }, e.brief_justification) : null,
-            e.reason_code ? el("div", { class: "inv-muted" }, `Reason: ${e.reason_code}`) : null,
+            why[1] ? el("div", { class: "inv-why" }, el("span", { class: "inv-why-label" }, why[0] + ": "), why[1]) : null,
+            found ? el("div", { class: "inv-found" }, el("span", { class: "inv-why-label" }, "Found: "), found) : null,
             el("div", { class: "inv-chips" }, (e.input_evidence_ids || []).length ? el("span", { class: "inv-muted" }, "used ") : null,
                 (e.input_evidence_ids || []).map(i => chip(i)),
                 (e.output_evidence_ids || []).length ? el("span", { class: "inv-muted" }, " produced ") : null,
                 (e.output_evidence_ids || []).map(i => chip(i))),
             el("details", { class: "inv-details" }, el("summary", {}, "Technical details"),
                 el("pre", { class: "inv-pre" }, json({ arguments: e.validated_arguments, result: e.result_snapshot, error: e.error,
-                    provider: e.provider, returned_model_version: e.returned_model_version, event_hash: e.event_hash }))));
+                    provider: e.provider, returned_model_version: e.returned_model_version, reason_code: e.reason_code, event_hash: e.event_hash }))));
         list.append(li);
     });
     box.append(list);
@@ -468,13 +646,18 @@ function renderEvidence() {
     const box = document.getElementById("inv-evidence");
     if (!box) return;
     box.replaceChildren(el("h3", {}, "Evidence details"));
-    if (!inv.selected.length) { box.append(el("p", { class: "inv-muted" }, "Select an evidence ID, claim or graph node.")); return; }
+    if (!inv.selected.length) { box.append(el("p", { class: "inv-muted" }, "Select an evidence ID, a claim or a graph node to see what was found, in plain language.")); return; }
     inv.selected.forEach(id => {
         const e = evidenceById(id);
         if (!e) { box.append(el("div", { class: "inv-error" }, `${id} was not found in this run.`)); return; }
-        box.append(el("div", { class: "inv-evidence-item" }, el("strong", {}, `${e.evidence_id} · ${e.type}`),
-            kv([["Source", e.source], ["Observed", e.observed_at]]), el("pre", { class: "inv-pre" }, json(e.payload)),
-            el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), kv([["Snapshot hash", e.snapshot_hash], ["Source record", e.source_record_id]]))));
+        const facts = evidenceFacts(e);
+        box.append(el("div", { class: "inv-evidence-item" },
+            el("strong", {}, `${e.evidence_id} · ${EVIDENCE_LABEL[e.type] || sentence(words(e.type))}`),
+            el("div", { class: "inv-muted" }, `Checked ${shortTime(e.observed_at)} UTC${CHECK_LABEL[e.source] ? ` · ${CHECK_LABEL[e.source]} check` : ""}`),
+            factsView(facts),
+            el("details", { class: "inv-details" }, el("summary", {}, "Technical details"),
+                kv([["Evidence ID", e.evidence_id], ["Type", e.type], ["Source tool", e.source], ["Source record", e.source_record_id], ["Snapshot hash", e.snapshot_hash]]),
+                el("pre", { class: "inv-pre" }, json(e.payload)))));
     });
 }
 
@@ -546,112 +729,84 @@ async function runEvaluation() {
     renderAll();
 }
 
-// ---------------------------------------------------------------- decision consistency
+// ---------------------------------------------------------------- decision consistency (read-only report)
+// A recorded check, not a control: it is generated by `python -m evidencetrail.consistency`, once for a demo and
+// periodically afterwards if the company decides to. Nothing here can start a run.
+async function loadConsistency() {
+    try {
+        const d = await invApi("/api/evidencetrail/consistency");
+        inv.reports = d.reports; inv.report = d.latest; inv.reportCmd = d.run_command; inv.reportError = null;
+    } catch (e) { inv.reportError = `Could not load the consistency report: ${e.message}`; }
+    renderConsistency();
+}
+
+async function openReport(id) {
+    try { inv.report = await invApi(`/api/evidencetrail/consistency/${id}`); inv.reportError = null; }
+    catch (e) { inv.reportError = `Could not open report: ${e.message}`; }
+    renderConsistency();
+}
+
+function countsText(counts) {
+    const parts = Object.entries(counts || {}).map(([k, n]) => `${n}× ${k.replace("CONTEXT_CHECK", "Context check").replace("ALLOW", "Allow").replace("REVIEW", "Review")}`);
+    return parts.length ? parts.join(", ") : "–";
+}
+
 function renderConsistency() {
     const box = document.getElementById("inv-consistency");
     if (!box) return;
-    box.replaceChildren(el("h3", {}, "Decision consistency"));
-    const busy = inv.exp && inv.exp.state === "running";
-    const mode = el("select", { id: "inv-mode", disabled: busy, "aria-label": "Experiment mode" },
-        el("option", { value: "end_to_end" }, "End-to-end investigations"), el("option", { value: "fixed_evidence" }, "Fixed evidence"));
-    const reps = el("select", { id: "inv-reps", disabled: busy, "aria-label": "Repetitions" }, [3, 5, 10, 20].map(n => el("option", { value: n, selected: n === 5 }, `${n} fresh runs`)));
-    const hasLinks = ((inv.run && inv.run.evidence) || []).some(e => e.type === "relationship_graph" && (e.payload.links || []).length);
-    const noRun = inv.run && isRunning(inv.run);
-    box.append(el("div", { class: "inv-actions" }, mode, reps,
-        el("button", { class: "page-btn", type: "button", disabled: busy || !inv.caseId || noRun, onclick: () => startExperiment("repeat") }, "Run repeats"),
-        el("button", { class: "page-btn", type: "button", disabled: busy || !hasLinks, title: hasLinks ? "" : "Needs a run that found network links",
-            onclick: () => startExperiment("counterfactual") }, "Evidence-change experiment"),
-        el("button", { class: "page-btn", type: "button", disabled: busy || noRun, title: "All five cases: rules vs Gemini without Jev vs Gemini with Jev",
-            onclick: () => startExperiment("ablation") }, "Compare approaches")),
-        el("p", { class: "inv-muted" }, "Repeats are fresh model calls (never recorded replay). “Fixed evidence” freezes one evidence bundle and asks Gemini and Jev independently several times. Agreement can be consistently wrong."));
-    if (!inv.exp) return;
-    if (inv.exp.error) { box.append(el("div", { class: "inv-error", role: "alert" }, inv.exp.error)); return; }
-    if (inv.expKind === "fixed_evidence") return renderFixedEvidence(box);
-    if (inv.expKind === "ablation") return renderAblation(box);
-    renderRepeatSummary(box);
-}
-
-function renderRepeatSummary(box) {
-    const s = inv.exp.summary || {};
-    if (s.attempted_runs == null) { box.append(el("p", { class: "inv-muted" }, "Starting runs…")); return; }
-    const elapsed = (s.elapsed_ms || []).filter(x => x != null);
-    box.append(el("h4", {}, inv.expKind === "counterfactual" ? "Evidence-change experiment: network links removed" : "Repeated fresh runs"),
-        el("span", { class: "inv-tag fresh" }, inv.exp.label || "Fresh runs"),
-        kv([["Attempted / finished / successful", `${s.attempted_runs} / ${s.finished_runs} / ${s.successful_runs}`],
-            ["Failed or incomplete", s.failed_or_incomplete_runs],
-            ["Allow / Context check / Review", s.action_counts ? `${s.action_counts.ALLOW} / ${s.action_counts.CONTEXT_CHECK} / ${s.action_counts.REVIEW}` : "–"],
-            ["Most common action", s.modal && s.modal.modal_action ? `${ACTION_TEXT[s.modal.modal_action]} (${s.modal.agreement} successful runs)` : "–"],
-            ["Pairwise agreement", s.pairwise_agreement == null ? "n/a (needs 2+ successful runs)" : s.pairwise_agreement.toFixed(3)],
-            ["Both Allow and Review seen", s.opposite_outcome_flag ? "yes – inconsistent" : "no"],
-            ["Time per run", elapsed.length ? `${Math.min(...elapsed)}–${Math.max(...elapsed)} ms` : "–"]]),
-        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), el("pre", { class: "inv-pre" }, json({ failures: s.failures, tool_sequences: s.tool_sequences, tool_call_counts: s.tool_call_counts, error_counts: s.error_counts, usage_totals: s.usage_totals, cost: s.cost, run_ids: inv.exp.run_ids, configuration: inv.exp.configuration }))),
-        el("p", { class: "inv-muted" }, inv.expKind === "counterfactual"
-            ? "A change shows sensitivity under this intervention. It does not prove causal correctness or that every risk reduction should flip an action."
-            : (s.note || "")));
-}
-
-function renderFixedEvidence(box) {
-    const e = inv.exp;
-    if (e.state === "running") { box.append(el("p", { class: "inv-muted" }, `Running fixed-evidence calls… ${e.progress || 0}/${e.repetitions}`)); return; }
-    const r = e.result, d = r.decision, j = r.jev;
-    box.append(el("h4", {}, "Fixed evidence: one frozen bundle"), el("span", { class: "inv-tag fresh" }, e.label),
-        el("p", { class: "inv-muted" }, `Bundle ${r.bundle.evidence_ids.join(", ")} · hash ${r.bundle.bundle_hash.slice(0, 12)}…`),
-        el("h4", {}, "Gemini decision"),
-        kv([["Attempted / successful", `${d.attempted} / ${d.successful}`], ["Errors or incomplete", d.incomplete_or_error],
-            ["Allow / Context check / Review", `${d.action_counts.ALLOW} / ${d.action_counts.CONTEXT_CHECK} / ${d.action_counts.REVIEW}`],
-            ["Most common action", d.modal.modal_action ? `${ACTION_TEXT[d.modal.modal_action]} (${d.modal.agreement})` : "–"],
-            ["Pairwise agreement", d.pairwise_agreement == null ? "n/a" : d.pairwise_agreement.toFixed(3)]]),
-        el("h4", {}, "Jev assessment (separate)"),
-        kv([["Attempted / successful", `${j.attempted} / ${j.successful}`], ["Errors", j.errors]]),
-        kv(Object.entries(j.per_question).map(([q, v]) => [q.replaceAll("_", " "), v.counts ? Object.entries(v.counts).map(([k, n]) => `${k} ×${n}`).join(", ") : (v.mean != null ? `mean ${v.mean.toFixed(2)} (range ${v.min}–${v.max})` : "–")])),
-        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), el("pre", { class: "inv-pre" }, json({ decision_runs: d.runs, jev_runs: j.runs }))),
-        el("p", { class: "inv-muted" }, r.note));
-}
-
-function renderAblation(box) {
-    const e = inv.exp, s = e.summary;
-    if (!s || !s.arms) { box.append(el("p", { class: "inv-muted" }, "Starting runs…")); return; }
-    const names = { rules: "Rules only", no_jev: "Gemini without Jev", with_jev: "Gemini with Jev" };
-    box.append(el("h4", {}, "Approach comparison"), el("span", { class: "inv-tag fresh" }, e.state === "running" ? "Running…" : (e.label || "")));
-    const table = el("table", { class: "inv-table" }, el("thead", {}, el("tr", {}, el("th", {}, "Case"), Object.keys(names).map(k => el("th", {}, names[k])))));
+    const head = [el("h3", {}, "Decision consistency"),
+        el("p", { class: "inv-muted" }, "A recorded check, not a button. It is generated once for the demo and can be repeated periodically (for example monthly) to confirm the decisions are still stable.")];
+    box.replaceChildren(...head);
+    if (inv.reportError) { box.append(el("div", { class: "inv-error", role: "alert" }, inv.reportError)); return; }
+    const r = inv.report;
+    if (!r) {
+        box.append(el("p", { class: "inv-muted" }, "No report has been generated yet. To create one, run this on the server:"),
+            el("pre", { class: "inv-pre" }, inv.reportCmd || "python -m evidencetrail.consistency"));
+        return;
+    }
+    if ((inv.reports || []).length > 1) {
+        box.append(el("select", { "aria-label": "Report", onchange: e => openReport(e.target.value) },
+            inv.reports.map(m => el("option", { value: m.report_id, selected: m.report_id === r.report_id }, m.generated_at.replace("T", " ").slice(0, 16) + " UTC"))));
+    }
+    const c = r.configuration, o = r.overall;
+    const allGood = o.fully_consistent === o.scenarios && o.failed_runs === 0;
+    box.append(el("div", { class: "inv-decision " + (allGood ? "act-ALLOW" : "act-CONTEXT_CHECK") },
+        el("div", { class: "inv-decision-action" }, `${o.fully_consistent} of ${o.scenarios} scenarios fully consistent`),
+        el("div", { class: "inv-muted" }, `${o.match_policy_labels} of ${o.scenarios} match the illustrative policy labels · ${o.failed_runs} failed runs`)),
+        kv([["Generated", r.generated_at.replace("T", " ").slice(0, 19) + " UTC"], ["Took", `${r.duration_s} s`],
+            ["Fresh runs per scenario", c.repetitions], ["Agent model", `${c.agent_model_requested}${c.agent_models_returned.length ? " (returned " + c.agent_models_returned.join(", ") + ")" : ""}`],
+            ["Jev model", `${c.jev_model_requested}${c.jev_models_returned.length ? " (returned " + c.jev_models_returned.join(", ") + ")" : ""}`],
+            ["Code", c.code && c.code.commit ? c.code.commit.slice(0, 8) + (c.code.dirty ? " (uncommitted changes)" : "") : "unknown"],
+            ["Versions", `policy ${c.versions.policy} · prompts ${c.versions.team_prompt}`]]));
+    const table = el("table", { class: "inv-table" }, el("thead", {}, el("tr", {}, ["Scenario", "Expected", `${c.repetitions} fresh runs`, "Frozen evidence (decision · Jev)", "Result"].map(h => el("th", {}, h)))));
     const body = el("tbody");
-    e.case_ids.forEach(cid => {
-        const sc = (findCase(cid) || {}).name || cid;
-        const rules = s.arms.rules.cases[cid];
-        const cell = arm => {
-            const c = s.arms[arm].cases[cid], x = c.summary;
-            return `${x.action_counts.ALLOW}/${x.action_counts.CONTEXT_CHECK}/${x.action_counts.REVIEW}` + (x.failed_or_incomplete_runs ? ` · ${x.failed_or_incomplete_runs} incomplete/failed` : "") + ` · ${c.matched_runs}/${c.eligible_runs} match`;
-        };
-        body.append(el("tr", {}, el("td", {}, sc),
-            el("td", {}, `${ACTION_TEXT[rules.action]}${rules.status === "INCOMPLETE" ? " (incomplete)" : ""} · ${rules.match ? "match" : "no match"}`),
-            el("td", {}, cell("no_jev")), el("td", {}, cell("with_jev"))));
+    r.scenarios.forEach(e => {
+        const f = e.fixed_evidence || {};
+        body.append(el("tr", {},
+            el("td", {}, e.name),
+            el("td", {}, e.expected_action ? ACTION_TEXT[e.expected_action] : "–"),
+            el("td", {}, countsText(e.repeat.outcome_counts) + (e.repeat.failed.length ? ` · ${e.repeat.failed.length} failed` : "")),
+            el("td", {}, f.attempted ? `${countsText(f.outcome_counts)} · Jev ${f.jev_successful}/${f.jev_attempted}${f.all_agree ? " unanimous" : " varied"}` : "–"),
+            el("td", {}, e.consistent ? "✓ consistent" : "⚠ varied", e.matches_policy_label ? "" : " · differs from label")));
     });
     table.append(body);
-    const tot = arm => `${s.arms[arm].matched_runs}/${s.arms[arm].eligible_runs} matched (${s.arms[arm].attempted_runs} attempted; provider failures excluded)`;
-    box.append(el("div", { class: "inv-table-wrap" }, table),
-        kv([["Rules only", `${s.arms.rules.matched}/${s.arms.rules.eligible} cases matched`], ["Gemini without Jev", tot("no_jev")], ["Gemini with Jev", tot("with_jev")]]),
-        el("p", { class: "inv-muted" }, "Cells show Allow/Context check/Review counts across fresh runs, then how many successful runs matched the illustrative policy label. " + s.note));
-}
-
-async function startExperiment(kind) {
-    const repetitions = Number(document.getElementById("inv-reps").value);
-    const mode = document.getElementById("inv-mode").value;
-    try {
-        let body, expKind = kind;
-        if (kind === "repeat") { body = { caseId: inv.caseId, mode, repetitions }; if (mode === "fixed_evidence") expKind = "fixed_evidence"; }
-        else if (kind === "counterfactual") body = { caseId: inv.caseId, patch: { remove_network_links: true }, repetitions };
-        else body = { repetitions: Math.min(repetitions, 10) };
-        const d = await invApi(`/api/experiments/${kind}`, body);
-        inv.expKind = expKind; inv.exp = { state: "running", summary: {}, label: "Fresh runs", repetitions, progress: 0 };
-        clearInterval(inv.expTimer);
-        const tick = async () => {
-            try { inv.exp = await invApi(`/api/experiments/${d.experimentId}`); if (inv.exp.state !== "running") clearInterval(inv.expTimer); }
-            catch (e) { inv.error = e.message; clearInterval(inv.expTimer); }
-            renderConsistency(); renderControls();
-        };
-        inv.expTimer = setInterval(tick, 1200); tick();
-    } catch (e) { inv.error = `Experiment failed to start: ${e.message}`; }
-    renderAll();
+    box.append(el("div", { class: "inv-table-wrap" }, table));
+    if (r.sensitivity && r.sensitivity.length) {
+        box.append(el("h4", {}, "Does the decision follow the evidence?"));
+        r.sensitivity.forEach(x => box.append(el("div", { class: "inv-muted" },
+            `${x.change}: ${countsText(x.outcome_counts)} (was ${x.baseline_outcome ? x.baseline_outcome.replace("CONTEXT_CHECK", "Context check").replace("ALLOW", "Allow").replace("REVIEW", "Review") : "n/a"}) · ${x.action_changed ? "the action changed" : "no change"}`)));
+        box.append(el("p", { class: "inv-muted" }, "A change shows sensitivity under this intervention; it does not prove causal correctness."));
+    }
+    if (r.ablation && r.ablation.arms) {
+        const a = r.ablation.arms;
+        box.append(el("h4", {}, "Approach comparison"),
+            kv([["Rules only", `${a.rules.matched}/${a.rules.eligible} cases matched`],
+                ["Agent team without Jev", `${a.no_jev.matched_runs}/${a.no_jev.eligible_runs} runs matched`],
+                ["Agent team with Jev", `${a.with_jev.matched_runs}/${a.with_jev.eligible_runs} runs matched`]]));
+    }
+    box.append(el("p", { class: "inv-muted" }, r.interpretation),
+        el("details", { class: "inv-details" }, el("summary", {}, "Technical details"), el("pre", { class: "inv-pre" }, json(r))),
+        el("p", { class: "inv-muted" }, "Re-run on the server with: ", el("code", {}, inv.reportCmd || "python -m evidencetrail.consistency")));
 }
 
 // ---------------------------------------------------------------- alerts
@@ -689,7 +844,7 @@ async function setAlertStatus(id, status) {
 
 function openAlertRun(a) {
     stopReplay(); clearInterval(inv.pollTimer);
-    Object.assign(inv, { caseId: a.case_id, runId: a.run_id, run: { state: "running", events: [], evidence: [] }, selected: [], reviewOpen: false, contextOpen: false, exp: null, error: null });
+    Object.assign(inv, { caseId: a.case_id, runId: a.run_id, run: { state: "running", events: [], evidence: [] }, selected: [], reviewOpen: false, contextOpen: false, error: null });
     pollRun(); renderAll();
     document.getElementById("inv-controls").scrollIntoView({ behavior: "smooth" });
 }
@@ -767,7 +922,7 @@ function renderSeedBatch() {
 
 function openSeedRun(row) {
     inv.source = "seed"; stopReplay(); clearInterval(inv.pollTimer);
-    Object.assign(inv, { caseId: row.case_id, runId: row.run_id, run: { state: "running", events: [], evidence: [] }, selected: [], reviewOpen: false, contextOpen: false, exp: null, error: null });
+    Object.assign(inv, { caseId: row.case_id, runId: row.run_id, run: { state: "running", events: [], evidence: [] }, selected: [], reviewOpen: false, contextOpen: false, error: null });
     pollRun(); renderAll();
     document.getElementById("inv-controls").scrollIntoView({ behavior: "smooth" });
 }

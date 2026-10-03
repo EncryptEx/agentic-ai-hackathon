@@ -29,6 +29,15 @@ ALL DATA IS SYNTHETIC AND FICTIONAL. This system provides analysis for human
 compliance officers and investigators; it does not make autonomous legal decisions.
 """
 
+import os
+from dotenv import load_dotenv
+
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ENV_PATH = os.path.join(_BASE_DIR, ".env")
+if os.path.exists(_ENV_PATH):
+    load_dotenv(_ENV_PATH)
+load_dotenv()
+
 from google.adk.agents import Agent, SequentialAgent
 from google.adk.apps import App
 from google.adk.models import Gemini
@@ -55,8 +64,11 @@ _SYNTHETIC_ONLY = (
 
 def _model() -> Gemini:
     """Build the shared Gemini model config for every agent in this app."""
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    client_kwargs = {"api_key": api_key} if api_key else {}
     return Gemini(
         model=MODEL,
+        client_kwargs=client_kwargs,
         retry_options=types.HttpRetryOptions(attempts=3),
     )
 

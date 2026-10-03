@@ -26,6 +26,7 @@
             <button class="nav-tab" data-target="tab-investigator">Investigator</button>
             <button class="nav-tab" data-target="tab-simulator">Live Simulator</button>
             <button class="nav-tab" data-target="tab-generator">Cohort & Exports</button>
+            <button class="nav-tab" data-target="tab-audit">Audit Trail & Evals</button>
         </div>
     </header>
 
@@ -1035,6 +1036,41 @@
                     <a href="/api/download?file=risk_assessments.csv" class="page-btn" style="text-decoration: none; padding: 10px 16px; font-weight: 600;">📥 risk_assessments.csv</a>
                     <a href="/api/download?file=alerts.csv" class="page-btn" style="text-decoration: none; padding: 10px 16px; font-weight: 600;">📥 alerts.csv</a>
                 </div>
+            </div>
+        </div>
+
+        <!-- TAB 7: COMPLIANCE AUDIT TRAIL & AI EVALUATION -->
+        <div id="tab-audit" class="tab-content" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                <div>
+                    <h2 style="font-size: 18px; margin-bottom: 4px;">Compliance Investigation Audit Trail & Verification</h2>
+                    <p style="color: var(--text-secondary); font-size: 13px;">Immutable ledger of autonomous multi-agent investigations, cryptographic SHA-256 integrity digests, and human officer sign-offs.</p>
+                </div>
+                <button id="btn-refresh-audit" class="btn-pick-test" style="display: flex; align-items: center; gap: 6px;">
+                    <span>🔄</span> Refresh Audit Logs
+                </button>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="audit-table">
+                    <thead>
+                        <tr>
+                            <th>Investigation ID</th>
+                            <th>Timestamp</th>
+                            <th>Customer Subject</th>
+                            <th>Trigger Rule</th>
+                            <th>Risk Tier</th>
+                            <th>Model</th>
+                            <th>SHA-256 Digest</th>
+                            <th>Officer Status</th>
+                            <th>Reviewing Officer</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="audit-table-body">
+                        <tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading audit records...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </main>

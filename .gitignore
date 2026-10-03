@@ -207,6 +207,8 @@ Thumbs.db
 .persist_vector_store
 tests/load_test/.results/*.html
 tests/load_test/.results/*.csv
+artifacts/
+*.evalset.json
 .locust_env
 my_env.tfvars
 .saved_chats

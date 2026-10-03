@@ -66,9 +66,16 @@ function initTabs() {
 
             if (target === "tab-transactions") {
                 loadTransactions();
+            } else if (target === "tab-audit") {
+                loadAuditTrail();
             }
         });
     });
+
+    const refreshAuditBtn = document.getElementById("btn-refresh-audit");
+    if (refreshAuditBtn) {
+        refreshAuditBtn.addEventListener("click", () => loadAuditTrail());
+    }
 }
 
 function initControls() {
@@ -644,18 +651,88 @@ function formatMarkdown(text) {
 
 function renderAgentReport(data, container) {
     const reportText = data.report || "No report generated.";
+    const invId = data.investigation_id || ("INV-" + Math.random().toString(36).substring(2, 10).toUpperCase());
+    const sha = data.report_sha256 || "";
+    const officerStatus = data.officer_sign_off_status || "PENDING";
+    const officerName = data.officer_name || "";
+    const officerNotes = data.officer_notes || "";
+    const reviewedAt = data.reviewed_at || "";
+    const isSignedOff = officerStatus !== "PENDING";
+
     container.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color);">
-            <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <span class="badge badge-${data.risk_tier || 'HIGH'}" style="font-size: 12px;">${data.risk_tier || 'CRITICAL'} CASE DOSSIER</span>
                 <span style="font-size: 12px; color: var(--text-secondary);">FRAML Score: <strong>${(data.composite_score || 0).toFixed(1)}/100</strong></span>
+                <span style="font-size: 11px; background: rgba(59,130,246,0.15); color: #93c5fd; padding: 3px 8px; border-radius: 4px; font-family: monospace;">
+                    ID: ${invId}
+                </span>
             </div>
-            <button id="btn-copy-report" class="btn-pick-test" style="display: flex; align-items: center; gap: 6px;">
-                <span>📋</span> Copy 11-Section Dossier
-            </button>
+            <div style="display: flex; gap: 8px;">
+                <button id="btn-copy-report" class="btn-pick-test" style="display: flex; align-items: center; gap: 6px;">
+                    <span>📋</span> Copy 11-Section Dossier
+                </button>
+            </div>
         </div>
+
+        ${sha ? `
+        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; font-size: 11px; flex-wrap: wrap; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px; color: #34d399;">
+                <span>🔒</span>
+                <strong>Tamper-Evident SHA-256 Digest:</strong>
+                <code style="color: #6ee7b7; font-family: monospace; font-size: 11px;">${sha}</code>
+            </div>
+            <span style="color: var(--text-muted); font-size: 11px;">Immutable Ledger Verified</span>
+        </div>` : ''}
+
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; font-size: 13px;">
             ${formatMarkdown(reportText)}
+        </div>
+
+        <!-- Human-in-the-Loop Compliance Officer Sign-Off Card -->
+        <div id="signoff-box-${invId}" style="margin-top: 24px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 8px; padding: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <h4 style="margin: 0; color: var(--accent-blue); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    ⚖️ Human Compliance Officer Sign-Off & Disposition
+                </h4>
+                <span id="signoff-badge-${invId}" class="badge ${isSignedOff ? 'badge-LOW' : 'badge-HIGH'}" style="font-size: 11px;">
+                    ${officerStatus}
+                </span>
+            </div>
+
+            <div id="signoff-view-${invId}" style="${isSignedOff ? 'display: block;' : 'display: none;'} background: rgba(59,130,246,0.08); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; margin-bottom: 10px; font-size: 12px;">
+                <div><strong>Reviewing Officer:</strong> <span id="signoff-officer-disp-${invId}">${officerName || 'N/A'}</span></div>
+                <div style="margin-top: 4px;"><strong>Decision:</strong> <span id="signoff-decision-disp-${invId}">${officerStatus}</span></div>
+                <div style="margin-top: 4px;"><strong>Officer Notes:</strong> <span id="signoff-notes-disp-${invId}">${officerNotes || 'None recorded'}</span></div>
+                <div style="margin-top: 4px; font-size: 11px; color: var(--text-muted);"><strong>Timestamp:</strong> <span id="signoff-time-disp-${invId}">${reviewedAt || ''}</span></div>
+            </div>
+
+            <div id="signoff-form-${invId}" style="${isSignedOff ? 'display: none;' : 'display: block;'}">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div>
+                        <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Officer Name / Badge</label>
+                        <input type="text" id="signoff-officer-${invId}" value="Compliance Officer" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px; font-size: 12px;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Disposition Action</label>
+                        <select id="signoff-decision-${invId}" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px; font-size: 12px;">
+                            <option value="APPROVED_SAR_FILED">Approved: File Suspicious Activity Report (SAR) & Restrict</option>
+                            <option value="APPROVED_EDD_REQUESTED">Approved: Escalate to Enhanced Due Diligence (EDD)</option>
+                            <option value="APPROVED_ACCOUNT_RESTRICTED">Approved: Restrict Outbound Wires & Hold Balance</option>
+                            <option value="DISMISSED_FALSE_POSITIVE">Dismissed: Documented Legitimate Business Purpose (False Positive)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Regulatory Rationale & Case Notes</label>
+                    <textarea id="signoff-notes-${invId}" rows="2" placeholder="State compliance justification and statutory evidence reviewed..." style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px; font-size: 12px; font-family: inherit; resize: vertical;"></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                    <button id="btn-submit-signoff-${invId}" class="btn-magenta" style="padding: 7px 16px; font-size: 12px; font-weight: 700; cursor: pointer;">
+                        <span>✍️</span> Submit Officer Sign-Off
+                    </button>
+                </div>
+            </div>
         </div>
     `;
 
@@ -670,7 +747,122 @@ function renderAgentReport(data, container) {
             });
         });
     }
+
+    const submitSignoffBtn = document.getElementById(`btn-submit-signoff-${invId}`);
+    if (submitSignoffBtn) {
+        submitSignoffBtn.addEventListener("click", async () => {
+            const officer = (document.getElementById(`signoff-officer-${invId}`).value || "Compliance Officer").trim();
+            const decision = document.getElementById(`signoff-decision-${invId}`).value;
+            const notes = document.getElementById(`signoff-notes-${invId}`).value.trim();
+
+            submitSignoffBtn.disabled = true;
+            submitSignoffBtn.innerHTML = `<span>⏳</span> Saving...`;
+
+            try {
+                const res = await fetch("/api/investigations/sign-off", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        investigation_id: invId,
+                        officer_name: officer,
+                        decision: decision,
+                        notes: notes
+                    })
+                });
+                const resData = await res.json();
+                if (resData.status === "success") {
+                    const badge = document.getElementById(`signoff-badge-${invId}`);
+                    badge.textContent = decision;
+                    badge.className = "badge badge-LOW";
+                    document.getElementById(`signoff-officer-disp-${invId}`).textContent = officer;
+                    document.getElementById(`signoff-decision-disp-${invId}`).textContent = decision;
+                    document.getElementById(`signoff-notes-disp-${invId}`).textContent = notes || "None recorded";
+                    document.getElementById(`signoff-time-disp-${invId}`).textContent = (resData.audit_log && resData.audit_log.reviewed_at) || new Date().toISOString();
+                    document.getElementById(`signoff-form-${invId}`).style.display = "none";
+                    document.getElementById(`signoff-view-${invId}`).style.display = "block";
+                }
+            } catch (e) {
+                alert("Failed to save officer sign-off: " + e.message);
+                submitSignoffBtn.disabled = false;
+                submitSignoffBtn.innerHTML = `<span>✍️</span> Submit Officer Sign-Off`;
+            }
+        });
+    }
 }
+
+async function loadAuditTrail() {
+    const tbody = document.getElementById("audit-table-body");
+    if (!tbody) return;
+
+    try {
+        const resp = await fetch("/api/investigations/audit-trail?limit=50");
+        const logs = await resp.json();
+
+        if (!logs || logs.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 24px;">No multi-agent investigations logged yet. Run an investigation from any customer dossier to record audit entries.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = logs.map(l => {
+            const isSigned = l.officer_sign_off_status && l.officer_sign_off_status !== "PENDING";
+            const statusBadge = isSigned 
+                ? `<span class="badge badge-LOW" style="font-size: 10px;">${l.officer_sign_off_status}</span>`
+                : `<span class="badge badge-HIGH" style="font-size: 10px;">PENDING</span>`;
+            const shaShort = l.final_report_sha256 ? `${l.final_report_sha256.substring(0, 10)}...` : 'N/A';
+            const dateStr = (l.timestamp || "").replace("T", " ").substring(0, 19);
+
+            return `
+                <tr>
+                    <td style="font-family: monospace; font-size: 11px; color: var(--accent-blue); font-weight: 600;">${l.investigation_id}</td>
+                    <td style="font-size: 11px; color: var(--text-muted);">${dateStr}</td>
+                    <td><strong>${l.customer_name || ''}</strong> <span style="font-size: 11px; color: var(--text-muted);">(${l.customer_id})</span></td>
+                    <td style="font-size: 12px;">${l.trigger_rule || 'Manual Risk Review'}</td>
+                    <td><span class="badge badge-${l.risk_tier || 'LOW'}" style="font-size: 10px;">${l.risk_tier || 'LOW'} (${(l.composite_score || 0).toFixed(1)})</span></td>
+                    <td style="font-size: 11px; color: var(--text-muted); font-family: monospace;">${l.model_version || 'gemini-3.8-flash'}</td>
+                    <td style="font-family: monospace; font-size: 11px; color: #34d399;" title="${l.final_report_sha256}">🔒 ${shaShort}</td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size: 12px;">${l.officer_name || '<em style="color: var(--text-muted);">Unassigned</em>'}</td>
+                    <td>
+                        <button class="btn-pick-test" onclick="viewAuditLogDossier('${l.investigation_id}')" style="padding: 4px 8px; font-size: 11px;">
+                            View Dossier
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: #ef4444; padding: 24px;">Failed to load audit trail: ${err.message}</td></tr>`;
+    }
+}
+
+window.viewAuditLogDossier = async function(invId) {
+    try {
+        const res = await fetch(`/api/investigations/${invId}`);
+        const log = await res.json();
+        const overlay = document.getElementById("modal-overlay");
+        const content = document.getElementById("dossier-content");
+        if (overlay && content) {
+            overlay.classList.add("active");
+            content.innerHTML = `<div id="audit-dossier-container"></div>`;
+            const container = document.getElementById("audit-dossier-container");
+            renderAgentReport({
+                investigation_id: log.investigation_id,
+                report_sha256: log.final_report_sha256,
+                officer_sign_off_status: log.officer_sign_off_status,
+                officer_name: log.officer_name,
+                officer_notes: log.officer_notes,
+                reviewed_at: log.reviewed_at,
+                customer_id: log.customer_id,
+                customer_name: log.customer_name,
+                risk_tier: log.risk_tier,
+                composite_score: log.composite_score,
+                report: log.final_report_text
+            }, container);
+        }
+    } catch (e) {
+        alert("Error loading dossier: " + e.message);
+    }
+};
 
 // ==========================================
 // FRAML SIMULATOR TYPOLOGY PRESETS & AUTO-FILL

@@ -554,7 +554,27 @@ async def investigate_customer(req: InvestigateRequest, request: Request):
     if req.alert_id and final_report:
         dispatcher.mark_alert_investigated(req.alert_id, notes=final_report[:500])
 
+    # Log to immutable audit ledger with SHA-256 integrity hash
+    db = DatabaseManager()
+    inv_id = db.log_investigation({
+        "customer_id": cust_id,
+        "customer_name": packet.get("customer_name"),
+        "trigger_alert_id": req.alert_id,
+        "trigger_rule": (packet.get("trigger_alert") or {}).get("rule_name", "Manual Risk Review"),
+        "risk_tier": packet.get("risk_tier"),
+        "composite_score": packet.get("composite_score", 0.0),
+        "model_version": "gemini-3.8-flash",
+        "raw_prompt": prompt,
+        "final_report_text": final_report,
+        "officer_sign_off_status": "PENDING",
+    })
+    log_record = db.get_investigation_audit_log(inv_id)
+    report_sha256 = log_record.get("final_report_sha256") if log_record else ""
+
     return {
+        "investigation_id": inv_id,
+        "report_sha256": report_sha256,
+        "officer_sign_off_status": "PENDING",
         "customer_id": cust_id,
         "customer_name": packet["customer_name"],
         "archetype": packet["archetype"],
@@ -563,6 +583,48 @@ async def investigate_customer(req: InvestigateRequest, request: Request):
         "prompt_dispatched": prompt,
         "report": final_report
     }
+
+
+class SignOffRequest(BaseModel):
+    investigation_id: str
+    officer_name: str
+    decision: str
+    notes: Optional[str] = None
+    action_taken: Optional[str] = None
+
+
+@app.post("/api/investigations/sign-off")
+async def sign_off_investigation(req: SignOffRequest):
+    """Records human compliance officer sign-off and rationale for an investigation."""
+    db = DatabaseManager()
+    ok = db.update_audit_sign_off(
+        investigation_id=req.investigation_id,
+        officer_sign_off_status=req.decision,
+        officer_name=req.officer_name,
+        officer_notes=req.notes,
+        officer_action_taken=req.action_taken or req.decision
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Investigation {req.investigation_id} not found")
+    updated = db.get_investigation_audit_log(req.investigation_id)
+    return {"status": "success", "audit_log": updated}
+
+
+@app.get("/api/investigations/audit-trail")
+async def get_audit_trail(customer_id: Optional[str] = None, limit: int = 50):
+    """Retrieves immutable audit logs for compliance reviews, optionally filtered by customer."""
+    db = DatabaseManager()
+    return db.get_investigation_audit_logs(customer_id=customer_id, limit=limit)
+
+
+@app.get("/api/investigations/{investigation_id}")
+async def get_investigation_detail(investigation_id: str):
+    """Retrieves a single investigation audit log and its SHA-256 integrity verification."""
+    db = DatabaseManager()
+    log = db.get_investigation_audit_log(investigation_id)
+    if not log:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    return log
 
 
 # --------------------------------------------------------------------------

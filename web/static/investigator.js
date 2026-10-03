@@ -5,7 +5,7 @@ const inv = {
     scenarios: [], caseId: null, run: null, runId: null, starting: false,
     selected: [], replayCount: null, replayTimer: null, pollTimer: null,
     reviewOpen: false, contextOpen: false, exp: null, expKind: null, expTimer: null, error: null,
-    alerts: [], alertFilter: "open", alertsError: null, architecture: "team",
+    alerts: [], alertFilter: "open", alertsError: null, architecture: "team", handoffAsk: {}, alertTimer: null,
 };
 
 const TOOL_LABELS = {
@@ -61,7 +61,7 @@ async function invApi(path, body) {
     const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
     const res = await fetch(path, opts);
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if (!res.ok) { const err = new Error(data.error || `HTTP ${res.status}`); err.status = res.status; err.data = data; throw err; }
     return data;
 }
 
@@ -323,6 +323,51 @@ function renderTrace() {
         list.append(li);
     });
     box.append(list);
+}
+
+// ---------------------------------------------------------------- hand-off to the ADK specialist team
+const HANDOFF_SOURCE = {
+    adk_agents: "Written by the ADK specialist agents",
+    specialist_tools_fallback: "Synthesized from the specialist data tools (no LLM ran)",
+};
+
+function handoffButton(a) {
+    const h = a.handoff;
+    if (h && h.status === "running") return el("button", { class: "page-btn", type: "button", disabled: true }, "ADK team investigating…");
+    return el("button", { class: "page-btn", type: "button", onclick: () => startHandoff(a.alert_id) },
+        h ? "Hand off again" : "Hand off to ADK team");
+}
+
+function handoffBlock(a) {
+    const out = [], h = a.handoff, ask = inv.handoffAsk[a.alert_id];
+    if (ask) {
+        const input = el("input", { type: "text", placeholder: "FRAML customer ID, e.g. CUST-00015", "aria-label": "FRAML customer ID", class: "inv-input" });
+        out.push(el("div", { class: "inv-warn", role: "alert" }, ask,
+            el("div", { class: "inv-actions" }, input,
+                el("button", { class: "page-btn", type: "button", onclick: () => startHandoff(a.alert_id, input.value.trim()) }, "Send"),
+                el("button", { class: "page-btn", type: "button", onclick: () => { delete inv.handoffAsk[a.alert_id]; renderAlerts(); } }, "Cancel"))));
+    }
+    if (!h) return out;
+    if (h.status === "running") out.push(el("div", { class: "inv-muted" }, `ADK investigation team is reviewing ${h.customer_id}…`));
+    else if (h.status === "failed") out.push(el("div", { class: "inv-error", role: "alert" }, `Hand-off failed (${h.error}). It can be retried.`));
+    else out.push(el("details", { class: "inv-details" },
+        el("summary", {}, `ADK team report for ${h.customer_id} · ${h.risk_tier || "tier n/a"}`),
+        el("span", { class: "inv-tag" + (h.report_source === "adk_agents" ? " fresh" : "") }, HANDOFF_SOURCE[h.report_source] || h.report_source),
+        el("div", { class: "inv-muted" }, h.note),
+        el("pre", { class: "inv-pre" }, h.report)));
+    return out;
+}
+
+async function startHandoff(alertId, customerId) {
+    inv.alertsError = null;
+    try {
+        await invApi(`/api/evidencetrail/alerts/${alertId}/handoff`, customerId ? { customerId } : {});
+        delete inv.handoffAsk[alertId];
+    } catch (e) {
+        if (e.status === 409 && e.data && e.data.needs_customer_id) inv.handoffAsk[alertId] = e.message;
+        else inv.alertsError = `Hand-off failed: ${e.message}`;
+    }
+    loadAlerts();
 }
 
 // ---------------------------------------------------------------- relationship graph
@@ -626,12 +671,16 @@ function renderAlerts() {
             el("div", { class: "inv-muted" }, `${name} · ${a.transaction.amount.toLocaleString("en-US")} ${a.transaction.currency} to ${a.transaction.recipient_id} · ${a.created_at.replace("T", " ").slice(0, 19)} UTC`),
             el("div", { class: "inv-muted" }, a.summary),
             a.disagreement ? el("div", { class: "inv-muted" }, DISAGREEMENT_TEXT[a.disagreement]) : null,
+            handoffBlock(a),
             el("div", { class: "inv-actions" },
                 el("button", { class: "page-btn", type: "button", onclick: () => openAlertRun(a) }, "Open investigation"),
+                handoffButton(a),
                 a.status === "open" ? el("button", { class: "page-btn", type: "button", onclick: () => setAlertStatus(a.alert_id, "acknowledged") }, "Acknowledge") : null,
                 a.status !== "dismissed" ? el("button", { class: "page-btn", type: "button", onclick: () => setAlertStatus(a.alert_id, "dismissed") }, "Dismiss") : null)));
     });
     box.append(list);
+    clearTimeout(inv.alertTimer);
+    if (inv.alerts.some(x => x.handoff && x.handoff.status === "running")) inv.alertTimer = setTimeout(loadAlerts, 2000);
 }
 
 document.addEventListener("DOMContentLoaded", initInvestigator);

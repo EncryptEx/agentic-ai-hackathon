@@ -842,3 +842,6 @@ td {
 .inv-tag.agent-behavior_device { color: var(--tier-low); border-color: var(--tier-low); }
 .inv-tag.agent-recipient_network { color: var(--tier-med); border-color: var(--tier-med); }
 .inv-tag.agent-risk_judge { color: var(--fraud-magenta); border-color: var(--fraud-magenta); }
+
+/* ---------- Hand-off ---------- */
+.inv-input { background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 7px 10px; font-size: 12px; min-width: 220px; }

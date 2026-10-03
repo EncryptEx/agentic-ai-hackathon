@@ -143,7 +143,8 @@ def build_alert(case, run_id, store, final, triage, triage_evidence):
         "jev_triage": {k: triage.get(k) for k in ("status", "suspicion", "severity_level", "model", "reason",
                                                   "alert_spec_version")},
         "evidence_ids": evidence_ids, "synthetic": True, "notice": NOTICE,
-        "created_at": now_utc(), "history": [{"status": "open", "at": now_utc(), "note": "Alert created"}],
+        "created_at": now_utc(), "handoff": None,
+        "history": [{"status": "open", "at": now_utc(), "note": "Alert created"}],
     }
 
 
@@ -190,6 +191,18 @@ class AlertStore:
         with self._lock:
             rows = self._db().execute(sql + " ORDER BY created_at DESC", params).fetchall()
         return [json.loads(r[0]) for r in rows]
+
+    def set_handoff(self, alert_id, handoff):
+        """Attach (or update) the ADK hand-off record. Never changes status or the simulated action."""
+        alert = self.get(alert_id)
+        if alert is None:
+            return None
+        alert["handoff"] = handoff
+        with self._lock:
+            db = self._db()
+            db.execute("UPDATE evidencetrail_alerts SET payload=? WHERE alert_id=?", (canonical(alert), alert_id))
+            db.commit()
+        return alert
 
     def set_status(self, alert_id, status, note=None):
         if status not in STATUSES:

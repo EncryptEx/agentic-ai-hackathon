@@ -10,7 +10,7 @@ from .scenarios import list_scenarios
 _manager = None  # created on first use so importing the module has no side effects
 _RUN = re.compile(r"^/api/investigations/([\w-]+)(/evaluate|/context-answer|/export)?$")
 _EXP = re.compile(r"^/api/experiments/([\w-]+)$")
-_ALERT = re.compile(r"^/api/evidencetrail/alerts(?:/([\w-]+)(/status)?)?$")
+_ALERT = re.compile(r"^/api/evidencetrail/alerts(?:/([\w-]+)(/status|/handoff)?)?$")
 _EXP_POST = ("/api/experiments/repeat", "/api/experiments/counterfactual", "/api/experiments/ablation")
 
 
@@ -41,6 +41,8 @@ def _int(payload, key, default, lo, hi):
 def handle_get(path, query=None):
     query = query or {}
     m = _ALERT.match(path)
+    if m and m.group(2) == "/status" or m and m.group(2) == "/handoff":
+        return 404, {"error": "Endpoint not found"}
     if m and not m.group(2):
         if m.group(1):
             alert = _mgr().get_alert(m.group(1))
@@ -94,6 +96,8 @@ def handle_post(path, payload):
             exp = _mgr().start_ablation(case_ids, _int(payload, "repetitions", 3, 1, 10))
             return 202, {"experimentId": exp}
         m = _ALERT.match(path)
+        if m and m.group(1) and m.group(2) == "/handoff":
+            return 501, {"error": "Hand-off to the ADK investigation team needs the combined server (python cli.py serve)."}
         if m and m.group(1) and m.group(2) == "/status":
             note = payload.get("note")
             if note is not None and not isinstance(note, str):

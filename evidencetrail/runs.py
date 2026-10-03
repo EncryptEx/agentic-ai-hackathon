@@ -102,6 +102,9 @@ class RunManager:
     def get_alert(self, alert_id):
         return self._alerts.get(alert_id)
 
+    def set_alert_handoff(self, alert_id, handoff):
+        return self._alerts.set_handoff(alert_id, handoff)
+
     def set_alert_status(self, alert_id, status, note=None):
         return self._alerts.set_status(alert_id, status, note)
 

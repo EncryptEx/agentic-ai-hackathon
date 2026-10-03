@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadTransactions();
     initSimulator();
     initGenerator();
+    initGoogleVoiceCopilot();
 });
 
 function initTabs() {
@@ -1999,3 +2000,259 @@ function initGenerator() {
         }
     });
 }
+
+// ---------------------------------------------------------
+// Google Voice AI Copilot (Interactive Two-Way Spoken Dialogue)
+// ---------------------------------------------------------
+function initGoogleVoiceCopilot() {
+    const launcher = document.getElementById("btn-open-voice-copilot");
+    const modal = document.getElementById("voice-copilot-modal");
+    const closeBtn = document.getElementById("btn-close-voice-copilot");
+    const micBtn = document.getElementById("btn-copilot-mic");
+    const micIcon = document.getElementById("copilot-mic-icon");
+    const inputEl = document.getElementById("copilot-text-input");
+    const sendBtn = document.getElementById("btn-copilot-send");
+    const stream = document.getElementById("voice-dialogue-stream");
+    const waveText = document.getElementById("voice-wave-text");
+    const waveDot = document.getElementById("voice-wave-dot");
+    const statusInd = document.getElementById("voice-status-indicator");
+    const chkAutoTts = document.getElementById("chk-auto-tts");
+    const chips = document.querySelectorAll(".voice-chip");
+
+    if (!launcher || !modal) return;
+
+    // Toggle Modal
+    launcher.addEventListener("click", () => {
+        const isHidden = modal.style.display === "none" || !modal.style.display;
+        modal.style.display = isHidden ? "flex" : "none";
+        if (isHidden && inputEl) inputEl.focus();
+    });
+
+    if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+            modal.style.display = "none";
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        });
+    }
+
+    // Helper: append message to dialogue stream
+    function appendMessage(sender, text, isAi = false) {
+        const msg = document.createElement("div");
+        msg.className = `voice-msg ${isAi ? 'ai-msg' : 'user-msg'}`;
+        if (isAi) {
+            msg.style.cssText = "align-self: flex-start; max-width: 90%; background: #0f172a; border: 1px solid #1e293b; border-radius: 12px 12px 12px 2px; padding: 10px 14px; color: #e2e8f0; font-size: 12px; line-height: 1.5;";
+            let formatted = text
+                .replace(/^### (.*$)/gim, '<div style="font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 4px;">$1</div>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.5); color: #67e8f9; padding: 1px 4px; border-radius: 3px; font-family: monospace;">$1</code>')
+                .replace(/\n/g, '<br/>');
+            msg.innerHTML = `
+                <div style="font-size: 10px; font-family: monospace; color: #38bdf8; margin-bottom: 4px; font-weight: 700;">🤖 VALIANT AI INVESTIGATOR (VOICE COPILOT)</div>
+                <div>${formatted}</div>
+            `;
+        } else {
+            msg.style.cssText = "align-self: flex-end; max-width: 85%; background: linear-gradient(135deg, #0284c7, #2563eb); border-radius: 12px 12px 2px 12px; padding: 10px 14px; color: #fff; font-size: 12px; line-height: 1.4; box-shadow: 0 4px 12px rgba(2,132,199,0.3);";
+            msg.innerHTML = `
+                <div style="font-size: 9px; font-family: monospace; color: rgba(255,255,255,0.8); margin-bottom: 2px;">👤 SPOKEN INQUIRY</div>
+                <div>${text}</div>
+            `;
+        }
+        stream.appendChild(msg);
+        stream.scrollTop = stream.scrollHeight;
+    }
+
+    // Waveform visualizer
+    let barInterval = null;
+    function startWaveform(color = "#06b6d4") {
+        const bars = document.querySelectorAll(".v-bar");
+        if (barInterval) clearInterval(barInterval);
+        barInterval = setInterval(() => {
+            bars.forEach(b => {
+                const h = Math.floor(Math.random() * 14) + 4;
+                b.style.height = `${h}px`;
+                b.style.background = color;
+            });
+        }, 120);
+    }
+
+    function stopWaveform() {
+        if (barInterval) clearInterval(barInterval);
+        barInterval = null;
+        const bars = document.querySelectorAll(".v-bar");
+        bars.forEach((b, idx) => {
+            b.style.height = `${[6, 12, 8, 16, 9][idx % 5]}px`;
+            b.style.background = "#06b6d4";
+        });
+    }
+
+    // Google TTS Voice Output
+    function speakAI(text) {
+        if (!('speechSynthesis' in window) || !chkAutoTts?.checked) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 1.05;
+        u.pitch = 1.02;
+        u.lang = "en-US";
+        u.onstart = () => {
+            if (statusInd) {
+                statusInd.textContent = "SPEAKING (GOOGLE TTS)";
+                statusInd.style.color = "#38bdf8";
+                statusInd.style.background = "rgba(56,189,248,0.2)";
+            }
+            if (waveText) waveText.textContent = "Agent speaking aloud (Google SpeechSynthesis)...";
+            if (waveDot) waveDot.style.background = "#38bdf8";
+            startWaveform("#38bdf8");
+        };
+        u.onend = () => {
+            if (statusInd) {
+                statusInd.textContent = "STANDBY";
+                statusInd.style.color = "#4ade80";
+                statusInd.style.background = "rgba(34,197,94,0.2)";
+            }
+            if (waveText) waveText.textContent = "Ready. Tap mic or ask question.";
+            if (waveDot) waveDot.style.background = "#22c55e";
+            stopWaveform();
+        };
+        window.speechSynthesis.speak(u);
+    }
+
+    // Submit dialogue query
+    async function sendQuery(queryText) {
+        if (!queryText || !queryText.trim()) return;
+        appendMessage("user", queryText, false);
+        if (inputEl) inputEl.value = "";
+
+        if (statusInd) {
+            statusInd.textContent = "THINKING (MULTI-AGENT)...";
+            statusInd.style.color = "#fbbf24";
+            statusInd.style.background = "rgba(251,191,36,0.2)";
+        }
+        if (waveText) waveText.textContent = "Orchestrator deliberating across dialectic tribunal...";
+        if (waveDot) waveDot.style.background = "#fbbf24";
+        startWaveform("#fbbf24");
+
+        try {
+            const res = await fetch("/api/voice/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: queryText })
+            });
+            const data = await res.json();
+            stopWaveform();
+
+            appendMessage("ai", data.reply, true);
+
+            // If action opens customer dossier, trigger it!
+            if (data.action === "OPEN_CUSTOMER" && data.customer_id) {
+                if (typeof openDossier === "function") {
+                    openDossier(data.customer_id);
+                } else if (typeof openCustomerDrawer === "function") {
+                    openCustomerDrawer(data.customer_id);
+                }
+            }
+
+            // Speak response aloud via Google TTS
+            if (data.spoken_reply) {
+                speakAI(data.spoken_reply);
+            }
+        } catch (err) {
+            stopWaveform();
+            appendMessage("ai", `Error contacting agent: ${err.message}`, true);
+        }
+    }
+
+    if (sendBtn) {
+        sendBtn.addEventListener("click", () => sendQuery(inputEl.value));
+    }
+    if (inputEl) {
+        inputEl.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") sendQuery(inputEl.value);
+        });
+    }
+
+    // Quick chips
+    chips.forEach(chip => {
+        chip.addEventListener("click", () => {
+            const prompt = chip.getAttribute("data-prompt");
+            if (prompt) sendQuery(prompt);
+        });
+    });
+
+    // Google Speech Recognition (STT Voice Input)
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let rec = null;
+    let isListening = false;
+
+    if (SpeechRec) {
+        rec = new SpeechRec();
+        rec.continuous = false;
+        rec.interimResults = true;
+        rec.lang = "en-US";
+
+        rec.onstart = () => {
+            isListening = true;
+            if (micBtn) {
+                micBtn.style.background = "#22c55e";
+                micBtn.style.boxShadow = "0 0 20px rgba(34,197,94,0.6)";
+            }
+            if (micIcon) micIcon.textContent = "🔴";
+            if (statusInd) {
+                statusInd.textContent = "LISTENING (SPEAK NOW)...";
+                statusInd.style.color = "#f43f5e";
+                statusInd.style.background = "rgba(244,63,94,0.2)";
+            }
+            if (waveText) waveText.textContent = "Listening to your voice (Google Speech STT)...";
+            if (waveDot) waveDot.style.background = "#f43f5e";
+            startWaveform("#f43f5e");
+        };
+
+        rec.onresult = (ev) => {
+            let transcript = "";
+            for (let i = ev.resultIndex; i < ev.results.length; ++i) {
+                transcript += ev.results[i][0].transcript;
+            }
+            if (inputEl) inputEl.value = transcript;
+            if (waveText) waveText.textContent = `Heard: "${transcript}"`;
+        };
+
+        rec.onend = () => {
+            isListening = false;
+            if (micBtn) {
+                micBtn.style.background = "#e11d48";
+                micBtn.style.boxShadow = "0 0 12px rgba(225,29,72,0.4)";
+            }
+            if (micIcon) micIcon.textContent = "🎙️";
+            stopWaveform();
+
+            const finalQuery = inputEl?.value?.trim();
+            if (finalQuery) {
+                sendQuery(finalQuery);
+            } else {
+                if (statusInd) {
+                    statusInd.textContent = "STANDBY";
+                    statusInd.style.color = "#4ade80";
+                    statusInd.style.background = "rgba(34,197,94,0.2)";
+                }
+                if (waveText) waveText.textContent = "Ready. Tap mic or ask question.";
+                if (waveDot) waveDot.style.background = "#22c55e";
+            }
+        };
+
+        if (micBtn) {
+            micBtn.addEventListener("click", () => {
+                if (isListening) {
+                    rec.stop();
+                } else {
+                    if (inputEl) inputEl.value = "";
+                    try { rec.start(); } catch (e) { console.error(e); }
+                }
+            });
+        }
+    } else {
+        if (micBtn) {
+            micBtn.title = "Google Speech Recognition not supported in this browser. Please use text input or prompt chips.";
+        }
+    }
+}
+

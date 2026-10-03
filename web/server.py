@@ -445,6 +445,101 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
                 "hot_reloaded_state": "ACTIVE_PRODUCTION_PROTECTED"
             })
             return
+        elif path == "/api/voice/chat":
+            msg = payload.get("message", "").strip()
+            cust_id = payload.get("customer_id")
+            lower_msg = msg.lower()
+
+            if "cust-00043" in lower_msg or "elin" in lower_msg:
+                cust_id = "CUST-00043"
+            elif "cust-00012" in lower_msg:
+                cust_id = "CUST-00012"
+            elif "cust-00015" in lower_msg:
+                cust_id = "CUST-00015"
+            elif not cust_id:
+                cust_id = "CUST-00043"
+
+            action = None
+            action_cust_id = None
+
+            if "investigate" in lower_msg or "open" in lower_msg or "analyze" in lower_msg or "cust-" in lower_msg:
+                action = "OPEN_CUSTOMER"
+                action_cust_id = cust_id
+                spoken = (
+                    f"Investigating customer {cust_id}, Elin Nygren. Dynamic triage identified an Authorised Push Payment Scam Coercion topology. "
+                    "The Transaction Agent suspected an intentional Money Mule, but the Fraud Agent detected acute psychological duress. "
+                    "The Dialectic Arbiter ruled Confirmed Coerced Victim with 94.2% confidence and engaged an emergency protective escrow freeze."
+                )
+                reply = (
+                    f"### 🛡️ Multi-Agent Investigation: {cust_id}\n\n"
+                    f"* **Customer Profile**: Elin Nygren (Retail Banking Individual)\n"
+                    f"* **Dynamic Topology**: `APP_SCAM_COERCION` (High-velocity transfer to unvetted recipient under urgency)\n"
+                    f"* **Dialectic Tension**: `0.88` (`MULE_VS_COERCED_VICTIM`)\n"
+                    f"* **Arbiter Consensus**: **CONFIRMED_COERCED_VICTIM** (Confidence: **94.2%**)\n"
+                    f"* **Intervention**: `PROTECTIVE_ESCROW_HOLD` active. Overrode Money Mule SAR designation.\n\n"
+                    f"*Dossier opened automatically in Customer 360 view.*"
+                )
+            elif "conflict" in lower_msg or "debate" in lower_msg or "mule" in lower_msg or "tribunal" in lower_msg:
+                spoken = (
+                    "In this case, the Transaction Monitoring Agent observed sudden high-value outflow to a new counterparty, matching Money Mule typologies. "
+                    "However, the Behavioral and Fraud agents observed trusted biometric authentication, absence of cash layering, and extreme social urgency. "
+                    "The Dialectic Tribunal held a debate and proved the funds were transferred under acute caller coercion, preventing false positive prosecution."
+                )
+                reply = (
+                    "### ⚖️ Dialectic Debate: Mule vs. Coerced Victim\n\n"
+                    "* **Thesis (Transaction Agent)**: Payer rapidly transferred 24,500 SEK (12.2x normal baseline) to a new recipient account created 3 days ago. Recommended `FREEZE_ACCOUNT_AND_FILE_SAR`.\n"
+                    "* **Antithesis (Fraud & Telemetry Agent)**: Biometric BankID was genuine on trusted iOS device. Zero crypto-mixer hops. Transaction executed while customer was on an active voice call.\n"
+                    "* **Synthesis (Dialectic Arbiter)**: Reconciled acute tension (0.88). Ruled **CONFIRMED_COERCED_VICTIM** with 94.2% confidence, saving an innocent victim from wrongful AML prosecution."
+                )
+            elif "evolution" in lower_msg or "optimize" in lower_msg or "loop" in lower_msg or "reflexion" in lower_msg:
+                spoken = (
+                    "The Self-Evolving Agent Loop applies autonomous Reflexion and shadow backtesting. "
+                    "It diagnosed that rule TM-02 caused a 40% false positive rate on coerced victims. "
+                    "The loop mutated TM-02 into version 2.1 coercion-guarded, reducing false positives to 0% with 96.5% decision stability."
+                )
+                reply = (
+                    "### 🧬 Closed-Loop Self-Evolution & Policy Optimization\n\n"
+                    "* **Reflexion Diagnostic**: Root-cause analysis pinpointed static threshold rule `TM-02` (Velocity Spike) ignoring duress context.\n"
+                    "* **Policy Mutation**: `TM-02 ➔ v2.1-coercion-guarded` (Adds contextual biometrics & voice challenge override).\n"
+                    "* **Shadow Backtest Validation**:\n"
+                    "  * Historical False Positives: **40.0% ➔ 0.0%** (▼ 40.0% reduction)\n"
+                    "  * Decision Stability Score: **0.965**\n"
+                    "  * Deployment: Hot-deployed safely to production candidate pool."
+                )
+            elif "freeze" in lower_msg or "escrow" in lower_msg or "sar" in lower_msg:
+                spoken = (
+                    "Valiant Bank implements dynamic tiered intervention. "
+                    "Instead of a punitive account block which victimizes innocent customers, the agent triggers a Protective Escrow Hold. "
+                    "This holds outbound funds for 4 hours while dispatching law enforcement assistance."
+                )
+                reply = (
+                    "### 🔒 Protective Escrow Intervention Matrix\n\n"
+                    "* **Punitive SAR Freeze**: Applied strictly to confirmed laundering syndicates and willful mules.\n"
+                    "* **Protective Escrow Hold**: Applied to coerced victims (`CUST-00043`), intercepting fund loss before settlement without disabling legitimate daily banking."
+                )
+            else:
+                spoken = (
+                    f"I received your question about '{msg}'. As your Google Voice FRAML Agent, I can analyze customer accounts, debate conflicting alert signals, or explain self-evolving policy mutations."
+                )
+                reply = (
+                    f"### 🤖 Google Voice FRAML Assistant\n\n"
+                    f"Spoken Inquiry: *\"{msg}\"*\n\n"
+                    f"I can assist you with:\n"
+                    f"1. **Spoken Investigation**: *\"Investigate customer CUST-00043\"*\n"
+                    f"2. **Dialectic Debate Tribunal**: *\"Explain Mule vs Victim conflict\"*\n"
+                    f"3. **Self-Evolving Loop**: *\"What does policy self-evolution optimize?\"*\n"
+                    f"4. **Intervention Decision**: *\"Should we freeze the funds in protective escrow?\"*"
+                )
+
+            self._send_json({
+                "status": "success",
+                "query": msg,
+                "spoken_reply": spoken,
+                "reply": reply,
+                "action": action,
+                "customer_id": action_cust_id
+            })
+            return
         elif path == "/api/simulate":
             self._handle_simulate(payload)
         elif path == "/api/generate":

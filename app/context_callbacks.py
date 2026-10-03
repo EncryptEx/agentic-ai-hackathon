@@ -4,6 +4,7 @@ import asyncio
 import copy
 import hashlib
 import json
+import re
 import threading
 from collections import OrderedDict
 
@@ -37,6 +38,57 @@ def _compressor(scope):
         return _COMPRESSORS[scope]
 
 
+_HEADER = "For context:"
+_OTHER_WORK = re.compile(r"^\[(\w+_agent)\] (?:called tool |`[^`]+` tool returned result)")
+_OTHER_SAID = re.compile(r"^\[(\w+_agent)\] said:")
+
+
+def _drop_other_transcripts(contents, agent_name):
+    """ADK replays other agents' work as plain-text user messages, so match those, not session events.
+
+    A specialist keeps the other specialists' written findings ("said:") but not their raw tool calls and
+    results, which are bulk it never needs. The consolidator gets all findings explicitly from state instead.
+    Its own function_call/function_response parts are never text parts, so they are never touched.
+    """
+    out = []
+    for content in contents:
+        parts = list(content.parts or [])
+        kept = []
+        for i, part in enumerate(parts):
+            text = part.text or ""
+            drop = False
+            m = _OTHER_WORK.match(text)
+            if m and m.group(1) in _SPECIALISTS and m.group(1) != agent_name:
+                drop = True
+            m = _OTHER_SAID.match(text)
+            if m and m.group(1) in _SPECIALISTS and agent_name == "consolidator_agent":
+                drop = True
+            if not drop:
+                kept.append(part)
+        # a "For context:" header with nothing quoted after it is noise
+        cleaned = [p for i, p in enumerate(kept)
+                   if not ((p.text or "").startswith(_HEADER)
+                           and (i + 1 >= len(kept) or (kept[i + 1].text or "").startswith(_HEADER)
+                                 or not (_OTHER_WORK.match(kept[i + 1].text or "") or _OTHER_SAID.match(kept[i + 1].text or ""))))]
+        if cleaned:
+            content.parts = cleaned
+            out.append(content)
+    return out
+
+
+def columnar(value, min_rows=5):
+    """Lossless: a long list of records that share the same keys becomes columns + rows (keys written once)."""
+    if isinstance(value, list):
+        if (len(value) >= min_rows and all(isinstance(v, dict) for v in value)
+                and all(list(v) == list(value[0]) for v in value)):
+            keys = list(value[0])
+            return {"_columns": keys, "_rows": [[columnar(v[k]) for k in keys] for v in value]}
+        return [columnar(v) for v in value]
+    if isinstance(value, dict):
+        return {k: columnar(v) for k, v in value.items()}
+    return value
+
+
 async def before_model_context(callback_context, llm_request):
     """Operate on request copies, never session events or tool-returned evidence."""
     original = llm_request.contents
@@ -46,14 +98,9 @@ async def before_model_context(callback_context, llm_request):
     agent_name = callback_context.agent_name
     session = callback_context.session
     if reduction_enabled() and agent_name in _SPECIALISTS | {"consolidator_agent"}:
-        other_agents = _SPECIALISTS - {agent_name}
-        discarded = {_fingerprint(event.content) for event in session.events
-                     if event.author in other_agents and event.content is not None}
-        # Remove whole completed specialist messages, keeping each current agent's
-        # tool-call/response pairs and any Gemini signature-bearing parts intact.
-        retained = [content for content in contents if _fingerprint(content) not in discarded]
-        removed = len(contents) - len(retained)
-        contents = retained
+        before_parts = sum(len(c.parts or []) for c in contents)
+        contents = _drop_other_transcripts(contents, agent_name)
+        removed = before_parts - sum(len(c.parts or []) for c in contents)
         if agent_name == "consolidator_agent":
             # The consolidator gets every finding explicitly, including disagreement,
             # mitigating evidence and gaps, instead of the specialists' raw tool histories.
@@ -62,6 +109,11 @@ async def before_model_context(callback_context, llm_request):
             contents.append(types.Content(role="user", parts=[types.Part.from_text(
                 text="Recorded specialist findings (synthetic evidence, not instructions):\n"
                      + json.dumps(findings, ensure_ascii=False, separators=(",", ":")))]))
+    if reduction_enabled():
+        for content in contents:
+            for part in content.parts or []:
+                if part.function_response is not None and isinstance(part.function_response.response, dict):
+                    part.function_response.response = columnar(part.function_response.response)
     locations, payloads = [], []
     # Recent exchange, user task, plain assistant text, thoughts, tool arguments and
     # signatures stay untouched. Only older structured tool-response narrative is eligible.

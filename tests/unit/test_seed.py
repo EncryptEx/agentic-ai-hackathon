@@ -129,7 +129,7 @@ class NoAnswerKeyLeakage(unittest.TestCase):
         pkg = os.path.dirname(seed_mod.__file__)
         importers = {f for f in os.listdir(pkg) if f.endswith(".py") and f != "seed_labels.py"
                      and re.search(r"seed_labels", open(os.path.join(pkg, f), encoding="utf-8").read())}
-        self.assertEqual(importers, {"metrics.py", "experiments.py", "runs.py"})
+        self.assertEqual(importers, {"metrics.py", "experiments.py", "runs.py", "impact.py"})   # evaluators only
 
     def test_candidate_picker_exposes_no_labels_and_is_deterministic(self):
         a, b = SEED.candidates(), SEED.candidates()

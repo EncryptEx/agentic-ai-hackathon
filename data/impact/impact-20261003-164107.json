@@ -1,0 +1,795 @@
+{
+ "created": "20261003-164107",
+ "cases": 6,
+ "rows": [
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0104444",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101306",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 3500.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100254",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100880",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 169.2,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101699",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 171.91,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0106373",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 46490.56,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0104444",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7116,
+    "output": 1358,
+    "thinking": 2087,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19015,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0104444",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 15757,
+    "output": 2198,
+    "thinking": 2994,
+    "turns": 11,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 40202,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101306",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 3500.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6655,
+    "output": 1507,
+    "thinking": 2443,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 20140,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101306",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 3500.0,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 12771,
+    "output": 2080,
+    "thinking": 4247,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 33780,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100254",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7018,
+    "output": 1431,
+    "thinking": 2584,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19171,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100254",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 13158,
+    "output": 2098,
+    "thinking": 3366,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 28671,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100880",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 169.2,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6914,
+    "output": 1182,
+    "thinking": 1864,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 17156,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100880",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 169.2,
+   "alert_sources": [],
+   "tokens": {
+    "input": 15453,
+    "output": 1959,
+    "thinking": 2350,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 28078,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101699",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 171.91,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6782,
+    "output": 1206,
+    "thinking": 1556,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 17641,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101699",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 171.91,
+   "alert_sources": [],
+   "tokens": {
+    "input": 15627,
+    "output": 1893,
+    "thinking": 2528,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 25375,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0106373",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 46490.56,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7016,
+    "output": 1426,
+    "thinking": 2567,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19968,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0106373",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 46490.56,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 15264,
+    "output": 2083,
+    "thinking": 3758,
+    "turns": 11,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 32030,
+   "geval": {
+    "evidence_grounding": {
+     "score": 0.8,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  }
+ ],
+ "summary": {
+  "assumptions": {
+   "gemini_usd_per_million_input_tokens": 0.3,
+   "gemini_usd_per_million_output_tokens": 2.5,
+   "jev_usd_per_call": 0.0,
+   "analyst_minutes_per_alert": 25.0,
+   "analyst_usd_per_hour": 45.0
+  },
+  "arms": {
+   "rules": {
+    "detection": {
+     "attempted": 6,
+     "completed": 6,
+     "tp": 2,
+     "fn": 1,
+     "fp": 0,
+     "tn": 3,
+     "recall": {
+      "k": 2,
+      "n": 3,
+      "rate": 0.667,
+      "ci95": [
+       0.208,
+       0.939
+      ]
+     },
+     "false_positive_rate": {
+      "k": 0,
+      "n": 3,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.562
+      ]
+     },
+     "precision": {
+      "k": 2,
+      "n": 2,
+      "rate": 1.0,
+      "ci95": [
+       0.342,
+       1.0
+      ]
+     },
+     "missed_value_usd": 3500.0
+    },
+    "llm_cost": {
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "thinking": 0
+     },
+     "usd": 0.0,
+     "usd_per_case": 0.0
+    },
+    "analyst": {
+     "alerts_reviewed": 2,
+     "wasted_reviews": 0,
+     "usd": 37.5,
+     "wasted_usd": 0.0,
+     "usd_per_review": 18.75
+    },
+    "mean_seconds_per_case": null,
+    "net_usd": 37.5
+   },
+   "agents_no_jev": {
+    "detection": {
+     "attempted": 6,
+     "completed": 6,
+     "tp": 2,
+     "fn": 1,
+     "fp": 0,
+     "tn": 3,
+     "recall": {
+      "k": 2,
+      "n": 3,
+      "rate": 0.667,
+      "ci95": [
+       0.208,
+       0.939
+      ]
+     },
+     "false_positive_rate": {
+      "k": 0,
+      "n": 3,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.562
+      ]
+     },
+     "precision": {
+      "k": 2,
+      "n": 2,
+      "rate": 1.0,
+      "ci95": [
+       0.342,
+       1.0
+      ]
+     },
+     "missed_value_usd": 3500.0
+    },
+    "llm_cost": {
+     "tokens": {
+      "input": 41501,
+      "output": 8110,
+      "thinking": 13101
+     },
+     "usd": 0.0655,
+     "usd_per_case": 0.01091
+    },
+    "analyst": {
+     "alerts_reviewed": 2,
+     "wasted_reviews": 0,
+     "usd": 37.5,
+     "wasted_usd": 0.0,
+     "usd_per_review": 18.75
+    },
+    "mean_seconds_per_case": 18.8,
+    "net_usd": 37.57
+   },
+   "agents_jev": {
+    "detection": {
+     "attempted": 6,
+     "completed": 6,
+     "tp": 2,
+     "fn": 1,
+     "fp": 0,
+     "tn": 3,
+     "recall": {
+      "k": 2,
+      "n": 3,
+      "rate": 0.667,
+      "ci95": [
+       0.208,
+       0.939
+      ]
+     },
+     "false_positive_rate": {
+      "k": 0,
+      "n": 3,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.562
+      ]
+     },
+     "precision": {
+      "k": 2,
+      "n": 2,
+      "rate": 1.0,
+      "ci95": [
+       0.342,
+       1.0
+      ]
+     },
+     "missed_value_usd": 3500.0
+    },
+    "llm_cost": {
+     "tokens": {
+      "input": 88030,
+      "output": 12311,
+      "thinking": 19243
+     },
+     "usd": 0.1053,
+     "usd_per_case": 0.01755
+    },
+    "analyst": {
+     "alerts_reviewed": 2,
+     "wasted_reviews": 0,
+     "usd": 37.5,
+     "wasted_usd": 0.0,
+     "usd_per_review": 18.75
+    },
+    "mean_seconds_per_case": 31.4,
+    "net_usd": 37.61
+   }
+  },
+  "savings_vs_rules": {
+   "agents_no_jev": {
+    "wasted_reviews_avoided_vs_rules": 0,
+    "review_usd_saved_vs_rules": 0.0,
+    "llm_usd_spent": 0.0655,
+    "net_usd_vs_rules": -0.07,
+    "extra_missed_value_usd_vs_rules": 0.0
+   },
+   "agents_jev": {
+    "wasted_reviews_avoided_vs_rules": 0,
+    "review_usd_saved_vs_rules": 0.0,
+    "llm_usd_spent": 0.1053,
+    "net_usd_vs_rules": -0.11,
+    "extra_missed_value_usd_vs_rules": 0.0
+   }
+  },
+  "jev_effect": {
+   "paired_vs_no_jev": {
+    "cases": 6,
+    "only_b_correct": 0,
+    "only_a_correct": 0,
+    "both_correct": 5,
+    "both_wrong": 1
+   },
+   "alerts": {
+    "policy_only": {
+     "detected": {
+      "k": 2,
+      "n": 3,
+      "rate": 0.667,
+      "ci95": [
+       0.208,
+       0.939
+      ]
+     },
+     "false_alerts": {
+      "k": 0,
+      "n": 3,
+      "rate": 0.0,
+      "ci95": [
+       0.0,
+       0.562
+      ]
+     }
+    },
+    "jev_only": {
+     "detected": {
+      "k": 3,
+      "n": 3,
+      "rate": 1.0,
+      "ci95": [
+       0.438,
+       1.0
+      ]
+     },
+     "false_alerts": {
+      "k": 1,
+      "n": 3,
+      "rate": 0.333,
+      "ci95": [
+       0.061,
+       0.792
+      ]
+     }
+    },
+    "jev_or_policy": {
+     "detected": {
+      "k": 3,
+      "n": 3,
+      "rate": 1.0,
+      "ci95": [
+       0.438,
+       1.0
+      ]
+     },
+     "false_alerts": {
+      "k": 1,
+      "n": 3,
+      "rate": 0.333,
+      "ci95": [
+       0.061,
+       0.792
+      ]
+     }
+    }
+   },
+   "extra_tokens": {
+    "input": 46529,
+    "output": 4201,
+    "thinking": 6142
+   }
+  },
+  "geval_effect": {
+   "evaluated_runs": 6,
+   "wrong_decisions": 1,
+   "right_decisions": 5,
+   "wrong_held_by_gate": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0,
+    "ci95": [
+     0.0,
+     0.793
+    ]
+   },
+   "right_held_by_gate": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "ci95": [
+     0.0,
+     0.434
+    ]
+   },
+   "metrics": {
+    "evidence_grounding": {
+     "mean": 0.967,
+     "n": 6,
+     "pass": {
+      "k": 6,
+      "n": 6,
+      "rate": 1.0,
+      "ci95": [
+       0.61,
+       1.0
+      ]
+     }
+    },
+    "explanation_completeness": {
+     "mean": 1.0,
+     "n": 6,
+     "pass": {
+      "k": 6,
+      "n": 6,
+      "rate": 1.0,
+      "ci95": [
+       0.61,
+       1.0
+      ]
+     }
+    },
+    "investigation_relevance": {
+     "mean": 1.0,
+     "n": 6,
+     "pass": {
+      "k": 6,
+      "n": 6,
+      "rate": 1.0,
+      "ci95": [
+       0.61,
+       1.0
+      ]
+     }
+    }
+   },
+   "reading": "A gate is useful only if it holds wrong decisions clearly more often than right ones. G-Eval is a model judging explanations, not ground truth."
+  },
+  "notes": [
+   "Rates come from a sample enriched with attacks and cover a few dozen transactions; the confidence intervals are wide and say so.",
+   "Money uses the ASSUMPTIONS above. Token counts, decisions and missed value are measured.",
+   "The answer key marks every generator-planted transaction, including early ones nothing could know yet, so recall below 100% is expected."
+  ]
+ }
+}

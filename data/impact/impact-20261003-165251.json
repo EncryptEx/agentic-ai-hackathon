@@ -1,0 +1,3950 @@
+{
+ "created": "20261003-165251",
+ "cases": 48,
+ "rows": [
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0104444",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101306",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 3500.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100254",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0103896",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 36733.17,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101943",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101305",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 3800.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0103005",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 11728.78,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0102948",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101689",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 4718.13,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0106563",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101605",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0102214",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0104446",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 3600.27,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100498",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0102833",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101440",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 40150.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101133",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 2903.7,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100709",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 20008.19,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0102162",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 38741.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0102832",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100499",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100076",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100075",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 6500.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101067",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 9437.7,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100880",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 169.2,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101699",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 171.91,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0106373",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 46490.56,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101220",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 26560.71,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0106441",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 25598.54,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0103973",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 107.95,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0103429",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 22419.86,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0105168",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 4894.76,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101964",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 29734.65,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0103669",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 109.99,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0106381",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 45025.55,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0106379",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 37369.84,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0106433",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 28166.06,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0105387",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 113.84,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0101135",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 26931.36,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100060",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 29.18,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0104742",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 117.39,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0106375",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 33383.47,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100592",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 119.8,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0104703",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 298.39,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0106437",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 24100.34,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0106377",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 31531.97,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100849",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 444.04,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "rules",
+   "case_id": "seed:TXN-0100756",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 95.64,
+   "alert_sources": [],
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "thinking": 0,
+    "turns": 0,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": null,
+   "geval": {}
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0104444",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6791,
+    "output": 1401,
+    "thinking": 2139,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 18375,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0104444",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 17671,
+    "output": 2397,
+    "thinking": 3175,
+    "turns": 12,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 30514,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101306",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 3500.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6722,
+    "output": 1381,
+    "thinking": 2435,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19828,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101306",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 3500.0,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 12685,
+    "output": 2014,
+    "thinking": 3061,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 27578,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100254",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7166,
+    "output": 1420,
+    "thinking": 2414,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19921,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100254",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 12880,
+    "output": 2025,
+    "thinking": 3297,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 29796,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0103896",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 36733.17,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7121,
+    "output": 1497,
+    "thinking": 2234,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19514,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0103896",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 36733.17,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 12462,
+    "output": 2039,
+    "thinking": 3660,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 35094,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101943",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7947,
+    "output": 1555,
+    "thinking": 2549,
+    "turns": 8,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 23890,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101943",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 14871,
+    "output": 2030,
+    "thinking": 4021,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 29969,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101305",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 3800.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6732,
+    "output": 1561,
+    "thinking": 2526,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 21686,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101305",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 3800.0,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 12978,
+    "output": 2041,
+    "thinking": 2572,
+    "turns": 11,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 27781,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 0.8,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0103005",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 11728.78,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6979,
+    "output": 1419,
+    "thinking": 1943,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19093,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0103005",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 11728.78,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 11763,
+    "output": 2010,
+    "thinking": 2982,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 29079,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0102948",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6776,
+    "output": 1412,
+    "thinking": 2210,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 20890,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0102948",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 12461,
+    "output": 2130,
+    "thinking": 2834,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 28969,
+   "geval": {
+    "evidence_grounding": {
+     "score": 0.9,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 0.9,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 0.4,
+     "passed": false
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101689",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 4718.13,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6916,
+    "output": 1375,
+    "thinking": 1847,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 17233,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101689",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 4718.13,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 11883,
+    "output": 1970,
+    "thinking": 2515,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 26500,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0106563",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6791,
+    "output": 1632,
+    "thinking": 2339,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 21000,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0106563",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 13702,
+    "output": 1983,
+    "thinking": 2487,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 25485,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101605",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6942,
+    "output": 1590,
+    "thinking": 3049,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 21905,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101605",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 13906,
+    "output": 2054,
+    "thinking": 3408,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 27984,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0102214",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7921,
+    "output": 1520,
+    "thinking": 3043,
+    "turns": 8,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 35780,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0102214",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 16244,
+    "output": 2086,
+    "thinking": 3891,
+    "turns": 11,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 32094,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0104446",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 3600.27,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6704,
+    "output": 1417,
+    "thinking": 1998,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 17484,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0104446",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 3600.27,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 13165,
+    "output": 2047,
+    "thinking": 2852,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 26125,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100498",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6927,
+    "output": 1295,
+    "thinking": 2098,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19938,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100498",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 13584,
+    "output": 1958,
+    "thinking": 3891,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 30530,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0102833",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6850,
+    "output": 1302,
+    "thinking": 2047,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19187,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0102833",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 12578,
+    "output": 1915,
+    "thinking": 3725,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 30250,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101440",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 40150.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6900,
+    "output": 1400,
+    "thinking": 3679,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 26765,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101440",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 40150.0,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 12086,
+    "output": 2084,
+    "thinking": 4277,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 34546,
+   "geval": {
+    "evidence_grounding": {
+     "score": 0.9,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101133",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 2903.7,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6795,
+    "output": 1618,
+    "thinking": 2043,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 18750,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101133",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 2903.7,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 13917,
+    "output": 2226,
+    "thinking": 3298,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 30328,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100709",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 20008.19,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7056,
+    "output": 1623,
+    "thinking": 2237,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19936,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100709",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 20008.19,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 13623,
+    "output": 2142,
+    "thinking": 3322,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 30405,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0102162",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 38741.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7342,
+    "output": 1558,
+    "thinking": 3055,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 24469,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0102162",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 38741.45,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 13335,
+    "output": 2204,
+    "thinking": 3323,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 31172,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0102832",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6721,
+    "output": 1312,
+    "thinking": 2398,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 21030,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0102832",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": true,
+   "amount_usd": 0.89,
+   "alert_sources": [],
+   "tokens": {
+    "input": 12349,
+    "output": 1880,
+    "thinking": 3412,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 27704,
+   "geval": {
+    "evidence_grounding": {
+     "score": 0.9,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 0.8,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 0.6,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100499",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6946,
+    "output": 1479,
+    "thinking": 2457,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 21014,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100499",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 1.45,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 13295,
+    "output": 2221,
+    "thinking": 3568,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 33061,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100076",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6936,
+    "output": 1370,
+    "thinking": 2352,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 22202,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100076",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 9800.0,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 14722,
+    "output": 2253,
+    "thinking": 10371,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 62719,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100075",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 6500.0,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6995,
+    "output": 1499,
+    "thinking": 2281,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 21359,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100075",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": true,
+   "amount_usd": 6500.0,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 14575,
+    "output": 2309,
+    "thinking": 3578,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 32110,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101067",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 9437.7,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6829,
+    "output": 1493,
+    "thinking": 2085,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 18969,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101067",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "REVIEW",
+   "truth_flagged": true,
+   "amount_usd": 9437.7,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 12831,
+    "output": 2215,
+    "thinking": 3246,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 29640,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100880",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 169.2,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6827,
+    "output": 1446,
+    "thinking": 1654,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19328,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100880",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 169.2,
+   "alert_sources": [],
+   "tokens": {
+    "input": 15829,
+    "output": 1816,
+    "thinking": 2809,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 27812,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101699",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 171.91,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7850,
+    "output": 1271,
+    "thinking": 1495,
+    "turns": 8,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19045,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101699",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 171.91,
+   "alert_sources": [],
+   "tokens": {
+    "input": 15404,
+    "output": 1835,
+    "thinking": 2546,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 25327,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0106373",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 46490.56,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6917,
+    "output": 1507,
+    "thinking": 2767,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 21093,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0106373",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 46490.56,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 13832,
+    "output": 2125,
+    "thinking": 3018,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 27983,
+   "geval": {
+    "evidence_grounding": {
+     "score": 0.6,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 0.6,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101220",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 26560.71,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6852,
+    "output": 1445,
+    "thinking": 2642,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 20110,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101220",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 26560.71,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 14613,
+    "output": 2227,
+    "thinking": 3393,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 31000,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0106441",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 25598.54,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6968,
+    "output": 1576,
+    "thinking": 3216,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 24344,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0106441",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 25598.54,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 14078,
+    "output": 2234,
+    "thinking": 3181,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 30672,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0103973",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 107.95,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6591,
+    "output": 1158,
+    "thinking": 1754,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 16610,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0103973",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 107.95,
+   "alert_sources": [],
+   "tokens": {
+    "input": 15511,
+    "output": 1865,
+    "thinking": 2197,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 25078,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0103429",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 22419.86,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6708,
+    "output": 1446,
+    "thinking": 2228,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 18531,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0103429",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 22419.86,
+   "alert_sources": [],
+   "tokens": {
+    "input": 13396,
+    "output": 1926,
+    "thinking": 2828,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 25531,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0105168",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 4894.76,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7784,
+    "output": 1400,
+    "thinking": 2350,
+    "turns": 8,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 20780,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0105168",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 4894.76,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 14054,
+    "output": 2087,
+    "thinking": 6198,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 42702,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101964",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 29734.65,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6743,
+    "output": 1438,
+    "thinking": 2227,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19156,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101964",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 29734.65,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 13930,
+    "output": 2280,
+    "thinking": 3022,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 28530,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 0.8,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0103669",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 109.99,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6776,
+    "output": 1342,
+    "thinking": 1562,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 18390,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0103669",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 109.99,
+   "alert_sources": [],
+   "tokens": {
+    "input": 15322,
+    "output": 1891,
+    "thinking": 2516,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 29109,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0106381",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 45025.55,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6802,
+    "output": 1486,
+    "thinking": 2168,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 18500,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0106381",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 45025.55,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 14431,
+    "output": 2181,
+    "thinking": 3382,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 28344,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 0.9,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0106379",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 37369.84,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6630,
+    "output": 1344,
+    "thinking": 6968,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 36780,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0106379",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 37369.84,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 14726,
+    "output": 2143,
+    "thinking": 7556,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 47593,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0106433",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 28166.06,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7004,
+    "output": 1378,
+    "thinking": 2827,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 24686,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0106433",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 28166.06,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 15123,
+    "output": 2051,
+    "thinking": 3524,
+    "turns": 11,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 31280,
+   "geval": {
+    "evidence_grounding": {
+     "score": 0.7,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 0.6,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0105387",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 113.84,
+   "alert_sources": [],
+   "tokens": {
+    "input": 7696,
+    "output": 1320,
+    "thinking": 1745,
+    "turns": 8,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 18094,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0105387",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 113.84,
+   "alert_sources": [],
+   "tokens": {
+    "input": 16357,
+    "output": 1943,
+    "thinking": 2716,
+    "turns": 11,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 26438,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 0.9,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 0.9,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0101135",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 26931.36,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6902,
+    "output": 1512,
+    "thinking": 2668,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 20280,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0101135",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 26931.36,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 14600,
+    "output": 2058,
+    "thinking": 3935,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 29110,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 0.9,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100060",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 29.18,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6611,
+    "output": 1099,
+    "thinking": 1153,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 15140,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100060",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 29.18,
+   "alert_sources": [],
+   "tokens": {
+    "input": 15288,
+    "output": 1779,
+    "thinking": 2190,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 24046,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0104742",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 117.39,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6816,
+    "output": 1284,
+    "thinking": 1327,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 15609,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0104742",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 117.39,
+   "alert_sources": [],
+   "tokens": {
+    "input": 15403,
+    "output": 1809,
+    "thinking": 2221,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 23000,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0106375",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 33383.47,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6939,
+    "output": 1373,
+    "thinking": 2802,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19827,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0106375",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 33383.47,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 13774,
+    "output": 2217,
+    "thinking": 4828,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 34327,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100592",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 119.8,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6829,
+    "output": 1285,
+    "thinking": 1701,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 16594,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100592",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 119.8,
+   "alert_sources": [],
+   "tokens": {
+    "input": 15563,
+    "output": 1822,
+    "thinking": 3066,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 26125,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0104703",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 298.39,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6861,
+    "output": 1350,
+    "thinking": 2293,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 19859,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0104703",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 298.39,
+   "alert_sources": [],
+   "tokens": {
+    "input": 14996,
+    "output": 2080,
+    "thinking": 3218,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 30593,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 0.9,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0106437",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 24100.34,
+   "alert_sources": [],
+   "tokens": {
+    "input": 17252,
+    "output": 2501,
+    "thinking": 6729,
+    "turns": 15,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 44407,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0106437",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 24100.34,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 14089,
+    "output": 2007,
+    "thinking": 3821,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 32157,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 0.9,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0106377",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 31531.97,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6709,
+    "output": 1378,
+    "thinking": 2869,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 20578,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0106377",
+   "completed": true,
+   "flagged_by_system": false,
+   "action": "ALLOW",
+   "truth_flagged": false,
+   "amount_usd": 31531.97,
+   "alert_sources": [
+    "jev"
+   ],
+   "tokens": {
+    "input": 14061,
+    "output": 2066,
+    "thinking": 3757,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 30890,
+   "geval": {
+    "evidence_grounding": {
+     "score": 0.9,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100849",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 444.04,
+   "alert_sources": [],
+   "tokens": {
+    "input": 6888,
+    "output": 1319,
+    "thinking": 2113,
+    "turns": 7,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 18327,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100849",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 444.04,
+   "alert_sources": [
+    "policy"
+   ],
+   "tokens": {
+    "input": 16155,
+    "output": 1895,
+    "thinking": 3168,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 27405,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  },
+  {
+   "arm": "agents_no_jev",
+   "case_id": "seed:TXN-0100756",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 95.64,
+   "alert_sources": [],
+   "tokens": {
+    "input": 10321,
+    "output": 1813,
+    "thinking": 6441,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 0,
+   "elapsed_ms": 48360,
+   "geval": {}
+  },
+  {
+   "arm": "agents_jev",
+   "case_id": "seed:TXN-0100756",
+   "completed": true,
+   "flagged_by_system": true,
+   "action": "CONTEXT_CHECK",
+   "truth_flagged": false,
+   "amount_usd": 95.64,
+   "alert_sources": [
+    "jev",
+    "policy"
+   ],
+   "tokens": {
+    "input": 15885,
+    "output": 1966,
+    "thinking": 4976,
+    "turns": 10,
+    "turns_without_usage": 0
+   },
+   "jev_calls": 2,
+   "elapsed_ms": 37250,
+   "geval": {
+    "evidence_grounding": {
+     "score": 1.0,
+     "passed": true
+    },
+    "explanation_completeness": {
+     "score": 1.0,
+     "passed": true
+    },
+    "investigation_relevance": {
+     "score": 1.0,
+     "passed": true
+    }
+   }
+  }
+ ],
+ "summary": {
+  "assumptions": {
+   "gemini_usd_per_million_input_tokens": 0.3,
+   "gemini_usd_per_million_output_tokens": 2.5,
+   "jev_usd_per_call": 0.0,
+   "analyst_minutes_per_alert": 25.0,
+   "analyst_usd_per_hour": 45.0
+  },
+  "arms": {
+   "rules": {
+    "detection": {
+     "attempted": 48,
+     "completed": 48,
+     "tp": 18,
+     "fn": 6,
+     "fp": 8,
+     "tn": 16,
+     "recall": {
+      "k": 18,
+      "n": 24,
+      "rate": 0.75,
+      "ci95": [
+       0.551,
+       0.88
+      ]
+     },
+     "false_positive_rate": {
+      "k": 8,
+      "n": 24,
+      "rate": 0.333,
+      "ci95": [
+       0.18,
+       0.533
+      ]
+     },
+     "precision": {
+      "k": 18,
+      "n": 26,
+      "rate": 0.692,
+      "ci95": [
+       0.5,
+       0.835
+      ]
+     },
+     "missed_value_usd": 93984.06
+    },
+    "llm_cost": {
+     "tokens": {
+      "input": 0,
+      "output": 0,
+      "thinking": 0
+     },
+     "usd": 0.0,
+     "usd_per_case": 0.0
+    },
+    "analyst": {
+     "alerts_reviewed": 26,
+     "wasted_reviews": 8,
+     "usd": 487.5,
+     "wasted_usd": 150.0,
+     "usd_per_review": 18.75
+    },
+    "mean_seconds_per_case": null,
+    "net_usd": 487.5
+   },
+   "agents_no_jev": {
+    "detection": {
+     "attempted": 48,
+     "completed": 48,
+     "tp": 18,
+     "fn": 6,
+     "fp": 8,
+     "tn": 16,
+     "recall": {
+      "k": 18,
+      "n": 24,
+      "rate": 0.75,
+      "ci95": [
+       0.551,
+       0.88
+      ]
+     },
+     "false_positive_rate": {
+      "k": 8,
+      "n": 24,
+      "rate": 0.333,
+      "ci95": [
+       0.18,
+       0.533
+      ]
+     },
+     "precision": {
+      "k": 18,
+      "n": 26,
+      "rate": 0.692,
+      "ci95": [
+       0.5,
+       0.835
+      ]
+     },
+     "missed_value_usd": 93984.06
+    },
+    "llm_cost": {
+     "tokens": {
+      "input": 348081,
+      "output": 69600,
+      "thinking": 123157
+     },
+     "usd": 0.5863,
+     "usd_per_case": 0.01221
+    },
+    "analyst": {
+     "alerts_reviewed": 26,
+     "wasted_reviews": 8,
+     "usd": 487.5,
+     "wasted_usd": 150.0,
+     "usd_per_review": 18.75
+    },
+    "mean_seconds_per_case": 21.8,
+    "net_usd": 488.09
+   },
+   "agents_jev": {
+    "detection": {
+     "attempted": 48,
+     "completed": 48,
+     "tp": 18,
+     "fn": 6,
+     "fp": 8,
+     "tn": 16,
+     "recall": {
+      "k": 18,
+      "n": 24,
+      "rate": 0.75,
+      "ci95": [
+       0.551,
+       0.88
+      ]
+     },
+     "false_positive_rate": {
+      "k": 8,
+      "n": 24,
+      "rate": 0.333,
+      "ci95": [
+       0.18,
+       0.533
+      ]
+     },
+     "precision": {
+      "k": 18,
+      "n": 26,
+      "rate": 0.692,
+      "ci95": [
+       0.5,
+       0.835
+      ]
+     },
+     "missed_value_usd": 93984.06
+    },
+    "llm_cost": {
+     "tokens": {
+      "input": 679986,
+      "output": 98536,
+      "thinking": 170832
+     },
+     "usd": 0.8774,
+     "usd_per_case": 0.01828
+    },
+    "analyst": {
+     "alerts_reviewed": 26,
+     "wasted_reviews": 8,
+     "usd": 487.5,
+     "wasted_usd": 150.0,
+     "usd_per_review": 18.75
+    },
+    "mean_seconds_per_case": 30.7,
+    "net_usd": 488.38
+   }
+  },
+  "savings_vs_rules": {
+   "agents_no_jev": {
+    "wasted_reviews_avoided_vs_rules": 0,
+    "review_usd_saved_vs_rules": 0.0,
+    "llm_usd_spent": 0.5863,
+    "net_usd_vs_rules": -0.59,
+    "extra_missed_value_usd_vs_rules": 0.0
+   },
+   "agents_jev": {
+    "wasted_reviews_avoided_vs_rules": 0,
+    "review_usd_saved_vs_rules": 0.0,
+    "llm_usd_spent": 0.8774,
+    "net_usd_vs_rules": -0.88,
+    "extra_missed_value_usd_vs_rules": 0.0
+   }
+  },
+  "jev_effect": {
+   "paired_vs_no_jev": {
+    "cases": 48,
+    "only_b_correct": 0,
+    "only_a_correct": 0,
+    "both_correct": 34,
+    "both_wrong": 14
+   },
+   "alerts": {
+    "policy_only": {
+     "detected": {
+      "k": 18,
+      "n": 24,
+      "rate": 0.75,
+      "ci95": [
+       0.551,
+       0.88
+      ]
+     },
+     "false_alerts": {
+      "k": 8,
+      "n": 24,
+      "rate": 0.333,
+      "ci95": [
+       0.18,
+       0.533
+      ]
+     }
+    },
+    "jev_only": {
+     "detected": {
+      "k": 23,
+      "n": 24,
+      "rate": 0.958,
+      "ci95": [
+       0.798,
+       0.993
+      ]
+     },
+     "false_alerts": {
+      "k": 13,
+      "n": 24,
+      "rate": 0.542,
+      "ci95": [
+       0.351,
+       0.721
+      ]
+     }
+    },
+    "jev_or_policy": {
+     "detected": {
+      "k": 23,
+      "n": 24,
+      "rate": 0.958,
+      "ci95": [
+       0.798,
+       0.993
+      ]
+     },
+     "false_alerts": {
+      "k": 14,
+      "n": 24,
+      "rate": 0.583,
+      "ci95": [
+       0.388,
+       0.755
+      ]
+     }
+    }
+   },
+   "extra_tokens": {
+    "input": 331905,
+    "output": 28936,
+    "thinking": 47675
+   }
+  },
+  "geval_effect": {
+   "evaluated_runs": 48,
+   "wrong_decisions": 14,
+   "right_decisions": 34,
+   "wrong_held_by_gate": {
+    "k": 1,
+    "n": 14,
+    "rate": 0.071,
+    "ci95": [
+     0.013,
+     0.315
+    ]
+   },
+   "right_held_by_gate": {
+    "k": 0,
+    "n": 34,
+    "rate": 0.0,
+    "ci95": [
+     0.0,
+     0.102
+    ]
+   },
+   "metrics": {
+    "evidence_grounding": {
+     "mean": 0.977,
+     "n": 48,
+     "pass": {
+      "k": 48,
+      "n": 48,
+      "rate": 1.0,
+      "ci95": [
+       0.926,
+       1.0
+      ]
+     }
+    },
+    "explanation_completeness": {
+     "mean": 0.973,
+     "n": 48,
+     "pass": {
+      "k": 48,
+      "n": 48,
+      "rate": 1.0,
+      "ci95": [
+       0.926,
+       1.0
+      ]
+     }
+    },
+    "investigation_relevance": {
+     "mean": 0.963,
+     "n": 48,
+     "pass": {
+      "k": 47,
+      "n": 48,
+      "rate": 0.979,
+      "ci95": [
+       0.891,
+       0.996
+      ]
+     }
+    }
+   },
+   "reading": "A gate is useful only if it holds wrong decisions clearly more often than right ones. G-Eval is a model judging explanations, not ground truth."
+  },
+  "notes": [
+   "Rates come from a sample enriched with attacks and cover a few dozen transactions; the confidence intervals are wide and say so.",
+   "Money uses the ASSUMPTIONS above. Token counts, decisions and missed value are measured.",
+   "The answer key marks every generator-planted transaction, including early ones nothing could know yet, so recall below 100% is expected."
+  ]
+ }
+}

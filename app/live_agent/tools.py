@@ -329,25 +329,25 @@ class InvestigationEnvironment:
         }
 
     def record_customer_inquiry_response(self, question_id: str, selected_option: Dict[str, Any]) -> Dict[str, Any]:
-        """Ingests customer response from Question Bank into Evidence Store as E07."""
+        """Ingests customer response from Question Bank or Google Voice into Evidence Store as E07."""
+        channel = selected_option.get("interrogation_channel") or selected_option.get("audio_source") or "Google_Voice_Interrogation"
         payload = {
             "question_id": question_id,
-            "selected_option_key": selected_option["key"],
-            "customer_statement": selected_option["statement"],
-            "risk_verdict": selected_option["risk_verdict"],
-            "recommended_action": selected_option["recommended_action"],
-            "interrogation_channel": "BankID_Secure_InApp_Prompt"
+            "selected_option_key": selected_option.get("key", "UNKNOWN"),
+            "customer_statement": selected_option.get("statement", ""),
+            "risk_verdict": selected_option.get("risk_verdict", "CONFIRMED_COERCED_VICTIM"),
+            "recommended_action": selected_option.get("recommended_action", "PROTECTIVE_ESCROW_HOLD"),
+            "interrogation_channel": channel
         }
-        summary = (
-            f"Customer Statement Recorded: '{selected_option['label']}'. "
-            f"Finding: {selected_option['statement']}"
-        )
+        lbl = selected_option.get("label", "Voice Testimony")
+        stmt = selected_option.get("statement", "")
+        summary = f"Customer Statement Recorded via {channel}: '{lbl}'. Finding: {stmt}"
         evidence = self.evidence_store.add(
             evidence_type="customer_inquiry_statement",
-            source="bank_inapp_customer_interview",
+            source="bank_voice_customer_interrogation",
             source_record_id=question_id,
             payload=payload,
-            title=f"Customer Inquiry Finding: {selected_option['risk_verdict']}",
+            title=f"Customer Voice Inquiry: {selected_option.get('risk_verdict', 'CONFIRMED_COERCION')}",
             summary=summary
         )
         return {

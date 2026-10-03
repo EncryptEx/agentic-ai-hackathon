@@ -147,10 +147,16 @@ class LiveCheckLogic(unittest.TestCase):
         model = AutoTeam()
         model.available = lambda: True
         res = live_check.check_e2e(model, FakeJev())
-        self.assertEqual(len(res), 5)
+        cases = [r for r in res if r["name"].startswith("e2e ")]
+        self.assertEqual(len(cases), 5)
         # AutoTeam finishes every case with an ALLOW recommendation; the policy decides the rest.
-        self.assertTrue(all("expected=" in r["detail"] for r in res))
+        self.assertTrue(all("expected=" in r["detail"] for r in cases))
         self.assertEqual(statuses(res)["e2e case-familiar"], "PASS")
+        # The real G-Eval judge is part of the e2e check. Unit tests have no judge key, so it must FAIL
+        # visibly (never pass or invent scores) and say why.
+        judge = next(r for r in res if r["name"] == "g-eval judge")
+        self.assertEqual(judge["status"], "FAIL")
+        self.assertIn("GEMINI_API_KEY", judge["detail"])
 
     def test_main_exits_nonzero_when_keys_are_missing(self):
         self.assertEqual(live_check.main([]), 1)  # keys are stripped in unit tests, so no network is used

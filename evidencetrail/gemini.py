@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 
 from .config import GEMINI_BASE_URL, GEMINI_MODEL, GENERATION_SETTINGS, REQUEST_TIMEOUT_S, gemini_key
-from .jev import ProviderUnavailable
+from .jev import ProviderUnavailable, error_detail
 
 
 class ModelTurn:
@@ -52,7 +52,7 @@ class GeminiClient:
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_S) as resp:
                 raw = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
-            raise ProviderUnavailable(f"Gemini HTTP {e.code}") from None
+            raise ProviderUnavailable(f"Gemini HTTP {e.code}{error_detail(e, key)}") from None
         except (urllib.error.URLError, TimeoutError, ValueError) as e:
             raise ProviderUnavailable(f"Gemini request failed: {type(e).__name__}") from None
         out_steps = raw.get("steps")

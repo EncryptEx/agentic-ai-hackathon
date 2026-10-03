@@ -1,6 +1,37 @@
-"""Runtime configuration. Provider keys are read from the server environment only."""
+"""Runtime configuration. Provider keys come from the server environment or a gitignored .env file.
+
+They are never sent to the browser, written to traces or committed.
+"""
 
 import os
+
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+def load_env_file(path, environ=None):
+    """Minimal .env reader: KEY=VALUE lines, optional quotes, # comments. Blank values are ignored and
+    real environment variables always win. Returns the names it set (never the values)."""
+    environ = os.environ if environ is None else environ
+    names = []
+    try:
+        lines = open(path, encoding="utf-8").read().splitlines()
+    except OSError:
+        return names
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key, value = key.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if key and value and key not in environ:
+            environ[key] = value
+            names.append(key)
+    return names
+
+
+load_env_file(os.path.join(_ROOT, ".env"))
 
 PROMPT_VERSION = "investigator-prompt-v1"
 TEAM_PROMPT_VERSION = "investigator-team-prompt-v1"

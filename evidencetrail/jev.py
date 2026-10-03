@@ -12,6 +12,24 @@ from .canon import canonical
 from .config import JEV_MODEL, JEV_URL, REQUEST_TIMEOUT_S, jev_key
 
 
+def error_detail(http_error, key=None, limit=300):
+    """Short provider error message for diagnosing wire-format problems. The key is scrubbed."""
+    try:
+        body = http_error.read().decode("utf-8", "replace")
+        try:
+            data = json.loads(body)
+            err = data.get("error", data)
+            body = err.get("message") if isinstance(err, dict) and err.get("message") else json.dumps(err)
+        except ValueError:
+            pass
+    except Exception:
+        return ""
+    if key:
+        body = body.replace(key, "[REDACTED]")
+    body = " ".join(body.split())[:limit]
+    return f": {body}" if body else ""
+
+
 class ProviderUnavailable(Exception):
     """Credentials missing or provider call failed; must stay visible, never fabricated."""
 
@@ -119,7 +137,7 @@ class JevClient:
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_S) as resp:
                 raw = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
-            raise ProviderUnavailable(f"Jev HTTP {e.code}") from None
+            raise ProviderUnavailable(f"Jev HTTP {e.code}{error_detail(e, key)}") from None
         except (urllib.error.URLError, TimeoutError, ValueError) as e:
             raise ProviderUnavailable(f"Jev request failed: {type(e).__name__}") from None
         answers = raw.get("answers")

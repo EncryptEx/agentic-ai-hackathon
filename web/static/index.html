@@ -101,84 +101,6 @@
             </div>
         </section>
 
-        <!-- DASHBOARD INTEGRATED GOOGLE VOICE AI INVESTIGATION CONSOLE -->
-        <section class="dashboard-voice-card" id="dashboard-voice-card" style="background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(8,145,178,0.18)); border: 1px solid rgba(6,182,212,0.4); border-radius: 12px; padding: 18px 22px; margin-bottom: 24px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
-            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; margin-bottom: 14px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(135deg, #0284c7, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 0 15px rgba(2,132,199,0.4);">
-                        🎙️
-                    </div>
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <h3 style="font-size: 15px; font-weight: 700; color: #f8fafc; margin: 0;">Dashboard Google Voice AI Copilot</h3>
-                            <span id="dash-voice-badge" style="background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-size: 10px; font-family: monospace; padding: 2px 8px; border-radius: 10px; font-weight: 700;">LIVE VOICE DIALOGUE</span>
-                        </div>
-                        <p style="font-size: 12px; color: #94a3b8; margin: 2px 0 0 0;">Ask questions by voice about any anomaly, alert, or customer spotted on this dashboard.</p>
-                    </div>
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #cbd5e1; cursor: pointer;">
-                        <input type="checkbox" id="dash-voice-tts-check" checked style="accent-color: #06b6d4;">
-                        <span>🔊 Speak Replies Aloud (Google TTS)</span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Voice Controls & Real-Time Waveform Bar -->
-            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
-                <!-- Push-to-Talk Button -->
-                <button id="btn-dash-mic" style="background: linear-gradient(135deg, #e11d48, #be123c); color: #fff; border: 1px solid #f43f5e; border-radius: 24px; padding: 10px 18px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 15px rgba(225,29,72,0.35); transition: all 0.2s;">
-                    <span id="dash-mic-icon" style="font-size: 16px;">🎙️</span>
-                    <span id="dash-mic-text">Click to Speak Question</span>
-                </button>
-
-                <!-- Input Box for Speech Transcript & Text fallback -->
-                <div style="flex: 1; min-width: 260px; position: relative;">
-                    <input type="text" id="dash-voice-input" placeholder="Speak via mic or ask: 'Why is CUST-00043 flagged as critical?'..." style="width: 100%; background: #030712; border: 1px solid #334155; border-radius: 20px; padding: 10px 52px 10px 16px; color: #f8fafc; font-size: 12px; outline: none; box-sizing: border-box;">
-                    <button id="btn-dash-send" style="position: absolute; right: 4px; top: 4px; bottom: 4px; background: #0284c7; color: #fff; border: none; border-radius: 16px; padding: 0 14px; font-size: 11px; font-weight: 700; cursor: pointer;">
-                        Ask
-                    </button>
-                </div>
-
-                <!-- Waveform status indicator -->
-                <div id="dash-wave-box" style="display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 6px 14px;">
-                    <span id="dash-wave-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></span>
-                    <span id="dash-wave-text" style="font-size: 11px; font-family: monospace; color: #38bdf8;">Voice Standby</span>
-                    <div id="dash-bars" style="display: flex; gap: 2px; align-items: center; height: 14px;">
-                        <span class="d-bar" style="width: 2px; height: 4px; background: #06b6d4; border-radius: 1px;"></span>
-                        <span class="d-bar" style="width: 2px; height: 10px; background: #06b6d4; border-radius: 1px;"></span>
-                        <span class="d-bar" style="width: 2px; height: 6px; background: #06b6d4; border-radius: 1px;"></span>
-                        <span class="d-bar" style="width: 2px; height: 12px; background: #06b6d4; border-radius: 1px;"></span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Dashboard Spoken Prompt Suggestions / Investigation Chips -->
-            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;" id="dash-prompt-chips">
-                <span style="font-size: 11px; color: #94a3b8; display: flex; align-items: center; font-weight: 600;">Spoken Inquiries:</span>
-                <button class="dash-chip" data-q="Why is customer CUST-00043 flagged as critical risk?" style="background: rgba(8,145,178,0.18); border: 1px solid #0891b2; color: #67e8f9; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer;">
-                    💬 "Why is CUST-00043 critical?"
-                </button>
-                <button class="dash-chip" data-q="What are the top active fraud and AML alerts on the dashboard?" style="background: rgba(245,158,11,0.18); border: 1px solid #d97706; color: #fcd34d; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer;">
-                    💬 "Summarize active alerts"
-                </button>
-                <button class="dash-chip" data-q="Explain the dialectic debate between Money Mule and Coerced Victim" style="background: rgba(99,102,241,0.18); border: 1px solid #6366f1; color: #c7d2fe; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer;">
-                    💬 "Explain Mule vs Victim conflict"
-                </button>
-                <button class="dash-chip" data-q="Filter customers to show only high and critical risk" style="background: rgba(239,68,68,0.18); border: 1px solid #ef4444; color: #fca5a5; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer;">
-                    💬 "Show critical customers"
-                </button>
-                <button class="dash-chip" data-q="How does the self-evolving loop optimize the policy rules?" style="background: rgba(16,185,129,0.18); border: 1px solid #10b981; color: #6ee7b7; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer;">
-                    💬 "How does Self-Evolution work?"
-                </button>
-            </div>
-
-            <!-- Dialogue Interaction Feed / Answer Box -->
-            <div id="dash-voice-feed" style="margin-top: 14px; display: none; background: #030712; border: 1px solid #1e293b; border-radius: 10px; padding: 14px; max-height: 240px; overflow-y: auto;">
-                <div id="dash-voice-latest-msg" style="font-size: 12px; line-height: 1.6; color: #e2e8f0;"></div>
-            </div>
-        </section>
-
         <!-- TAB 1: CUSTOMERS DIRECTORY -->
         <div id="tab-customers" class="tab-content">
             <div class="controls-bar">
@@ -1135,5 +1057,6 @@
     </div>
 
     <script src="/app.js"></script>
+    <script src="/static/google_voice_copilot.js"></script>
 </body>
 </html>

@@ -161,14 +161,15 @@ class _Run:
     def model_turn(self, agent, system, steps, decls, prompt_tag):
         t0 = time.monotonic()
         turn = self.model.generate(system, steps, decls)
-        request_steps = redact(steps)
+        request_steps = redact(getattr(turn, "request_steps", steps))
         self.rec(agent, event_type="model_turn", actor=agent, provider=self.provider, requested_model=self.req_model,
                  returned_model_version=turn.returned_model_version, generation_settings=self.gen,
                  duration_ms=int((time.monotonic() - t0) * 1000), usage_if_available=turn.usage,
                  result_snapshot={"calls": turn.calls, "text": turn.text, "request_steps": request_steps,
                                   "request_hash": sha256({"system": prompt_tag, "input": request_steps,
                                                           "tools": sha256(decls)}),
-                                  "response_steps": redact(turn.steps)})
+                                  "response_steps": redact(turn.steps),
+                                  "context_compression": getattr(turn, "context_stats", None)})
         return turn
 
 

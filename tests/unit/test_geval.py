@@ -1,6 +1,8 @@
 """G-Eval integration tests. The stub judge is a test double that drives the real DeepEval
 GEval code path; it never produces scores shown to users."""
 
+import _no_live_keys  # noqa: F401  (strips real provider keys loaded from .env)
+
 import os
 import unittest
 

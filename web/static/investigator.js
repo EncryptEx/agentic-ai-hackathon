@@ -262,7 +262,9 @@ function renderFinal() {
     box.append(el("details", { class: "inv-details" }, el("summary", {}, "Technical details"),
         kv([["Policy version", f.policy_version], ["Rule", f.rule], ["Reason code", f.reason_code], ["Status", f.status],
             ["Agent recommended", f.agent_recommendation && f.agent_recommendation.recommended_action],
-            ["Agent escalated policy", f.agent_escalation ? "yes" : "no"],
+            ["Agent vs policy", f.agent_escalation ? "agent was more cautious and was kept (escalation enabled)" :
+                f.agent_disagreement === "agent_more_cautious" ? "agent was more cautious; policy took precedence" :
+                f.agent_disagreement === "agent_less_cautious" ? "agent was less cautious; policy took precedence" : "agree"],
             ["Reference validity", f.reference_validity ? `${f.reference_validity.valid}/${f.reference_validity.cited} cited IDs exist` : "n/a"]]),
         el("p", { class: "inv-muted" }, "Valid evidence IDs do not establish that a claim is semantically supported.")));
 }

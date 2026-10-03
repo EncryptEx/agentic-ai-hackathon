@@ -8,7 +8,7 @@ prints a key. --e2e spends real quota (several Gemini calls per case plus Jev ca
 import argparse
 import sys
 
-from . import alerts, team
+from . import alerts, evaluator, team
 from .config import gemini_key, jev_key
 from .eval_fixtures import EXPECTED_ACTIONS
 from .experiments import gather_all
@@ -110,7 +110,7 @@ def check_jev(client):
 def check_e2e(model, jev):
     if not model.available():
         return [_result("e2e", SKIP, "no Gemini key")]
-    out = []
+    out, runs = [], {}
     for cid in SCENARIOS:
         case = get_case(cid)
         try:
@@ -118,6 +118,7 @@ def check_e2e(model, jev):
         except Exception as e:  # report, never crash the whole check
             out.append(_result(f"e2e {cid}", FAIL, f"{type(e).__name__}: {e}"))
             continue
+        runs[cid] = (case, r)
         final = r["final"] or {}
         expected = EXPECTED_ACTIONS[cid]
         action = final.get("simulated_action")
@@ -128,7 +129,25 @@ def check_e2e(model, jev):
             f"action={action} expected={expected} ({final.get('status')}); tools={r['tool_call_count']} "
             f"consultations={r.get('consultation_count')}; alert={(alert or {}).get('severity') or 'none'}"
             + (f"; failure={r['failure']}" if r["failure"] else "")))
+    out += check_geval(runs.get("case-manipulated"))
     return out
+
+
+def check_geval(entry):
+    """Score one real run with the real G-Eval judge (three official GEval metrics)."""
+    if entry is None:
+        return [_result("g-eval judge", SKIP, "no completed run to evaluate")]
+    case, run = entry
+    try:
+        ev = evaluator.evaluate(run, case)
+    except Exception as e:
+        return [_result("g-eval judge", FAIL, f"{type(e).__name__}: {e}")]
+    metrics = ev["geval"]
+    bad = {k: m for k, m in metrics.items() if m["status"] != "scored"}
+    if bad:
+        return [_result("g-eval judge", FAIL, "; ".join(f"{k}: {m['status']} {m['reason'][:160]}" for k, m in bad.items()))]
+    return [_result("g-eval judge", PASS, "; ".join(
+        f"{m['label']}={m['score']:.2f}" for m in metrics.values()) + f"; judge={ev['judge'].get('judge_requested_model')}")]
 
 
 def run_checks(e2e=False, gemini=None, jev=None):

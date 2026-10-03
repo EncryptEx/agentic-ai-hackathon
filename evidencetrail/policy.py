@@ -1,11 +1,12 @@
 """Deterministic policy v1 (illustrative demo rule, not validated banking policy).
 
 Signals are derived from recorded evidence payloads only, never from agent claims.
-The agent's recommendation can escalate the outcome but never lower it, and a single
+The policy controls the simulated action. The agent's recommendation is recorded and a more cautious
+one is flagged as a disagreement (it only raises the action if escalation is explicitly enabled). A single
 Jev probability can neither authorize nor block a transfer.
 """
 
-from .config import POLICY_VERSION
+from .config import POLICY_VERSION, agent_may_escalate
 
 SEVERITY = {"ALLOW": 0, "CONTEXT_CHECK": 1, "REVIEW": 2}
 CONTEXT_QUESTION = ("Has someone asked you to move this money to a 'safe account', "
@@ -102,13 +103,20 @@ def decide(store, transaction, finish):
     present = {k: v for k, v in signals.items() if v}
 
     def result(action, status, rule, reason, explanation):
-        escalated = False
+        escalated, disagreement = False, None
         if status == "COMPLETE" and SEVERITY.get(agent["recommended_action"], 0) > SEVERITY[action]:
-            action, escalated = agent["recommended_action"], True
-            explanation += " Agent recommendation was more cautious than policy and was kept."
+            if agent_may_escalate():
+                explanation += " Agent recommendation was more cautious than policy and was kept."
+                action, escalated = agent["recommended_action"], True
+            else:
+                disagreement = "agent_more_cautious"
+                explanation += (f" The agent recommended {agent['recommended_action']}, which is more cautious; "
+                                f"policy v1 outcome ({action}) takes precedence.")
+        elif status == "COMPLETE" and SEVERITY.get(agent["recommended_action"], 0) < SEVERITY[action]:
+            disagreement = "agent_less_cautious"
         return {"policy_version": POLICY_VERSION, "status": status, "simulated_action": action,
                 "rule": rule, "reason_code": reason, "explanation": explanation, "signals": present,
-                "claims": claims, "agent_recommendation": agent, "agent_escalation": escalated,
+                "claims": claims, "agent_recommendation": agent, "agent_escalation": escalated, "agent_disagreement": disagreement,
                 "context_check": ({"question": CONTEXT_QUESTION, "answer": None}
                                   if action == "CONTEXT_CHECK" else None),
                 "reference_validity": validity}

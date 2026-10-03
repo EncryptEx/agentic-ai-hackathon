@@ -1,5 +1,7 @@
 """Fixed-evidence experiment, ablation, export, provenance, streaming and judge-repeat tests."""
 
+import _no_live_keys  # noqa: F401  (strips real provider keys loaded from .env)
+
 import json
 import time
 import unittest

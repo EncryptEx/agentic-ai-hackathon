@@ -5,6 +5,7 @@ import os
 import time
 import unittest
 
+import _no_live_keys  # noqa: F401  (strips real provider keys loaded from .env)
 os.environ["EVIDENCETRAIL_ALERT_DB"] = ":memory:"
 
 from evidencetrail import api, evaluator, team

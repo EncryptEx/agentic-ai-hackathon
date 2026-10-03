@@ -4,6 +4,7 @@ import os
 import time
 import unittest
 
+import _no_live_keys  # noqa: F401  (strips real provider keys loaded from .env)
 os.environ["EVIDENCETRAIL_ALERT_DB"] = ":memory:"  # never touch the real alert database in tests
 
 from evidencetrail import agent, api, policy
@@ -135,10 +136,28 @@ class PolicyOutcomes(unittest.TestCase):
         _, _, r = run_case("case-familiar", plan=[])
         self.assertEqual(r["final"]["status"], "INCOMPLETE")
 
-    def test_agent_can_escalate_never_lower(self):
+    def test_policy_controls_the_action_and_a_more_cautious_agent_is_flagged_not_obeyed(self):
         _, _, r = run_case("case-familiar", action="REVIEW")
+        f = r["final"]
+        self.assertEqual(f["simulated_action"], "ALLOW")
+        self.assertFalse(f["agent_escalation"])
+        self.assertEqual(f["agent_disagreement"], "agent_more_cautious")
+        self.assertIn("policy v1 outcome (ALLOW) takes precedence", f["explanation"])
+
+    def test_escalation_is_an_explicit_opt_in(self):
+        os.environ["EVIDENCETRAIL_AGENT_ESCALATION"] = "1"
+        try:
+            _, _, r = run_case("case-familiar", action="REVIEW")
+        finally:
+            del os.environ["EVIDENCETRAIL_AGENT_ESCALATION"]
         self.assertEqual(r["final"]["simulated_action"], "REVIEW")
         self.assertTrue(r["final"]["agent_escalation"])
+        self.assertIsNone(r["final"]["agent_disagreement"])
+
+    def test_a_less_cautious_agent_never_lowers_the_policy_and_is_flagged(self):
+        _, _, r = run_case("case-takeover", action="ALLOW")
+        self.assertEqual(r["final"]["simulated_action"], "REVIEW")
+        self.assertEqual(r["final"]["agent_disagreement"], "agent_less_cautious")
 
     def test_invented_evidence_id_is_incomplete(self):
         case = get_case("case-familiar")

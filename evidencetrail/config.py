@@ -55,6 +55,12 @@ RUN_TIMEOUT_S = 240
 GENERATION_SETTINGS = {"temperature": 1.0}
 
 
+def agent_may_escalate():
+    """Opt-in: let a more cautious agent recommendation raise the simulated action above the policy's.
+    Off by default so the deterministic policy controls the action (set EVIDENCETRAIL_AGENT_ESCALATION=1)."""
+    return os.environ.get("EVIDENCETRAIL_AGENT_ESCALATION") == "1"
+
+
 def gemini_key():
     return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 

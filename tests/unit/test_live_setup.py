@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import urllib.error
 
+import _no_live_keys  # noqa: F401  (strips real provider keys loaded from .env)
 os.environ["EVIDENCETRAIL_ALERT_DB"] = ":memory:"
 
 from evidencetrail import live_check
@@ -151,8 +152,16 @@ class LiveCheckLogic(unittest.TestCase):
         self.assertTrue(all("expected=" in r["detail"] for r in res))
         self.assertEqual(statuses(res)["e2e case-familiar"], "PASS")
 
-    def test_main_exit_code_reflects_failures(self):
-        self.assertEqual(live_check.main([]) in (0, 1), True)
+    def test_main_exits_nonzero_when_keys_are_missing(self):
+        self.assertEqual(live_check.main([]), 1)  # keys are stripped in unit tests, so no network is used
+
+
+class Isolation(unittest.TestCase):
+    def test_unit_tests_never_see_real_provider_keys(self):
+        from evidencetrail.config import gemini_key, jev_key
+        self.assertIsNone(gemini_key())
+        self.assertIsNone(jev_key())
+        self.assertEqual(os.environ["EVIDENCETRAIL_ALERT_DB"], ":memory:")
 
 
 if __name__ == "__main__":

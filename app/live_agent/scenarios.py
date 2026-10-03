@@ -8,7 +8,7 @@ import datetime
 SCENARIOS: Dict[str, Dict[str, Any]] = {
     "case-1": {
         "id": "case-1",
-        "title": "Familiar Payment (600 SEK)",
+        "title": "Case 1: Familiar Payment (600 SEK)",
         "subtitle": "Routine transfer to recurring contact",
         "expected_action": "ALLOW",
         "customer": {
@@ -62,7 +62,7 @@ SCENARIOS: Dict[str, Dict[str, Any]] = {
     },
     "case-2": {
         "id": "case-2",
-        "title": "Account Takeover (8,000 SEK)",
+        "title": "Case 2: Account Takeover (8,000 SEK)",
         "subtitle": "New device + synthetic session anomaly",
         "expected_action": "REVIEW",
         "customer": {
@@ -120,7 +120,7 @@ SCENARIOS: Dict[str, Dict[str, Any]] = {
     },
     "case-3": {
         "id": "case-3",
-        "title": "Manipulated Payer / Safe Account Scam (24,500 SEK)",
+        "title": "Case 3: APP Scam & Google Voice (24,500 SEK)",
         "subtitle": "Authorised push payment with social engineering signals",
         "expected_action": "CONTEXT_CHECK",
         "customer": {

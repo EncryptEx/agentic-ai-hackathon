@@ -41,7 +41,7 @@ const EMBEDDED_SCENARIOS = [
   },
   {
     "id": "case-2",
-    "title": "Account Takeover (8,000 SEK)",
+    "title": "Case 2: Account Takeover (8,000 SEK)",
     "subtitle": "New device + synthetic session anomaly",
     "expected_action": "REVIEW",
     "customer": {
@@ -78,7 +78,7 @@ const EMBEDDED_SCENARIOS = [
   },
   {
     "id": "case-3",
-    "title": "Manipulated Payer / Safe Account Scam (24,500 SEK)",
+    "title": "Case 3: APP Scam & Google Voice (24,500 SEK)",
     "subtitle": "Authorised push payment with social engineering signals",
     "expected_action": "CONTEXT_CHECK",
     "customer": {
@@ -585,12 +585,24 @@ function renderScenarioTabs() {
   scenarioTabsContainer.innerHTML = "";
   scenarios.forEach((s) => {
     const btn = document.createElement("button");
-    btn.className = `px-3.5 py-1.5 text-xs font-mono rounded-lg transition-all border cursor-pointer ${
-      currentScenario && currentScenario.id === s.id
-        ? "bg-cyan-950/80 text-cyan-300 border-cyan-500 shadow-sm"
+    const isCurrent = currentScenario && currentScenario.id === s.id;
+    let badgeText = s.id === "case-1" ? "CASE 1" : s.id === "case-2" ? "CASE 2" : "CASE 3";
+    let badgeClass = s.id === "case-1" ? "bg-emerald-950 text-emerald-300 border-emerald-700" :
+                     s.id === "case-2" ? "bg-amber-950 text-amber-300 border-amber-700" :
+                     "bg-rose-950 text-rose-300 border-rose-600 animate-pulse";
+    let label = s.id === "case-1" ? "Routine P2P (Alice 1.2k SEK)" :
+                s.id === "case-2" ? "Account Takeover (Johan 8k SEK)" :
+                "🎙️ APP Scam & Google Voice (Elin 24.5k SEK)";
+
+    btn.className = `px-3.5 py-2 text-xs font-mono rounded-lg transition-all border cursor-pointer flex items-center gap-2 ${
+      isCurrent
+        ? "bg-cyan-950/90 text-cyan-200 border-cyan-400 ring-2 ring-cyan-500/40 shadow-lg shadow-cyan-950/60 font-bold"
         : "bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200"
     }`;
-    btn.innerHTML = `<span class="font-bold">${s.title}</span>`;
+    btn.innerHTML = `
+      <span class="px-1.5 py-0.5 rounded text-[10px] font-mono border font-extrabold ${badgeClass}">${badgeText}</span>
+      <span>${label}</span>
+    `;
     btn.onclick = () => selectScenario(s);
     scenarioTabsContainer.appendChild(btn);
   });
@@ -619,15 +631,26 @@ function selectScenario(scenario) {
   txExpectedBadge.textContent = scenario.expected_action;
   txExpectedBadge.className = `px-2.5 py-1 text-xs font-mono font-bold rounded ${getBadgeClass(scenario.expected_action)}`;
 
-  traceContainer.innerHTML = `<div class="text-slate-500 italic py-8 text-center font-sans">Click "Investigate Transaction" to launch Gemini agent.</div>`;
+  traceContainer.innerHTML = `<div class="text-slate-500 italic py-8 text-center font-sans">Click "Launch Agent Investigation" to run Gemini multi-agent tribunal, or use Google Voice console below!</div>`;
   traceStepCountEl.textContent = "0 steps completed";
   claimsContainer.innerHTML = `<div class="text-xs text-slate-500 italic">No investigation findings yet.</div>`;
   evidenceContainer.innerHTML = `<div class="text-slate-500 italic py-8 text-center text-xs">Evidence items recorded during investigation will appear here.</div>`;
   policyActionBadge.textContent = "PENDING";
   policyActionBadge.className = "px-2.5 py-1 text-xs font-mono font-bold rounded bg-slate-800 text-slate-400";
   policySummaryBox.classList.add("hidden");
-  contextCheckBanner.classList.add("hidden");
   causalRecalculatePanel.classList.add("hidden");
+
+  // If Case 3 is selected, show Google Voice console IMMEDIATELY!
+  if (scenario.id === "case-3") {
+    renderCustomerInquiry({
+      policy_decision: {
+        context_check_prompt: "Has someone asked you to move this money to a 'safe account', keep the transfer secret, or act urgently?"
+      }
+    });
+    contextCheckBanner.classList.remove("hidden");
+  } else {
+    contextCheckBanner.classList.add("hidden");
+  }
 
   renderGraph({ nodes: [], links: [] });
 }

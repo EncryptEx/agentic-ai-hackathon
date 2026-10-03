@@ -74,8 +74,12 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed_url.path
         query = urllib.parse.parse_qs(parsed_url.query)
 
-        if path == "/live-stream" or path == "/investigator":
+        if path in ("/live-stream", "/investigator", "/live_stream.html", "/live_stream"):
             self._serve_file(LIVE_STREAM_HTML, "text/html; charset=utf-8")
+            return
+        elif path == "/Financialcrime_realtime.html":
+            p = os.path.join(ROOT_DIR, "Financialcrime_realtime.html")
+            self._serve_file(p, "text/html; charset=utf-8")
             return
         elif path == "/sentinel":
             self._serve_file(SENTINEL_HTML, "text/html; charset=utf-8")

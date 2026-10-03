@@ -5,7 +5,7 @@ const inv = {
     scenarios: [], caseId: null, run: null, runId: null, starting: false,
     selected: [], replayCount: null, replayTimer: null, pollTimer: null,
     reviewOpen: false, contextOpen: false, exp: null, expKind: null, expTimer: null, error: null,
-    alerts: [], alertFilter: "open", alertsError: null,
+    alerts: [], alertFilter: "open", alertsError: null, architecture: "team",
 };
 
 const TOOL_LABELS = {
@@ -16,6 +16,10 @@ const TOOL_LABELS = {
     assess_with_jev: "Requested Jev risk assessment",
     finish_investigation: "Submitted recommendation",
     alert_triage: "Jev alert triage",
+};
+const AGENT_LABELS = {
+    orchestrator: "Orchestrator", behavior_device: "Behavior & Device analyst",
+    recipient_network: "Recipient & Network analyst", risk_judge: "Risk judge (Jev)", investigator: "Investigator", alert_triage: "Alert triage (Jev)",
 };
 const SEVERITY_TEXT = { high: "High", medium: "Medium", low: "Low" };
 const SOURCE_TEXT = { jev: "Jev", policy: "Policy" };
@@ -128,7 +132,11 @@ function renderControls() {
         "▶ Replay recorded trace");
     const exportBtn = el("button", { class: "page-btn", type: "button", disabled: !inv.runId || !inv.run || isRunning(inv.run), onclick: exportTrace,
         title: "Redacted JSON of the recorded audit trail" }, "⬇ Export trace");
-    const kids = [el("label", { class: "inv-label" }, "Case"), select, start, replay, exportBtn, runBadges()];
+    const arch = el("select", { id: "inv-arch", disabled: busy, "aria-label": "Agent architecture", title: "Agent architecture",
+        onchange: e => { inv.architecture = e.target.value; } },
+        el("option", { value: "team", selected: inv.architecture === "team" }, "Agent team"),
+        el("option", { value: "single", selected: inv.architecture === "single" }, "Single agent"));
+    const kids = [el("label", { class: "inv-label" }, "Case"), select, arch, start, replay, exportBtn, runBadges()];
     if (inv.error) kids.push(el("div", { class: "inv-error", role: "alert" }, inv.error));
     box.replaceChildren(...kids);
 }
@@ -140,6 +148,10 @@ function runBadges() {
     if (inv.replayCount != null) wrap.append(el("span", { class: "inv-tag recorded" }, "Recorded replay – no inference"));
     else if (!isRunning(r)) wrap.append(el("span", { class: "inv-tag fresh" }, "Fresh run"));
     wrap.append(el("span", { class: "inv-tag state-" + r.state }, `State: ${r.state}`));
+    const hdr = r.run_header;
+    if (hdr && hdr.architecture === "team") wrap.append(el("span", { class: "inv-tag", title: Object.keys(hdr.roster).map(k => AGENT_LABELS[k]).join(", ") },
+        `Agent team: orchestrator + ${Object.keys(hdr.roster).length} specialists` + (r.consultation_count != null ? ` · ${r.consultation_count} consultations` : "")));
+    else if (hdr && hdr.architecture === "single") wrap.append(el("span", { class: "inv-tag" }, "Single agent"));
     const mc = r.run_header && r.run_header.model_configuration;
     if (mc) wrap.append(el("span", { class: "inv-tag" + (r.failure ? " bad" : "") }, r.failure ? "Provider unavailable" : `${r.run_header.run_mode}: ${mc.provider} / ${mc.requested_model || "n/a"}`));
     if (r.recorded_audit_trail_verified === true) wrap.append(el("span", { class: "inv-tag" }, "Recorded audit trail – hash chain verified"));
@@ -164,7 +176,7 @@ async function startRun() {
     if (inv.starting || (inv.run && isRunning(inv.run))) return; // prevent duplicate starts
     resetRun(); inv.starting = true; renderAll();
     try {
-        const d = await invApi("/api/investigations", { caseId: inv.caseId, configuration: {} });
+        const d = await invApi("/api/investigations", { caseId: inv.caseId, configuration: { architecture: inv.architecture } });
         inv.runId = d.runId;
         inv.run = { state: "queued", events: [], evidence: [] };
         inv.starting = false;
@@ -290,9 +302,13 @@ function renderTrace() {
         const isErr = e.event_type === "tool_error" || e.event_type === "run_failed";
         const title = e.event_type === "run_started" ? "Investigation started" : e.event_type === "run_failed" ? "Investigation stopped"
             : e.event_type === "final_decision" ? "Policy decision" : e.event_type === "alert_created" ? "Alert created"
-            : e.event_type === "alert_not_created" ? "No alert raised" : (TOOL_LABELS[e.tool_name] || e.tool_name);
+            : e.event_type === "alert_not_created" ? "No alert raised"
+            : e.event_type === "consultation" ? `Orchestrator asked ${AGENT_LABELS[e.validated_arguments.specialist] || e.validated_arguments.specialist}`
+            : e.event_type === "specialist_report" ? `${AGENT_LABELS[e.agent] || e.agent} reported findings`
+            : (TOOL_LABELS[e.tool_name] || e.tool_name);
         const li = el("li", { class: "inv-step" + (isErr ? " err" : "") },
             el("div", { class: "inv-step-head" }, el("span", { class: "inv-step-n", title: `trace event ${e.sequence}` }, idx + 1), el("strong", {}, title),
+                e.agent && e.agent !== "investigator" && e.event_type !== "consultation" ? el("span", { class: "inv-tag agent-" + e.agent }, AGENT_LABELS[e.agent] || e.agent) : null,
                 isErr ? el("span", { class: "inv-tag bad" }, "error / missing evidence") : null,
                 e.duration_ms != null ? el("span", { class: "inv-muted" }, ` ${e.duration_ms} ms`) : null),
             e.brief_justification ? el("div", { class: "inv-muted" }, e.brief_justification) : null,

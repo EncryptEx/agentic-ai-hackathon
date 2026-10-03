@@ -63,6 +63,7 @@ def registered_tools(enable_jev=True):
 def run_header(case, run_mode, model, decls=None, arm="with_jev"):
     return {
         "tool_snapshot_hash": sha256(decls or TOOL_DECLARATIONS),
+        "architecture": "single",
         "arm": arm,
         "code": code_commit(),
         "scenario_version": SCENARIO_VERSION,
@@ -95,7 +96,7 @@ def investigate(case, model, jev, run_id, run_mode="live", on_event=None, enable
     deadline = time.monotonic() + RUN_TIMEOUT_S
 
     def rec(**kw):
-        ev = trace.record(**kw)
+        ev = trace.record(agent="investigator", **kw)
         if on_event:
             on_event(ev)
         return ev

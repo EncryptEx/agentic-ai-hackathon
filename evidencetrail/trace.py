@@ -9,7 +9,7 @@ import uuid
 from .canon import now_utc, redact, sha256
 
 EVENT_FIELDS = (
-    "event_type", "actor", "tool_name", "validated_arguments", "input_evidence_ids",
+    "event_type", "actor", "agent", "tool_name", "validated_arguments", "input_evidence_ids",
     "output_evidence_ids", "result_snapshot", "reason_code", "brief_justification",
     "provider", "requested_model", "returned_model_version", "generation_settings",
     "duration_ms", "usage_if_available", "error",

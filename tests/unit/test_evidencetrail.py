@@ -268,7 +268,7 @@ class ApiFlow(unittest.TestCase):
         def factory():
             case_model = {}
             return ScriptedFor()
-        api.set_manager(RunManager(model_factory=ScriptedFor, jev_factory=FakeJev))
+        api.set_manager(RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=FakeJev))
 
     def _wait(self, run_id):
         for _ in range(100):

@@ -168,7 +168,7 @@ class AlertStoreTests(unittest.TestCase):
 class AlertApi(unittest.TestCase):
     def setUp(self):
         self.jev = FakeJev(triage=SUSPICIOUS)
-        self.mgr = RunManager(model_factory=ScriptedFor, jev_factory=lambda: self.jev,
+        self.mgr = RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=lambda: self.jev,
                               alert_store=AlertStore(":memory:"))
         api.set_manager(self.mgr)
 
@@ -233,7 +233,7 @@ class AlertApi(unittest.TestCase):
             def create(self, alert):
                 import sqlite3
                 raise sqlite3.OperationalError("disk full")
-        mgr = RunManager(model_factory=ScriptedFor, jev_factory=lambda: self.jev, alert_store=BrokenStore(":memory:"))
+        mgr = RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=lambda: self.jev, alert_store=BrokenStore(":memory:"))
         api.set_manager(mgr)
         _, body = api.handle_post("/api/investigations", {"caseId": "case-takeover"})
         view = self._finish(body["runId"])

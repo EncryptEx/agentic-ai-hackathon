@@ -3,6 +3,7 @@
 import os
 
 PROMPT_VERSION = "investigator-prompt-v1"
+TEAM_PROMPT_VERSION = "investigator-team-prompt-v1"
 POLICY_VERSION = "policy-v1-demo"
 JEV_SPEC_VERSION = "jev-questions-v1"
 SCENARIO_VERSION = "scenarios-v1"
@@ -15,6 +16,8 @@ JEV_URL = "https://api.typesafe.ai/v1/systemone"
 
 MAX_TOOL_CALLS = 8
 MAX_GRAPH_HOPS = 2
+MAX_CONSULTATIONS = 6        # orchestrator -> specialist requests per run
+SPECIALIST_MAX_TURNS = 5      # model turns a specialist may use per consultation
 REQUEST_TIMEOUT_S = 60
 RUN_TIMEOUT_S = 240
 

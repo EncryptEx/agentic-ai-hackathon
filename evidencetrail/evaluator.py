@@ -65,11 +65,13 @@ def evidence_context(run):
 def trace_context(run):
     lines = []
     for e in run["events"]:
-        if e["event_type"] in ("tool_call", "tool_error", "final_decision", "run_failed"):
-            lines.append(f"step {e['sequence']}: {e['event_type']} tool={e['tool_name']} "
+        if e["event_type"] in ("tool_call", "tool_error", "final_decision", "run_failed", "consultation",
+                               "specialist_report"):
+            lines.append(f"step {e['sequence']}: [{e.get('agent') or 'agent'}] {e['event_type']} tool={e['tool_name']} "
                          f"args={json.dumps(e['validated_arguments'], sort_keys=True)} "
                          f"in={e['input_evidence_ids']} out={e['output_evidence_ids']} "
-                         f"reason={e['reason_code']}")
+                         f"reason={e['reason_code']}"
+                         + (f" question={e['brief_justification']!r}" if e["event_type"] == "consultation" else ""))
     return lines
 
 

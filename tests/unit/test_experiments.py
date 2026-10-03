@@ -127,7 +127,7 @@ class Ablation(unittest.TestCase):
                             agent.run_header(case, "live", model)["tool_snapshot_hash"])
 
     def test_ablation_api_reports_all_arms_with_denominators(self):
-        api.set_manager(RunManager(model_factory=ScriptedFor, jev_factory=FakeJev))
+        api.set_manager(RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=FakeJev))
         status, body = api.handle_post("/api/experiments/ablation",
                                        {"caseIds": ["case-familiar", "case-takeover"], "repetitions": 2})
         self.assertEqual(status, 202)
@@ -143,7 +143,7 @@ class Ablation(unittest.TestCase):
             self.assertEqual((arms[arm]["matched_runs"], arms[arm]["eligible_runs"]), (4, 4))
 
     def test_incomplete_outcome_counts_for_missing_tool_case_but_provider_outage_does_not(self):
-        api.set_manager(RunManager(model_factory=ScriptedFor, jev_factory=FakeJev))
+        api.set_manager(RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=FakeJev))
         _, body = api.handle_post("/api/experiments/ablation", {"caseIds": ["case-missing-tool"], "repetitions": 2})
         for _ in range(200):
             _, exp = api.handle_get(f"/api/experiments/{body['experimentId']}")
@@ -194,7 +194,7 @@ class TraceExportAndProvenance(unittest.TestCase):
         self.assertGreater(len(snap["request_steps"]), len(events[0]["result_snapshot"]["request_steps"]))
 
     def test_export_is_redacted_and_labelled_not_immutable(self):
-        mgr = RunManager(model_factory=ScriptedFor, jev_factory=FakeJev)
+        mgr = RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=FakeJev)
         api.set_manager(mgr)
         _, body = api.handle_post("/api/investigations", {"caseId": "case-familiar"})
         for _ in range(100):
@@ -235,7 +235,7 @@ class JudgeRepeats(unittest.TestCase):
         self.assertEqual(out["judge_passes_requested"], 3)
 
     def test_api_validates_repeats(self):
-        api.set_manager(RunManager(model_factory=ScriptedFor, jev_factory=FakeJev))
+        api.set_manager(RunManager(architecture="single", model_factory=ScriptedFor, jev_factory=FakeJev))
         _, body = api.handle_post("/api/investigations", {"caseId": "case-familiar"})
         status, _ = api.handle_post(f"/api/investigations/{body['runId']}/evaluate", {"repeats": 9})
         self.assertEqual(status, 400)

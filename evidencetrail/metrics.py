@@ -33,6 +33,8 @@ def summarize_runs(runs):
     counts = {a: actions.count(a) for a in ("ALLOW", "CONTEXT_CHECK", "REVIEW")}
     sequences = Counter(" > ".join(e["tool_name"] for e in r["events"]
                                    if e["event_type"] in ("tool_call", "tool_error")) for r in ok)
+    consult_sequences = Counter(" > ".join(e["validated_arguments"]["specialist"] for e in r["events"]
+                                           if e["event_type"] == "consultation") for r in ok)
     return {
         "attempted_runs": attempted, "finished_runs": len(finished), "successful_runs": len(ok),
         "failed_or_incomplete_runs": len(finished) - len(ok),
@@ -40,6 +42,8 @@ def summarize_runs(runs):
         "pairwise_agreement": pairwise_agreement(actions),
         "opposite_outcome_flag": counts["ALLOW"] > 0 and counts["REVIEW"] > 0,
         "tool_sequences": dict(sequences),
+        "specialist_sequences": dict(consult_sequences),
+        "architectures": sorted({r.get("architecture") for r in finished if r.get("architecture")}),
         "tool_call_counts": [r.get("tool_call_count") for r in finished],
         "elapsed_ms": [r.get("elapsed_ms") for r in finished],
         "error_counts": [_error_count(r) for r in finished],

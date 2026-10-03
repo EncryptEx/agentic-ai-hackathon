@@ -517,6 +517,42 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
                     "* **Punitive SAR Freeze**: Applied strictly to confirmed laundering syndicates and willful mules.\n"
                     "* **Protective Escrow Hold**: Applied to coerced victims (`CUST-00043`), intercepting fund loss before settlement without disabling legitimate daily banking."
                 )
+            elif "alert" in lower_msg or "summarize" in lower_msg or "overview" in lower_msg or "active" in lower_msg:
+                spoken = (
+                    "Across the retail banking dashboard, the platform is tracking 28 active alerts. "
+                    "There are 19 transaction monitoring alerts, predominantly structuring and mule patterns, and 9 fraud telemetry alerts including account takeover. "
+                    "The top priority case is customer CUST-00043, where an authorised push payment scam was intercepted in protective escrow."
+                )
+                reply = (
+                    "### 📊 Dashboard Anomaly & Alert Summary\n\n"
+                    "* **Active Fraud Alerts**: 9 alerts (ATO, Session Anomaly, SIM-Swap, AitM Phishing)\n"
+                    "* **Active AML Alerts**: 19 alerts (Fan-in Structuring, Rapid Liquidation, TBML Over-invoicing)\n"
+                    "* **Critical Customer Priority**: `CUST-00043` (Elin Nygren) — Held in `PROTECTIVE_ESCROW_HOLD`\n"
+                    "* **Recommended Action**: Complete EDD sign-offs on Critical tier accounts and review Dialectic Tribunal debate logs."
+                )
+            elif "critical" in lower_msg or "filter" in lower_msg or "high risk" in lower_msg:
+                action = "FILTER_TIER"
+                action_cust_id = "CRITICAL"
+                spoken = (
+                    "Filtering the customer directory to display all Critical Risk tier customers requiring mandatory compliance investigation."
+                )
+                reply = (
+                    "### 🔍 Filter Applied: Critical Risk Tier\n\n"
+                    "* **Action**: Showing all customers flagged with Critical FRAML scores (>85.0).\n"
+                    "* **Top Critical Profiles**: `CUST-00043` (Elin Nygren, FRAML 88.4), `CUST-00012` (FRAML 91.2), `CUST-00015` (FRAML 89.0).\n"
+                    "* **Dashboard View**: Customer table updated below."
+                )
+            elif "transaction" in lower_msg or "ledger" in lower_msg:
+                action = "SWITCH_TAB"
+                action_cust_id = "tab-transactions"
+                spoken = (
+                    "Switching the dashboard to the real-time Transactions Ledger to inspect live payment flows."
+                )
+                reply = (
+                    "### 💳 Transactions Ledger View\n\n"
+                    "* **Action**: Switched to Transactions Ledger view.\n"
+                    "* **Telemetry**: Monitoring all inbound/outbound SWIFT, SEPA, and BankID channels."
+                )
             else:
                 spoken = (
                     f"I received your question about '{msg}'. As your Google Voice FRAML Agent, I can analyze customer accounts, debate conflicting alert signals, or explain self-evolving policy mutations."

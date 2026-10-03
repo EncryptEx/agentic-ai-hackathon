@@ -2002,9 +2002,11 @@ function initGenerator() {
 }
 
 // ---------------------------------------------------------
-// Google Voice AI Copilot (Interactive Two-Way Spoken Dialogue)
+// ---------------------------------------------------------
+// Google Voice AI Copilot (Dashboard Integrated + Floating Two-Way Voice Dialogue)
 // ---------------------------------------------------------
 function initGoogleVoiceCopilot() {
+    // 1. Floating Modal Elements
     const launcher = document.getElementById("btn-open-voice-copilot");
     const modal = document.getElementById("voice-copilot-modal");
     const closeBtn = document.getElementById("btn-close-voice-copilot");
@@ -2017,39 +2019,57 @@ function initGoogleVoiceCopilot() {
     const waveDot = document.getElementById("voice-wave-dot");
     const statusInd = document.getElementById("voice-status-indicator");
     const chkAutoTts = document.getElementById("chk-auto-tts");
-    const chips = document.querySelectorAll(".voice-chip");
+    const modalChips = document.querySelectorAll(".voice-chip");
 
-    if (!launcher || !modal) return;
+    // 2. Dashboard Embedded Elements
+    const dashMicBtn = document.getElementById("btn-dash-mic");
+    const dashMicIcon = document.getElementById("dash-mic-icon");
+    const dashMicText = document.getElementById("dash-mic-text");
+    const dashInput = document.getElementById("dash-voice-input");
+    const dashSendBtn = document.getElementById("btn-dash-send");
+    const dashWaveDot = document.getElementById("dash-wave-dot");
+    const dashWaveText = document.getElementById("dash-wave-text");
+    const dashTtsCheck = document.getElementById("dash-voice-tts-check");
+    const dashChips = document.querySelectorAll(".dash-chip");
+    const dashFeed = document.getElementById("dash-voice-feed");
+    const dashLatestMsg = document.getElementById("dash-voice-latest-msg");
 
-    // Toggle Modal
-    launcher.addEventListener("click", () => {
-        const isHidden = modal.style.display === "none" || !modal.style.display;
-        modal.style.display = isHidden ? "flex" : "none";
-        if (isHidden && inputEl) inputEl.focus();
-    });
+    // Toggle Floating Modal
+    if (launcher && modal) {
+        launcher.addEventListener("click", () => {
+            const isHidden = modal.style.display === "none" || !modal.style.display;
+            modal.style.display = isHidden ? "flex" : "none";
+            if (isHidden && inputEl) inputEl.focus();
+        });
+    }
 
-    if (closeBtn) {
+    if (closeBtn && modal) {
         closeBtn.addEventListener("click", () => {
             modal.style.display = "none";
             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         });
     }
 
-    // Helper: append message to dialogue stream
-    function appendMessage(sender, text, isAi = false) {
+    // Markdown / text formatter
+    function formatAiText(text) {
+        return text
+            .replace(/^### (.*$)/gim, '<div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 6px;">$1</div>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.5); color: #67e8f9; padding: 1px 4px; border-radius: 3px; font-family: monospace;">$1</code>')
+            .replace(/\n/g, '<br/>');
+    }
+
+    // Helper: append to floating stream
+    function appendModalMessage(sender, text, isAi = false) {
+        if (!stream) return;
         const msg = document.createElement("div");
         msg.className = `voice-msg ${isAi ? 'ai-msg' : 'user-msg'}`;
         if (isAi) {
             msg.style.cssText = "align-self: flex-start; max-width: 90%; background: #0f172a; border: 1px solid #1e293b; border-radius: 12px 12px 12px 2px; padding: 10px 14px; color: #e2e8f0; font-size: 12px; line-height: 1.5;";
-            let formatted = text
-                .replace(/^### (.*$)/gim, '<div style="font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 4px;">$1</div>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.5); color: #67e8f9; padding: 1px 4px; border-radius: 3px; font-family: monospace;">$1</code>')
-                .replace(/\n/g, '<br/>');
             msg.innerHTML = `
                 <div style="font-size: 10px; font-family: monospace; color: #38bdf8; margin-bottom: 4px; font-weight: 700;">🤖 VALIANT AI INVESTIGATOR (VOICE COPILOT)</div>
-                <div>${formatted}</div>
+                <div>${formatAiText(text)}</div>
             `;
         } else {
             msg.style.cssText = "align-self: flex-end; max-width: 85%; background: linear-gradient(135deg, #0284c7, #2563eb); border-radius: 12px 12px 2px 12px; padding: 10px 14px; color: #fff; font-size: 12px; line-height: 1.4; box-shadow: 0 4px 12px rgba(2,132,199,0.3);";
@@ -2062,13 +2082,28 @@ function initGoogleVoiceCopilot() {
         stream.scrollTop = stream.scrollHeight;
     }
 
-    // Waveform visualizer
+    // Helper: update dashboard embedded feed
+    function updateDashboardFeed(query, reply) {
+        if (!dashFeed || !dashLatestMsg) return;
+        dashFeed.style.display = "block";
+        dashLatestMsg.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 6px; margin-bottom: 8px;">
+                <span style="font-family: monospace; font-size: 11px; color: #38bdf8; font-weight: 700;">👤 USER INQUIRY: "${query}"</span>
+                <span style="font-size: 10px; color: #94a3b8; font-family: monospace;">VOICE COGNITION ENGINE</span>
+            </div>
+            <div style="color: #f1f5f9; font-size: 12px; line-height: 1.6;">
+                ${formatAiText(reply)}
+            </div>
+        `;
+    }
+
+    // Waveform visualizers
     let barInterval = null;
     function startWaveform(color = "#06b6d4") {
-        const bars = document.querySelectorAll(".v-bar");
+        const vBars = document.querySelectorAll(".v-bar, .d-bar");
         if (barInterval) clearInterval(barInterval);
         barInterval = setInterval(() => {
-            bars.forEach(b => {
+            vBars.forEach(b => {
                 const h = Math.floor(Math.random() * 14) + 4;
                 b.style.height = `${h}px`;
                 b.style.background = color;
@@ -2079,8 +2114,8 @@ function initGoogleVoiceCopilot() {
     function stopWaveform() {
         if (barInterval) clearInterval(barInterval);
         barInterval = null;
-        const bars = document.querySelectorAll(".v-bar");
-        bars.forEach((b, idx) => {
+        const vBars = document.querySelectorAll(".v-bar, .d-bar");
+        vBars.forEach((b, idx) => {
             b.style.height = `${[6, 12, 8, 16, 9][idx % 5]}px`;
             b.style.background = "#06b6d4";
         });
@@ -2088,12 +2123,15 @@ function initGoogleVoiceCopilot() {
 
     // Google TTS Voice Output
     function speakAI(text) {
-        if (!('speechSynthesis' in window) || !chkAutoTts?.checked) return;
+        const ttsEnabled = (chkAutoTts && chkAutoTts.checked) || (dashTtsCheck && dashTtsCheck.checked);
+        if (!('speechSynthesis' in window) || !ttsEnabled) return;
+
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.rate = 1.05;
         u.pitch = 1.02;
         u.lang = "en-US";
+
         u.onstart = () => {
             if (statusInd) {
                 statusInd.textContent = "SPEAKING (GOOGLE TTS)";
@@ -2102,8 +2140,11 @@ function initGoogleVoiceCopilot() {
             }
             if (waveText) waveText.textContent = "Agent speaking aloud (Google SpeechSynthesis)...";
             if (waveDot) waveDot.style.background = "#38bdf8";
+            if (dashWaveText) dashWaveText.textContent = "Agent speaking aloud (Google TTS)...";
+            if (dashWaveDot) dashWaveDot.style.background = "#38bdf8";
             startWaveform("#38bdf8");
         };
+
         u.onend = () => {
             if (statusInd) {
                 statusInd.textContent = "STANDBY";
@@ -2112,16 +2153,20 @@ function initGoogleVoiceCopilot() {
             }
             if (waveText) waveText.textContent = "Ready. Tap mic or ask question.";
             if (waveDot) waveDot.style.background = "#22c55e";
+            if (dashWaveText) dashWaveText.textContent = "Voice Standby";
+            if (dashWaveDot) dashWaveDot.style.background = "#22c55e";
             stopWaveform();
         };
+
         window.speechSynthesis.speak(u);
     }
 
-    // Submit dialogue query
+    // Unified Submit dialogue query
     async function sendQuery(queryText) {
         if (!queryText || !queryText.trim()) return;
-        appendMessage("user", queryText, false);
+        appendModalMessage("user", queryText, false);
         if (inputEl) inputEl.value = "";
+        if (dashInput) dashInput.value = "";
 
         if (statusInd) {
             statusInd.textContent = "THINKING (MULTI-AGENT)...";
@@ -2130,6 +2175,8 @@ function initGoogleVoiceCopilot() {
         }
         if (waveText) waveText.textContent = "Orchestrator deliberating across dialectic tribunal...";
         if (waveDot) waveDot.style.background = "#fbbf24";
+        if (dashWaveText) dashWaveText.textContent = "Multi-agent tribunal deliberating...";
+        if (dashWaveDot) dashWaveDot.style.background = "#fbbf24";
         startWaveform("#fbbf24");
 
         try {
@@ -2141,15 +2188,23 @@ function initGoogleVoiceCopilot() {
             const data = await res.json();
             stopWaveform();
 
-            appendMessage("ai", data.reply, true);
+            appendModalMessage("ai", data.reply, true);
+            updateDashboardFeed(queryText, data.reply);
 
-            // If action opens customer dossier, trigger it!
+            // Execute interactive dashboard actions!
             if (data.action === "OPEN_CUSTOMER" && data.customer_id) {
                 if (typeof openDossier === "function") {
                     openDossier(data.customer_id);
                 } else if (typeof openCustomerDrawer === "function") {
                     openCustomerDrawer(data.customer_id);
                 }
+            } else if (data.action === "FILTER_TIER") {
+                const tier = data.customer_id || "CRITICAL";
+                const filterBtn = document.querySelector(`.filter-btn[data-tier="${tier}"]`);
+                if (filterBtn) filterBtn.click();
+            } else if (data.action === "SWITCH_TAB" && data.customer_id) {
+                const navTab = document.querySelector(`.nav-tab[data-target="${data.customer_id}"]`);
+                if (navTab) navTab.click();
             }
 
             // Speak response aloud via Google TTS
@@ -2158,24 +2213,27 @@ function initGoogleVoiceCopilot() {
             }
         } catch (err) {
             stopWaveform();
-            appendMessage("ai", `Error contacting agent: ${err.message}`, true);
+            appendModalMessage("ai", `Error contacting agent: ${err.message}`, true);
         }
     }
 
-    if (sendBtn) {
-        sendBtn.addEventListener("click", () => sendQuery(inputEl.value));
-    }
-    if (inputEl) {
-        inputEl.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") sendQuery(inputEl.value);
-        });
-    }
-
-    // Quick chips
-    chips.forEach(chip => {
+    // Modal Inputs
+    if (sendBtn) sendBtn.addEventListener("click", () => sendQuery(inputEl?.value));
+    if (inputEl) inputEl.addEventListener("keydown", (e) => { if (e.key === "Enter") sendQuery(inputEl.value); });
+    modalChips.forEach(chip => {
         chip.addEventListener("click", () => {
             const prompt = chip.getAttribute("data-prompt");
             if (prompt) sendQuery(prompt);
+        });
+    });
+
+    // Dashboard Inputs
+    if (dashSendBtn) dashSendBtn.addEventListener("click", () => sendQuery(dashInput?.value));
+    if (dashInput) dashInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendQuery(dashInput.value); });
+    dashChips.forEach(chip => {
+        chip.addEventListener("click", () => {
+            const q = chip.getAttribute("data-q");
+            if (q) sendQuery(q);
         });
     });
 
@@ -2183,6 +2241,7 @@ function initGoogleVoiceCopilot() {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     let rec = null;
     let isListening = false;
+    let activeSource = null; // 'modal' or 'dashboard'
 
     if (SpeechRec) {
         rec = new SpeechRec();
@@ -2192,11 +2251,17 @@ function initGoogleVoiceCopilot() {
 
         rec.onstart = () => {
             isListening = true;
-            if (micBtn) {
+            if (activeSource === "modal" && micBtn) {
                 micBtn.style.background = "#22c55e";
                 micBtn.style.boxShadow = "0 0 20px rgba(34,197,94,0.6)";
+                if (micIcon) micIcon.textContent = "🔴";
             }
-            if (micIcon) micIcon.textContent = "🔴";
+            if (activeSource === "dashboard" && dashMicBtn) {
+                dashMicBtn.style.background = "#22c55e";
+                dashMicBtn.style.boxShadow = "0 0 20px rgba(34,197,94,0.6)";
+                if (dashMicIcon) dashMicIcon.textContent = "🔴";
+                if (dashMicText) dashMicText.textContent = "Listening (Speak Now)...";
+            }
             if (statusInd) {
                 statusInd.textContent = "LISTENING (SPEAK NOW)...";
                 statusInd.style.color = "#f43f5e";
@@ -2204,6 +2269,8 @@ function initGoogleVoiceCopilot() {
             }
             if (waveText) waveText.textContent = "Listening to your voice (Google Speech STT)...";
             if (waveDot) waveDot.style.background = "#f43f5e";
+            if (dashWaveText) dashWaveText.textContent = "Listening (Google Speech STT)...";
+            if (dashWaveDot) dashWaveDot.style.background = "#f43f5e";
             startWaveform("#f43f5e");
         };
 
@@ -2212,8 +2279,10 @@ function initGoogleVoiceCopilot() {
             for (let i = ev.resultIndex; i < ev.results.length; ++i) {
                 transcript += ev.results[i][0].transcript;
             }
-            if (inputEl) inputEl.value = transcript;
+            if (activeSource === "modal" && inputEl) inputEl.value = transcript;
+            if (activeSource === "dashboard" && dashInput) dashInput.value = transcript;
             if (waveText) waveText.textContent = `Heard: "${transcript}"`;
+            if (dashWaveText) dashWaveText.textContent = `Heard: "${transcript}"`;
         };
 
         rec.onend = () => {
@@ -2221,11 +2290,17 @@ function initGoogleVoiceCopilot() {
             if (micBtn) {
                 micBtn.style.background = "#e11d48";
                 micBtn.style.boxShadow = "0 0 12px rgba(225,29,72,0.4)";
+                if (micIcon) micIcon.textContent = "🎙️";
             }
-            if (micIcon) micIcon.textContent = "🎙️";
+            if (dashMicBtn) {
+                dashMicBtn.style.background = "linear-gradient(135deg, #e11d48, #be123c)";
+                dashMicBtn.style.boxShadow = "0 0 15px rgba(225,29,72,0.35)";
+                if (dashMicIcon) dashMicIcon.textContent = "🎙️";
+                if (dashMicText) dashMicText.textContent = "Click to Speak Question";
+            }
             stopWaveform();
 
-            const finalQuery = inputEl?.value?.trim();
+            const finalQuery = activeSource === "modal" ? inputEl?.value?.trim() : dashInput?.value?.trim();
             if (finalQuery) {
                 sendQuery(finalQuery);
             } else {
@@ -2236,6 +2311,8 @@ function initGoogleVoiceCopilot() {
                 }
                 if (waveText) waveText.textContent = "Ready. Tap mic or ask question.";
                 if (waveDot) waveDot.style.background = "#22c55e";
+                if (dashWaveText) dashWaveText.textContent = "Voice Standby";
+                if (dashWaveDot) dashWaveDot.style.background = "#22c55e";
             }
         };
 
@@ -2244,15 +2321,27 @@ function initGoogleVoiceCopilot() {
                 if (isListening) {
                     rec.stop();
                 } else {
+                    activeSource = "modal";
                     if (inputEl) inputEl.value = "";
                     try { rec.start(); } catch (e) { console.error(e); }
                 }
             });
         }
-    } else {
-        if (micBtn) {
-            micBtn.title = "Google Speech Recognition not supported in this browser. Please use text input or prompt chips.";
+
+        if (dashMicBtn) {
+            dashMicBtn.addEventListener("click", () => {
+                if (isListening) {
+                    rec.stop();
+                } else {
+                    activeSource = "dashboard";
+                    if (dashInput) dashInput.value = "";
+                    try { rec.start(); } catch (e) { console.error(e); }
+                }
+            });
         }
+    } else {
+        if (micBtn) micBtn.title = "Google Speech Recognition not supported in this browser. Please use text input or prompt chips.";
+        if (dashMicBtn) dashMicBtn.title = "Google Speech Recognition not supported in this browser. Please use text input or prompt chips.";
     }
 }
 

@@ -11,6 +11,12 @@
 
     // Prevent duplicate initializations
     if (window.GoogleVoiceCopilotInitialized) return;
+    try {
+        if (window.self !== window.top && window.top.GoogleVoiceCopilotInitialized) {
+            console.log('[GoogleVoiceCopilot] Top window already has Google Voice Copilot; skipping duplicate orb in iframe.');
+            return;
+        }
+    } catch (e) {}
     window.GoogleVoiceCopilotInitialized = true;
 
     class GoogleVoiceCopilotService {
@@ -120,11 +126,14 @@
 
                     <!-- Prompt Chips -->
                     <div class="gvoice-chips-container">
-                        <button class="gvoice-chip" data-q="Investigate customer CUST-00043">💬 "Investigate CUST-00043"</button>
-                        <button class="gvoice-chip" data-q="Explain the dialectic debate between Money Mule and Coerced Victim">💬 "Why Mule vs Victim?"</button>
-                        <button class="gvoice-chip" data-q="What are the active alerts on the dashboard?">💬 "Active Alerts"</button>
-                        <button class="gvoice-chip" data-q="Filter customers to show critical risk cases">💬 "Show Critical"</button>
-                        <button class="gvoice-chip" data-q="How does the self-evolving loop optimize the policy rules?">💬 "Self-Evolution"</button>
+                        <button class="gvoice-chip" data-q="What is the current status of our active alerts queue?">💬 "Queue Status"</button>
+                        <button class="gvoice-chip" data-q="Investigate customer CUST-3912 Elin Nygren">💬 "Case 3: Elin Nygren"</button>
+                        <button class="gvoice-chip" data-q="What about Case 1 Alice Lindqvist?">💬 "Case 1: Alice Lindqvist"</button>
+                        <button class="gvoice-chip" data-q="What about Case 2 Johan Holm?">💬 "Case 2: Johan Holm"</button>
+                        <button class="gvoice-chip" data-q="How do we distinguish between an intentional money mule and a victim under coercion?">💬 "Mule vs. Victim"</button>
+                        <button class="gvoice-chip" data-q="Explain why we used a protective escrow hold instead of freezing the account">💬 "Why Escrow Hold?"</button>
+                        <button class="gvoice-chip" data-q="What are the red flags of smurfing and structuring?">💬 "Smurfing Flags"</button>
+                        <button class="gvoice-chip" data-q="Switch to the investigator tab">💬 "Go to Investigator"</button>
                     </div>
 
                     <!-- Input Controls -->
@@ -387,21 +396,22 @@
         executeDashboardAction(data) {
             if (!data.action) return;
 
-            console.log(`[GoogleVoiceCopilot] Executing action: ${data.action}`, data.customer_id);
+            const target = data.action_param || data.customer_id;
+            console.log(`[GoogleVoiceCopilot] Executing action: ${data.action}`, target);
 
-            if (data.action === 'OPEN_CUSTOMER' && data.customer_id) {
+            if (data.action === 'OPEN_CUSTOMER' && target) {
                 if (typeof window.openDossier === 'function') {
-                    window.openDossier(data.customer_id);
+                    window.openDossier(target);
                 } else if (typeof window.openCustomerDrawer === 'function') {
-                    window.openCustomerDrawer(data.customer_id);
+                    window.openCustomerDrawer(target);
                 }
             } else if (data.action === 'FILTER_TIER') {
-                const tier = data.customer_id || 'CRITICAL';
-                const filterBtn = document.querySelector(`.filter-btn[data-tier="${tier}"]`);
+                const tier = target || 'CRITICAL';
+                const filterBtn = document.querySelector(`.filter-btn[data-tier="${tier}"]`) || document.querySelector(`[data-severity="${tier}"]`);
                 if (filterBtn) filterBtn.click();
-            } else if (data.action === 'SWITCH_TAB' && data.customer_id) {
-                const navTab = document.querySelector(`.nav-tab[data-target="${data.customer_id}"]`);
-                if (navTab) navTab.click();
+            } else if (data.action === 'SWITCH_TAB' && target) {
+                const tab = document.querySelector(`.tab[data-target="${target}"]`) || document.querySelector(`.nav-tab[data-target="${target}"]`);
+                if (tab) tab.click();
             }
         }
 
@@ -410,10 +420,26 @@
             if (!('speechSynthesis' in window)) return;
             this.stopSpeechSynthesis();
 
-            const utterance = new SpeechSynthesisUtterance(text);
+            // Strip emojis, markdown hashes, asterisks, and code backticks for clean speech
+            const cleanText = text
+                .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+                .replace(/[#*`_~]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            const utterance = new SpeechSynthesisUtterance(cleanText);
             utterance.rate = 1.05;
             utterance.pitch = 1.02;
             utterance.lang = 'en-US';
+
+            // Select best natural English voice if available
+            try {
+                const voices = window.speechSynthesis.getVoices();
+                const preferredVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha')));
+                if (preferredVoice) utterance.voice = preferredVoice;
+            } catch (e) {
+                // Default voice fallback
+            }
 
             utterance.onstart = () => {
                 this.updateStatus('SPEAKING (GOOGLE TTS)', '#38bdf8', 'rgba(56,189,248,0.2)');

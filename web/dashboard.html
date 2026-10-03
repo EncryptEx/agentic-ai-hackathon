@@ -105,6 +105,7 @@
             <div class="tab" data-target="metrics-tab">Metrics & Visualizations</div>
             <div class="tab" data-target="realtime-tab">Realtime Stream</div>
             <div class="tab" data-target="investigator-tab">Investigator</div>
+            <div class="tab" data-target="live-stream-tab">Live Agent Console</div>
         </div>
     </div>
     
@@ -121,6 +122,9 @@
         <div id="investigator-tab" class="iframe-container">
             <iframe src="/investigator" title="EvidenceTrail Investigator"></iframe>
         </div>
+        <div id="live-stream-tab" class="iframe-container">
+            <iframe src="/live-stream" title="Live Agent Console & Interrogation"></iframe>
+        </div>
     </div>
 
     <script>
@@ -133,9 +137,12 @@
                 // Add active class to clicked tab and corresponding container
                 tab.classList.add('active');
                 const targetId = tab.getAttribute('data-target');
-                document.getElementById(targetId).classList.add('active');
+                const targetEl = document.getElementById(targetId);
+                if (targetEl) targetEl.classList.add('active');
             });
         });
     </script>
+    <!-- Google Voice AI Copilot (Standalone Floating Orb) -->
+    <script src="/static/google_voice_copilot.js"></script>
 </body>
 </html>

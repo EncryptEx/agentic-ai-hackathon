@@ -186,5 +186,165 @@ class TestFraudDetector(unittest.TestCase):
         self.assertTrue(any(a.rule_id == "FR-05" for a in alerts))
         self.assertGreaterEqual(pillar.raw_score, 75.0)
 
+    def test_sim_swap_detection(self):
+        now = datetime.now()
+        tx = Transaction(
+            transaction_id="TX-SIM-TEST",
+            customer_id=self.customer.customer_id,
+            timestamp=now.isoformat(),
+            transaction_type=TransactionType.DOMESTIC_WIRE_OUT,
+            direction=TransactionDirection.OUTBOUND,
+            amount_usd=8500.0,
+            counterparty_name="NeoBank Digital Escrow LLC",
+            counterparty_country=self.customer.residence_country,
+            counterparty_category="OFFSHORE_CORP",
+            channel="MOBILE_APP",
+            reference_narrative="SIM Swap MFA reset detected: Urgent balance evacuation to external account",
+            device_id="DEV-ROGUE-99",
+            is_new_payee=True,
+            is_fraud_synthetic=True,
+            fraud_typology_tag="SIM_SWAP_DRAIN"
+        )
+        alerts, pillar = self.detector.analyze_fraud(self.customer, [tx])
+        self.assertTrue(any(a.rule_id == "FR-06" for a in alerts))
+        self.assertGreaterEqual(pillar.raw_score, 85.0)
+
+    def test_friendly_fraud_detection(self):
+        now = datetime.now()
+        tx1 = Transaction(
+            transaction_id="TX-FF-1",
+            customer_id=self.customer.customer_id,
+            timestamp=(now - timedelta(days=5)).isoformat(),
+            transaction_type=TransactionType.ONLINE_PURCHASE,
+            direction=TransactionDirection.OUTBOUND,
+            amount_usd=750.0,
+            counterparty_name="Tech Store Direct",
+            counterparty_country=self.customer.residence_country,
+            counterparty_category="RETAILER",
+            channel="WEB_PORTAL",
+            reference_narrative="Dispute: Unauthorized transaction claim filed by cardholder",
+            device_id=self.customer.device_primary_id,
+            ip_country=self.customer.primary_ip_country,
+            fraud_typology_tag="FRIENDLY_FRAUD_DISPUTE"
+        )
+        tx2 = Transaction(
+            transaction_id="TX-FF-2",
+            customer_id=self.customer.customer_id,
+            timestamp=now.isoformat(),
+            transaction_type=TransactionType.ONLINE_PURCHASE,
+            direction=TransactionDirection.OUTBOUND,
+            amount_usd=890.0,
+            counterparty_name="Luxe Goods",
+            counterparty_country=self.customer.residence_country,
+            counterparty_category="RETAILER",
+            channel="WEB_PORTAL",
+            reference_narrative="Chargeback: Cardholder claims stolen identity",
+            device_id=self.customer.device_primary_id,
+            ip_country=self.customer.primary_ip_country,
+            fraud_typology_tag="FRIENDLY_FRAUD_DISPUTE"
+        )
+        alerts, pillar = self.detector.analyze_fraud(self.customer, [tx1, tx2])
+        self.assertTrue(any(a.rule_id == "FR-07" for a in alerts))
+        self.assertGreaterEqual(pillar.raw_score, 70.0)
+
+    def test_bin_attack_detection(self):
+        now = datetime.now()
+        txs = []
+        for i, status in enumerate(["DECLINED_INVALID_CVV", "DECLINED_EXPIRED", "DECLINED_SUSPECTED_FRAUD"]):
+            txs.append(Transaction(
+                transaction_id=f"TX-BIN-{i}",
+                customer_id=self.customer.customer_id,
+                timestamp=(now - timedelta(minutes=10 - i * 3)).isoformat(),
+                transaction_type=TransactionType.ONLINE_PURCHASE,
+                direction=TransactionDirection.OUTBOUND,
+                amount_usd=1.99,
+                counterparty_name="Global FastPay",
+                counterparty_country="US",
+                counterparty_category="RETAILER",
+                channel="WEB_PORTAL",
+                auth_status=status,
+                reference_narrative="Botnet testing"
+            ))
+        alerts, pillar = self.detector.analyze_fraud(self.customer, txs)
+        self.assertTrue(any(a.rule_id == "FR-08" for a in alerts))
+        self.assertGreaterEqual(pillar.raw_score, 80.0)
+
+    def test_bec_detection(self):
+        now = datetime.now()
+        tx = Transaction(
+            transaction_id="TX-BEC-1",
+            customer_id=self.customer.customer_id,
+            timestamp=now.isoformat(),
+            transaction_type=TransactionType.INTERNATIONAL_WIRE_OUT,
+            direction=TransactionDirection.OUTBOUND,
+            amount_usd=55000.0,
+            counterparty_name="Meridian Nominee Ltd",
+            counterparty_country="HK",
+            counterparty_category="OFFSHORE_CORP",
+            channel="SWIFT",
+            reference_narrative="Strictly Confidential M&A Acquisition Settlement Ref #9941 / CEO Authorization Required",
+            is_new_payee=True,
+            fraud_typology_tag="BEC_PAYROLL_IMPERSONATION"
+        )
+        alerts, pillar = self.detector.analyze_fraud(self.customer, [tx])
+        self.assertTrue(any(a.rule_id == "FR-09" for a in alerts))
+        self.assertGreaterEqual(pillar.raw_score, 85.0)
+
+    def test_aitm_detection(self):
+        now = datetime.now()
+        tx = Transaction(
+            transaction_id="TX-AITM-1",
+            customer_id=self.customer.customer_id,
+            timestamp=now.isoformat(),
+            transaction_type=TransactionType.DOMESTIC_WIRE_OUT,
+            direction=TransactionDirection.OUTBOUND,
+            amount_usd=6200.0,
+            counterparty_name="SwiftClear Virtual Settlement Hub",
+            counterparty_country="US",
+            counterparty_category="CRYPTO_EXCHANGE",
+            channel="WEB_PORTAL",
+            ip_country="DE",
+            reference_narrative="Reverse proxy session token replay: Instant wire out to third-party clearing wallet",
+            is_new_payee=True,
+            fraud_typology_tag="PHISHING_AITM_SESSION_HIJACK"
+        )
+        alerts, pillar = self.detector.analyze_fraud(self.customer, [tx])
+        self.assertTrue(any(a.rule_id == "FR-10" for a in alerts))
+        self.assertGreaterEqual(pillar.raw_score, 85.0)
+
+    def test_overpayment_detection(self):
+        now = datetime.now()
+        t_in = Transaction(
+            transaction_id="TX-OVP-IN",
+            customer_id=self.customer.customer_id,
+            timestamp=(now - timedelta(hours=14)).isoformat(),
+            transaction_type=TransactionType.ACH_DEPOSIT,
+            direction=TransactionDirection.INBOUND,
+            amount_usd=16000.0,
+            counterparty_name="National Corporate Disbursing Escrow",
+            counterparty_country="US",
+            counterparty_category="INDIVIDUAL",
+            channel="WEB_PORTAL",
+            reference_narrative="Corporate equipment advance check"
+        )
+        t_out = Transaction(
+            transaction_id="TX-OVP-OUT",
+            customer_id=self.customer.customer_id,
+            timestamp=now.isoformat(),
+            transaction_type=TransactionType.DOMESTIC_WIRE_OUT,
+            direction=TransactionDirection.OUTBOUND,
+            amount_usd=12000.0,
+            counterparty_name="Regional Courier Agent",
+            counterparty_country="US",
+            counterparty_category="INDIVIDUAL",
+            channel="WEB_PORTAL",
+            reference_narrative="Overpayment refund of unused advance to courier agent",
+            is_new_payee=True,
+            fraud_typology_tag="REFUND_OVERPAYMENT_SCAM"
+        )
+        alerts, pillar = self.detector.analyze_fraud(self.customer, [t_in, t_out])
+        self.assertTrue(any(a.rule_id == "FR-11" for a in alerts))
+        self.assertGreaterEqual(pillar.raw_score, 80.0)
+
 if __name__ == "__main__":
     unittest.main()

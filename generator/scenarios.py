@@ -571,3 +571,639 @@ def inject_bust_out_fraud_scenario(
         ))
 
     return txs
+
+# ==========================================
+# ADDITIONAL FRAUD & AML TYPOLOGY INJECTORS
+# ==========================================
+
+def inject_sim_swap_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    Fraud Typology FR-06: SIM Swap & Credential Reset Outbound Drain.
+    Adversary executes unauthorized SIM swap, resets online banking credentials,
+    adds a new beneficiary and immediately drains funds via wire.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+    t_start = anchor_date.replace(hour=11, minute=20)
+
+    drain_amt = round(random.uniform(4800.0, 9500.0), 2)
+    tx_id = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+
+    txs.append(Transaction(
+        transaction_id=tx_id,
+        customer_id=customer.customer_id,
+        timestamp=(t_start + timedelta(minutes=24)).isoformat(),
+        transaction_type=TransactionType.DOMESTIC_WIRE_OUT,
+        direction=TransactionDirection.OUTBOUND,
+        amount_usd=drain_amt,
+        counterparty_name="NeoBank Digital Escrow LLC",
+        counterparty_country=customer.residence_country,
+        counterparty_category="OFFSHORE_CORP",
+        channel="MOBILE_APP",
+        reference_narrative="SIM Swap MFA reset detected: Urgent balance evacuation to external account",
+        device_id="DEV-ROGUE-HANDSET-88A",
+        ip_address="172.56.21.99",
+        ip_country=customer.residence_country,
+        is_new_payee=True,
+        payee_first_seen_hours=0.4,
+        auth_status="AUTHORIZED",
+        is_fraud_synthetic=True,
+        fraud_typology_tag="SIM_SWAP_DRAIN"
+    ))
+
+    return txs
+
+def inject_friendly_fraud_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    Fraud Typology FR-07: Friendly Fraud / Systematic Chargeback & Dispute Abuse.
+    Customer orders expensive luxury/digital goods from trusted home device, then files
+    fraudulent chargeback claims claiming unauthorized activity or non-receipt.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+
+    claims = [
+        (620.0, "ElectroHub Consumer Tech", "Dispute: Unauthorized transaction claim filed by cardholder"),
+        (890.0, "Designer Apparel Direct", "Dispute: Goods not received claim filed after verified 3DS delivery"),
+        (1350.0, "Luxury Watches Online", "Chargeback: Cardholder claims stolen identity despite chip verification")
+    ]
+
+    for i, (amt, merchant, narr) in enumerate(claims):
+        tx_id = f"TXN-{current_tx_id:07d}"
+        current_tx_id += 1
+        t_tx = anchor_date + timedelta(days=i * 4 + 1, hours=15, minutes=10)
+
+        txs.append(Transaction(
+            transaction_id=tx_id,
+            customer_id=customer.customer_id,
+            timestamp=t_tx.isoformat(),
+            transaction_type=TransactionType.ONLINE_PURCHASE,
+            direction=TransactionDirection.OUTBOUND,
+            amount_usd=amt,
+            counterparty_name=merchant,
+            counterparty_country=customer.residence_country,
+            counterparty_category="RETAILER",
+            channel="WEB_PORTAL",
+            reference_narrative=narr,
+            device_id=customer.device_primary_id,
+            ip_address=customer.primary_ip_address,
+            ip_country=customer.primary_ip_country,
+            is_card_present=False,
+            card_entry_mode="CNP_ECOMMERCE",
+            auth_status="AUTHORIZED",
+            is_fraud_synthetic=True,
+            fraud_typology_tag="FRIENDLY_FRAUD_DISPUTE"
+        ))
+
+    return txs
+
+def inject_bin_attack_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    Fraud Typology FR-08: Automated BIN Attack & Card Testing Velocity.
+    Botnet fires rapid authorization requests with incrementing CVV/expiry combinations.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+    t_start = anchor_date.replace(hour=2, minute=15)
+
+    attempts = [
+        (1.99, "DECLINED_INVALID_CVV", "CVV Mismatch - automated payment gateway test #1"),
+        (2.49, "DECLINED_EXPIRED", "Expired card error - botnet script test #2"),
+        (1.85, "DECLINED_SUSPECTED_FRAUD", "Velocity rule block - automated script test #3"),
+        (850.0, "AUTHORIZED", "High value consumer electronic purchase following brute-force auth")
+    ]
+
+    for i, (amt, status, narr) in enumerate(attempts):
+        tx_id = f"TXN-{current_tx_id:07d}"
+        current_tx_id += 1
+        t_tx = t_start + timedelta(minutes=i * 3)
+
+        txs.append(Transaction(
+            transaction_id=tx_id,
+            customer_id=customer.customer_id,
+            timestamp=t_tx.isoformat(),
+            transaction_type=TransactionType.ONLINE_PURCHASE,
+            direction=TransactionDirection.OUTBOUND,
+            amount_usd=amt,
+            counterparty_name="Global FastPay Automated Gateway",
+            counterparty_country="US",
+            counterparty_category="RETAILER",
+            channel="WEB_PORTAL",
+            reference_narrative=narr,
+            device_id="DEV-BOTNET-CLUSTER-X7",
+            ip_address="198.51.100.44",
+            ip_country="NL",
+            is_card_present=False,
+            card_entry_mode="CNP_ECOMMERCE",
+            auth_status=status,
+            is_fraud_synthetic=True,
+            fraud_typology_tag="BIN_ATTACK_VELOCITY"
+        ))
+
+    return txs
+
+def inject_bec_impersonation_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    Fraud Typology FR-09: Business Email Compromise (BEC) & Executive Impersonation.
+    High-value wire diversion spoofing executive authority for confidential acquisition.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+    t_tx = anchor_date.replace(hour=10, minute=45)
+
+    wire_amt = round(random.uniform(35000.0, 75000.0), 2)
+    tx_id = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+
+    txs.append(Transaction(
+        transaction_id=tx_id,
+        customer_id=customer.customer_id,
+        timestamp=t_tx.isoformat(),
+        transaction_type=TransactionType.INTERNATIONAL_WIRE_OUT,
+        direction=TransactionDirection.OUTBOUND,
+        amount_usd=wire_amt,
+        counterparty_name="Meridian Global Acquisitions Nominee Ltd",
+        counterparty_country="HK",
+        counterparty_category="OFFSHORE_CORP",
+        channel="SWIFT",
+        reference_narrative="Strictly Confidential M&A Acquisition Settlement Ref #9941 / CEO Authorization Required",
+        device_id=customer.device_primary_id,
+        ip_address=customer.primary_ip_address,
+        ip_country=customer.primary_ip_country,
+        is_new_payee=True,
+        payee_first_seen_hours=0.1,
+        auth_status="AUTHORIZED",
+        is_fraud_synthetic=True,
+        fraud_typology_tag="BEC_PAYROLL_IMPERSONATION"
+    ))
+
+    return txs
+
+def inject_aitm_session_hijack_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    Fraud Typology FR-10: Adversary-in-the-Middle (AitM) Phishing Session Hijack.
+    Stolen session token replayed from hosting/VPN proxy to drain funds without credential reset.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+    t_start = anchor_date.replace(hour=16, minute=10)
+
+    # 1. Legitimate user session
+    tx_id_1 = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    txs.append(Transaction(
+        transaction_id=tx_id_1,
+        customer_id=customer.customer_id,
+        timestamp=t_start.isoformat(),
+        transaction_type=TransactionType.ONLINE_PURCHASE,
+        direction=TransactionDirection.OUTBOUND,
+        amount_usd=32.40,
+        counterparty_name="City Transit Authority",
+        counterparty_country=customer.residence_country,
+        counterparty_category="RETAILER",
+        channel="WEB_PORTAL",
+        reference_narrative="Commuter travel card reload",
+        device_id=customer.device_primary_id,
+        ip_address=customer.primary_ip_address,
+        ip_country=customer.primary_ip_country,
+        auth_status="AUTHORIZED",
+        is_fraud_synthetic=False
+    ))
+
+    # 2. Hostile session token replay drain 25 minutes later
+    tx_id_2 = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    drain_amt = round(random.uniform(5400.0, 11500.0), 2)
+    txs.append(Transaction(
+        transaction_id=tx_id_2,
+        customer_id=customer.customer_id,
+        timestamp=(t_start + timedelta(minutes=25)).isoformat(),
+        transaction_type=TransactionType.DOMESTIC_WIRE_OUT,
+        direction=TransactionDirection.OUTBOUND,
+        amount_usd=drain_amt,
+        counterparty_name="SwiftClear Virtual Settlement Hub",
+        counterparty_country="US",
+        counterparty_category="CRYPTO_EXCHANGE",
+        channel="WEB_PORTAL",
+        reference_narrative="Reverse proxy session token replay: Instant wire out to third-party clearing wallet",
+        device_id=customer.device_primary_id, # User-agent/device header cloned
+        ip_address="185.191.171.12",          # Hostile VPN / proxy IP
+        ip_country="DE",
+        is_new_payee=True,
+        payee_first_seen_hours=0.2,
+        auth_status="AUTHORIZED",
+        is_fraud_synthetic=True,
+        fraud_typology_tag="PHISHING_AITM_SESSION_HIJACK"
+    ))
+
+    return txs
+
+def inject_overpayment_scam_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    Fraud Typology FR-11: Counterfeit Overpayment & Fake Refund Scam.
+    Victim receives fake check/ACH deposit, tricked into wiring back the excess before it bounces.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+    t_in = anchor_date.replace(hour=9, minute=30)
+
+    # 1. Fake check / ACH deposit
+    deposit_amt = 16800.0
+    tx_id_1 = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    txs.append(Transaction(
+        transaction_id=tx_id_1,
+        customer_id=customer.customer_id,
+        timestamp=t_in.isoformat(),
+        transaction_type=TransactionType.ACH_DEPOSIT,
+        direction=TransactionDirection.INBOUND,
+        amount_usd=deposit_amt,
+        counterparty_name="National Corporate Disbursing Escrow",
+        counterparty_country=customer.residence_country,
+        counterparty_category="INDIVIDUAL",
+        channel="WEB_PORTAL",
+        reference_narrative="Executive recruitment stipend & equipment advance check",
+        device_id=customer.device_primary_id,
+        ip_address=customer.primary_ip_address,
+        ip_country=customer.primary_ip_country,
+        auth_status="AUTHORIZED",
+        is_fraud_synthetic=True,
+        fraud_typology_tag="REFUND_OVERPAYMENT_SCAM"
+    ))
+
+    # 2. Urgent refund wire 16 hours later before clearing
+    refund_amt = 12400.0
+    tx_id_2 = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    txs.append(Transaction(
+        transaction_id=tx_id_2,
+        customer_id=customer.customer_id,
+        timestamp=(t_in + timedelta(hours=16)).isoformat(),
+        transaction_type=TransactionType.DOMESTIC_WIRE_OUT,
+        direction=TransactionDirection.OUTBOUND,
+        amount_usd=refund_amt,
+        counterparty_name="Apex Logistics Logistics Agent",
+        counterparty_country=customer.residence_country,
+        counterparty_category="INDIVIDUAL",
+        channel="WEB_PORTAL",
+        reference_narrative="Overpayment refund of unused equipment advance to regional courier agent",
+        device_id=customer.device_primary_id,
+        ip_address=customer.primary_ip_address,
+        ip_country=customer.primary_ip_country,
+        is_new_payee=True,
+        payee_first_seen_hours=0.5,
+        auth_status="AUTHORIZED",
+        is_fraud_synthetic=True,
+        fraud_typology_tag="REFUND_OVERPAYMENT_SCAM"
+    ))
+
+    return txs
+
+# ==========================================
+# ADDITIONAL AML TYPOLOGY INJECTORS
+# ==========================================
+
+def inject_tbml_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    AML Typology TM-08: Trade-Based Money Laundering (TBML) & Over/Under-Invoicing.
+    High-value cross-border wires referencing commercial freight invoices & shipping consignments.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+
+    # Inbound trade payment
+    in_amt = round(random.uniform(55000.0, 95000.0), 2)
+    tx_id_1 = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    txs.append(Transaction(
+        transaction_id=tx_id_1,
+        customer_id=customer.customer_id,
+        timestamp=anchor_date.replace(hour=11, minute=15).isoformat(),
+        transaction_type=TransactionType.INTERNATIONAL_WIRE_IN,
+        direction=TransactionDirection.INBOUND,
+        amount_usd=in_amt,
+        counterparty_name="Al-Noor Petrochem & General Trading LLC",
+        counterparty_country="AE",
+        counterparty_category="OFFSHORE_CORP",
+        channel="SWIFT",
+        reference_narrative="Consignment commercial invoice #4902 - raw industrial polymers cargo",
+        is_suspicious_synthetic=True,
+        synthetic_typology_tag="TBML_OVER_INVOICING"
+    ))
+
+    # Outbound trade payment to offshore transit company 3 days later
+    out_amt = round(in_amt * 0.88, 2)
+    tx_id_2 = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    txs.append(Transaction(
+        transaction_id=tx_id_2,
+        customer_id=customer.customer_id,
+        timestamp=(anchor_date + timedelta(days=3, hours=4)).isoformat(),
+        transaction_type=TransactionType.INTERNATIONAL_WIRE_OUT,
+        direction=TransactionDirection.OUTBOUND,
+        amount_usd=out_amt,
+        counterparty_name="Star Ocean Shipping Logistics Ltd",
+        counterparty_country="HK",
+        counterparty_category="OFFSHORE_CORP",
+        channel="SWIFT",
+        reference_narrative="Bill of Lading #BOL-9912 - bulk freight customs & transshipment fee",
+        is_suspicious_synthetic=True,
+        synthetic_typology_tag="TBML_OVER_INVOICING"
+    ))
+
+    return txs
+
+def inject_fan_out_layering_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    AML Typology TM-09: Fan-Out Layering / High-Velocity Fund Distribution.
+    Large single inbound credit fragmented into multiple small outbound transfers across beneficiaries.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+
+    # 1. Large inbound credit
+    total_in = 36000.0
+    tx_id_in = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    txs.append(Transaction(
+        transaction_id=tx_id_in,
+        customer_id=customer.customer_id,
+        timestamp=anchor_date.replace(hour=8, minute=30).isoformat(),
+        transaction_type=TransactionType.DOMESTIC_WIRE_IN,
+        direction=TransactionDirection.INBOUND,
+        amount_usd=total_in,
+        counterparty_name="Vanguard Escrow Holdings Trust",
+        counterparty_country=customer.residence_country,
+        counterparty_category="OFFSHORE_CORP",
+        channel="WEB_PORTAL",
+        reference_narrative="Private contract disbursement proceeds",
+        is_suspicious_synthetic=True,
+        synthetic_typology_tag="FAN_OUT_LAYERING"
+    ))
+
+    # 2. 5 rapid fan-out outbound transfers over next 24 hours
+    split_payees = [
+        ("Alice Chen P2P Account", TransactionType.P2P_TRANSFER_OUT, 6800.0, "PEER"),
+        ("David Rossi Remittance Link", TransactionType.P2P_TRANSFER_OUT, 7200.0, "PEER"),
+        ("Kraken Digital Ramp", TransactionType.CRYPTO_PURCHASE, 6500.0, "CRYPTO_EXCHANGE"),
+        ("QuickPay Prepaid Settlement", TransactionType.DOMESTIC_WIRE_OUT, 7000.0, "OFFSHORE_CORP"),
+        ("Apex Intermediary Partner", TransactionType.DOMESTIC_WIRE_OUT, 6900.0, "INDIVIDUAL")
+    ]
+
+    for i, (payee, tx_type, amt, cat) in enumerate(split_payees):
+        tx_id_out = f"TXN-{current_tx_id:07d}"
+        current_tx_id += 1
+        t_out = anchor_date + timedelta(hours=i * 4 + 2)
+
+        txs.append(Transaction(
+            transaction_id=tx_id_out,
+            customer_id=customer.customer_id,
+            timestamp=t_out.isoformat(),
+            transaction_type=tx_type,
+            direction=TransactionDirection.OUTBOUND,
+            amount_usd=amt,
+            counterparty_name=payee,
+            counterparty_country=customer.residence_country,
+            counterparty_category=cat,
+            channel="MOBILE_APP",
+            reference_narrative=f"Fan-out distribution leg #{i+1} settlement",
+            is_new_payee=True,
+            is_suspicious_synthetic=True,
+            synthetic_typology_tag="FAN_OUT_LAYERING"
+        ))
+
+    return txs
+
+def inject_cuckoo_smurfing_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    AML Typology TM-10: Cuckoo Smurfing & Hawala Third-Party Remittance Matching.
+    Multiple unrelated third parties deposit cash or local transfers into account to fulfill Hawala order.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+
+    deposits = [
+        ("Branch Cash Deposit Counter #12", "ATM_BRANCH", 4800.0),
+        ("Sarah Jenkins Domestic Transfer", "INDIVIDUAL", 4200.0),
+        ("Metro Retail Cash Counter", "ATM_BRANCH", 4600.0),
+        ("Liam O'Connor P2P Credit", "PEER", 4900.0)
+    ]
+
+    for i, (cp_name, cat, amt) in enumerate(deposits):
+        tx_id = f"TXN-{current_tx_id:07d}"
+        current_tx_id += 1
+        t_tx = anchor_date + timedelta(days=i * 2 + 1, hours=12, minutes=random.randint(10, 50))
+
+        txs.append(Transaction(
+            transaction_id=tx_id,
+            customer_id=customer.customer_id,
+            timestamp=t_tx.isoformat(),
+            transaction_type=TransactionType.CASH_DEPOSIT if cat == "ATM_BRANCH" else TransactionType.DOMESTIC_WIRE_IN,
+            direction=TransactionDirection.INBOUND,
+            amount_usd=amt,
+            counterparty_name=cp_name,
+            counterparty_country=customer.residence_country,
+            counterparty_category=cat,
+            channel="BRANCH_TELLER" if cat == "ATM_BRANCH" else "ACH",
+            reference_narrative="Hawala third-party remittance aggregation deposit",
+            is_suspicious_synthetic=True,
+            synthetic_typology_tag="CUCKOO_SMURFING"
+        ))
+
+    return txs
+
+def inject_crypto_mixer_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    AML Typology TM-11: Crypto Mixer, Tumbler & Anonymity Protocol Interaction.
+    Outbound and inbound transactions directly touching sanctioned mixers (Tornado Cash / Sinbad).
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+
+    # 1. Outbound to mixer
+    tx_id_1 = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    txs.append(Transaction(
+        transaction_id=tx_id_1,
+        customer_id=customer.customer_id,
+        timestamp=anchor_date.replace(hour=14, minute=20).isoformat(),
+        transaction_type=TransactionType.CRYPTO_PURCHASE,
+        direction=TransactionDirection.OUTBOUND,
+        amount_usd=18500.0,
+        counterparty_name="Tornado Cash Router 0xd90e... (Sanctioned Protocol)",
+        counterparty_country="SC",
+        counterparty_category="CRYPTO_MIXER",
+        channel="WEB_PORTAL",
+        reference_narrative="Direct deposit to zero-knowledge privacy pool / mixer contract",
+        is_suspicious_synthetic=True,
+        synthetic_typology_tag="CRYPTO_MIXER_HOP"
+    ))
+
+    # 2. Obfuscated return hop 48 hours later
+    tx_id_2 = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    txs.append(Transaction(
+        transaction_id=tx_id_2,
+        customer_id=customer.customer_id,
+        timestamp=(anchor_date + timedelta(days=2, hours=3)).isoformat(),
+        transaction_type=TransactionType.CRYPTO_CASHOUT,
+        direction=TransactionDirection.INBOUND,
+        amount_usd=17800.0,
+        counterparty_name="Wasabi CoinJoin Anonymized Aggregator",
+        counterparty_country="VG",
+        counterparty_category="CRYPTO_MIXER",
+        channel="WEB_PORTAL",
+        reference_narrative="Cleaned crypto cash-out hop from privacy tumbler pool",
+        is_suspicious_synthetic=True,
+        synthetic_typology_tag="CRYPTO_MIXER_HOP"
+    ))
+
+    return txs
+
+def inject_human_trafficking_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    AML Typology TM-12: Human Trafficking & Labor Exploitation Red Flags.
+    Centralized wage pooling from vulnerable workers followed by immediate late-night ATM cash drain.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+
+    # Centralized worker deposits
+    workers = ["Worker Wage Credit 01", "Worker Wage Credit 02", "Worker Wage Credit 03"]
+    for i, w in enumerate(workers):
+        tx_id = f"TXN-{current_tx_id:07d}"
+        current_tx_id += 1
+        txs.append(Transaction(
+            transaction_id=tx_id,
+            customer_id=customer.customer_id,
+            timestamp=(anchor_date + timedelta(hours=i * 2 + 8)).isoformat(),
+            transaction_type=TransactionType.P2P_TRANSFER_IN,
+            direction=TransactionDirection.INBOUND,
+            amount_usd=850.0,
+            counterparty_name=w,
+            counterparty_country=customer.residence_country,
+            counterparty_category="PEER",
+            channel="MOBILE_APP",
+            reference_narrative="Worker wage deduction for recruitment fee / centralized payroll skimming",
+            is_suspicious_synthetic=True,
+            synthetic_typology_tag="HUMAN_TRAFFICKING_RED_FLAGS"
+        ))
+
+    # Late night cash withdrawals in transit corridor
+    for j in range(3):
+        tx_id = f"TXN-{current_tx_id:07d}"
+        current_tx_id += 1
+        txs.append(Transaction(
+            transaction_id=tx_id,
+            customer_id=customer.customer_id,
+            timestamp=(anchor_date + timedelta(days=1, hours=2, minutes=j * 15 + 10)).isoformat(),
+            transaction_type=TransactionType.ATM_WITHDRAWAL,
+            direction=TransactionDirection.OUTBOUND,
+            amount_usd=800.0,
+            counterparty_name="Highway Border Travel Plaza ATM",
+            counterparty_country=customer.residence_country,
+            counterparty_category="ATM",
+            channel="ATM",
+            reference_narrative="Late-night ATM cash extraction / centralized wage pooling cashout",
+            is_suspicious_synthetic=True,
+            synthetic_typology_tag="HUMAN_TRAFFICKING_RED_FLAGS"
+        ))
+
+    return txs
+
+def inject_loan_wash_scenario(
+    customer: CustomerProfile,
+    anchor_date: datetime,
+    tx_counter_start: int
+) -> List[Transaction]:
+    """
+    AML Typology TM-13: Loan Collateral Laundering & Rapid Early Liquidation.
+    Customer secures loan disbursement and liquidates the debt within days using unverified third-party funds.
+    """
+    txs: List[Transaction] = []
+    current_tx_id = tx_counter_start
+
+    # Loan disbursement
+    tx_id_1 = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    txs.append(Transaction(
+        transaction_id=tx_id_1,
+        customer_id=customer.customer_id,
+        timestamp=anchor_date.replace(hour=10, minute=0).isoformat(),
+        transaction_type=TransactionType.DOMESTIC_WIRE_IN,
+        direction=TransactionDirection.INBOUND,
+        amount_usd=40000.0,
+        counterparty_name="Valiant Commercial Credit Disbursal Unit",
+        counterparty_country=customer.residence_country,
+        counterparty_category="OFFSHORE_CORP",
+        channel="SWIFT",
+        reference_narrative="Term loan disbursement principal funding",
+        is_suspicious_synthetic=True,
+        synthetic_typology_tag="LOAN_COLLATERAL_WASH"
+    ))
+
+    # Rapid early payoff 10 days later with offshore funds
+    tx_id_2 = f"TXN-{current_tx_id:07d}"
+    current_tx_id += 1
+    txs.append(Transaction(
+        transaction_id=tx_id_2,
+        customer_id=customer.customer_id,
+        timestamp=(anchor_date + timedelta(days=10, hours=5)).isoformat(),
+        transaction_type=TransactionType.INTERNATIONAL_WIRE_OUT,
+        direction=TransactionDirection.OUTBOUND,
+        amount_usd=40150.0,
+        counterparty_name="Valiant Credit Loan Servicing Dept",
+        counterparty_country=customer.residence_country,
+        counterparty_category="OFFSHORE_CORP",
+        channel="SWIFT",
+        reference_narrative="Loan settlement full: Early payoff using offshore liquidity release",
+        is_suspicious_synthetic=True,
+        synthetic_typology_tag="LOAN_COLLATERAL_WASH"
+    ))
+
+    return txs

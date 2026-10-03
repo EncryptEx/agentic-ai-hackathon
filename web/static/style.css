@@ -732,3 +732,106 @@ td {
 .inv-alert.sev-low, .inv-alert-row.sev-low { border-left: 4px solid var(--accent-blue); }
 .inv-alert-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 .inv-alert-row { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+
+/* Quick-Pick Typology Presets */
+.quick-pick-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 20px;
+}
+
+.quick-pick-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chip-group-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 10px 0 6px 0;
+}
+
+.chip-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.typology-chip {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.typology-chip:hover {
+    border-color: var(--accent-blue);
+    color: var(--text-primary);
+    background: rgba(37,99,235,0.12);
+}
+
+.typology-chip.active {
+    background: var(--accent-blue);
+    color: white;
+    border-color: var(--accent-blue);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.35);
+}
+
+.typology-chip.fraud.active {
+    background: linear-gradient(135deg, #d946ef, #ec4899);
+    border-color: #d946ef;
+    box-shadow: 0 2px 8px rgba(217,70,239,0.35);
+}
+
+.typology-chip.aml.active {
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    border-color: #2563eb;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.35);
+}
+
+.preset-banner {
+    background: linear-gradient(90deg, rgba(37,99,235,0.12) 0%, rgba(217,70,239,0.12) 100%);
+    border: 1px solid rgba(37,99,235,0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.btn-pick-test {
+    background: rgba(37,99,235,0.15);
+    color: var(--accent-blue);
+    border: 1px solid var(--accent-blue);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-pick-test:hover {
+    background: var(--accent-blue);
+    color: white;
+}
+

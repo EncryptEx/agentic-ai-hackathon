@@ -1,7 +1,16 @@
-pydantic>=2.0.0
+pydantic>=2.6.0
 pandas>=2.0.0
-faker>=19.0.0
-rich>=13.0.0
+faker>=24.0.0
+rich>=13.7.0
+fastapi>=0.110.0
+uvicorn>=0.28.0
+websockets>=11.0.0
+google-adk>=2.9.2
+a2a-sdk[http-server]>=1.0.0
+google-genai
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+python-dotenv>=1.0.0
 
-# G-Eval (pinned to the version verified against the official GEval API)
+# G-Eval for EvidenceTrail (pinned to the version verified against the official GEval API)
 deepeval==4.2.8

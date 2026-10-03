@@ -12,7 +12,7 @@ from evidencetrail.alerts import AlertStore, decide_alert
 from evidencetrail.evidence import EvidenceStore
 from evidencetrail.runs import RunManager
 from evidencetrail.scenarios import get_case
-from tests.test_evidencetrail import FakeJev, ScriptedFor, ScriptedModel, finisher, full_plan
+from test_evidencetrail import FakeJev, ScriptedFor, ScriptedModel, finisher, full_plan
 
 SUSPICIOUS = {"suspicion": "SUSPICIOUS", "severity": 2}
 

@@ -13,8 +13,8 @@ from evidencetrail.runs import RunManager
 from evidencetrail.scenarios import SCENARIOS, get_case
 from evidencetrail.evidence import EvidenceStore
 from evidencetrail.tools import FINISH
-from tests.test_evidencetrail import FakeJev, ScriptedFor, ScriptedModel, finisher, full_plan
-from tests.test_geval import HAVE_DEEPEVAL
+from test_evidencetrail import FakeJev, ScriptedFor, ScriptedModel, finisher, full_plan
+from test_geval import HAVE_DEEPEVAL
 
 
 class FrozenDecider:
@@ -223,7 +223,7 @@ class TraceExportAndProvenance(unittest.TestCase):
 @unittest.skipUnless(HAVE_DEEPEVAL, "deepeval not installed")
 class JudgeRepeats(unittest.TestCase):
     def test_repeated_judge_passes_report_each_score_and_spread(self):
-        from tests.test_geval import StubJudge
+        from test_geval import StubJudge
         case = get_case("case-manipulated")
         run = agent.investigate(case, ScriptedModel(full_plan(case), finisher("CONTEXT_CHECK")), FakeJev(), "run-j")
         judge = StubJudge()

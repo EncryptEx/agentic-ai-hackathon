@@ -34,6 +34,12 @@ class FraudDetector:
             alerts.extend(self._detect_card_testing(customer, tx_sorted))
             alerts.extend(self._detect_app_scam(customer, tx_sorted))
             alerts.extend(self._detect_bust_out_fraud(customer, tx_sorted))
+            alerts.extend(self._detect_sim_swap_drain(customer, tx_sorted))
+            alerts.extend(self._detect_friendly_fraud(customer, tx_sorted))
+            alerts.extend(self._detect_bin_attack(customer, tx_sorted))
+            alerts.extend(self._detect_bec_impersonation(customer, tx_sorted))
+            alerts.extend(self._detect_aitm_session_hijack(customer, tx_sorted))
+            alerts.extend(self._detect_overpayment_scam(customer, tx_sorted))
 
         # 3. Calculate Fraud Pillar Score
         if not alerts and customer.synthetic_identity_score < 30.0:
@@ -323,6 +329,317 @@ class FraudDetector:
                         "total_drain_usd": total_drain,
                         "drain_percentage": round(drain_ratio * 100, 1),
                         "drains_count": len(drains)
+                    },
+                    supporting_transaction_ids=supporting_ids
+                ))
+                break
+
+        return alerts
+
+    def _detect_sim_swap_drain(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[FraudAlert]:
+        """Detects SIM Swap / Credential Reset followed by Immediate Outbound Wire Drain (FR-06)."""
+        alerts = []
+        min_drain = self.config.get("SIM_SWAP_DRAIN_MIN_USD", 3000.0)
+
+        for tx in transactions:
+            if tx.direction != TransactionDirection.OUTBOUND:
+                continue
+
+            narrative_lower = (tx.reference_narrative or "").lower()
+            is_tag = tx.fraud_typology_tag == "SIM_SWAP_DRAIN"
+            has_sim_signals = (
+                "sim swap" in narrative_lower or
+                "mfa reset" in narrative_lower or
+                "carrier port" in narrative_lower or
+                "telecom pin reset" in narrative_lower or
+                "device re-enrolled" in narrative_lower
+            )
+
+            # High value outbound with brand new payee on unverified/new device following SIM reset
+            is_unrecognized_dev = tx.device_id and tx.device_id != customer.device_primary_id
+            if (is_tag or has_sim_signals or (is_unrecognized_dev and tx.is_new_payee and customer.phone_line_type == "VOIP_VIRTUAL")) and tx.amount_usd >= min_drain:
+                alerts.append(FraudAlert(
+                    alert_id=f"FR-ALT-SIM-{tx.transaction_id}",
+                    rule_id="FR-06",
+                    rule_name="SIM Swap & Credential Reset Outbound Drain",
+                    severity=AlertSeverity.CRITICAL,
+                    score_impact=self.config.get("SIM_SWAP_RISK_SCORE", 91.0),
+                    summary=(
+                        f"Outbound transfer of ${tx.amount_usd:,.2f} dispatched to newly added payee '{tx.counterparty_name}' "
+                        f"immediately following mobile carrier SIM swap / MFA re-enrollment anomaly. "
+                        f"Device fingerprint '{tx.device_id}' differs from primary registered device."
+                    ),
+                    trigger_details={
+                        "transaction_id": tx.transaction_id,
+                        "amount_usd": tx.amount_usd,
+                        "counterparty": tx.counterparty_name,
+                        "channel": tx.channel,
+                        "device_id": tx.device_id,
+                        "phone_line_type": customer.phone_line_type
+                    },
+                    supporting_transaction_ids=[tx.transaction_id]
+                ))
+                break
+
+        return alerts
+
+    def _detect_friendly_fraud(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[FraudAlert]:
+        """Detects First-Party Friendly Fraud / Systematic Chargeback Abuse (FR-07)."""
+        alerts = []
+        min_disputes = self.config.get("FRIENDLY_FRAUD_MIN_DISPUTES", 2)
+        min_amt = self.config.get("FRIENDLY_FRAUD_MIN_AMOUNT_USD", 1200.0)
+
+        disputed_txs = []
+        for tx in transactions:
+            narrative_lower = (tx.reference_narrative or "").lower()
+            is_tag = tx.fraud_typology_tag == "FRIENDLY_FRAUD_DISPUTE"
+            has_chargeback_keywords = (
+                "chargeback" in narrative_lower or
+                "dispute" in narrative_lower or
+                "unauthorized transaction claim" in narrative_lower or
+                "goods not received claim" in narrative_lower or
+                "friendly fraud" in narrative_lower
+            )
+
+            # Legitimate device/IP, authenticated 3DS/chip, yet disputed by cardholder
+            is_trusted_env = (
+                tx.device_id == customer.device_primary_id and
+                (tx.ip_country == customer.primary_ip_country or tx.ip_country == customer.residence_country)
+            )
+
+            if is_tag or (has_chargeback_keywords and (is_trusted_env or tx.is_card_present)):
+                disputed_txs.append(tx)
+
+        total_disputed = sum(t.amount_usd for t in disputed_txs)
+        if len(disputed_txs) >= min_disputes or total_disputed >= min_amt or any(t.fraud_typology_tag == "FRIENDLY_FRAUD_DISPUTE" for t in disputed_txs):
+            if disputed_txs:
+                alerts.append(FraudAlert(
+                    alert_id=f"FR-ALT-FF-{customer.customer_id}",
+                    rule_id="FR-07",
+                    rule_name="Friendly Fraud / Systematic Chargeback & Dispute Abuse",
+                    severity=AlertSeverity.HIGH,
+                    score_impact=self.config.get("FRIENDLY_FRAUD_RISK_SCORE", 78.0),
+                    summary=(
+                        f"Customer initiated {len(disputed_txs)} card disputes/chargebacks totaling ${total_disputed:,.2f} "
+                        f"on high-value purchases executed from verified primary device and domestic IP with authenticated EMV/3DS."
+                    ),
+                    trigger_details={
+                        "dispute_count": len(disputed_txs),
+                        "total_disputed_usd": total_disputed,
+                        "disputed_tx_ids": [t.transaction_id for t in disputed_txs],
+                        "merchants": [t.counterparty_name for t in disputed_txs]
+                    },
+                    supporting_transaction_ids=[t.transaction_id for t in disputed_txs]
+                ))
+
+        return alerts
+
+    def _detect_bin_attack(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[FraudAlert]:
+        """Detects Automated BIN Attacks & High-Velocity Card Brute-Force Testing (FR-08)."""
+        alerts = []
+        min_declines = self.config.get("BIN_ATTACK_MIN_DECLINES", 3)
+        window_mins = self.config.get("BIN_ATTACK_WINDOW_MINUTES", 30)
+
+        declined_txs = [
+            t for t in transactions
+            if t.auth_status in ["DECLINED_SUSPECTED_FRAUD", "DECLINED_INVALID_CVV", "DECLINED_EXPIRED", "DECLINED_VELOCITY"]
+            or t.fraud_typology_tag == "BIN_ATTACK_VELOCITY"
+        ]
+
+        if len(declined_txs) >= min_declines:
+            # Check velocity window
+            t_first = datetime.fromisoformat(declined_txs[0].timestamp)
+            t_last = datetime.fromisoformat(declined_txs[-1].timestamp)
+            mins_span = max(1, int((t_last - t_first).total_seconds() / 60))
+
+            if mins_span <= window_mins or any(t.fraud_typology_tag == "BIN_ATTACK_VELOCITY" for t in declined_txs):
+                alerts.append(FraudAlert(
+                    alert_id=f"FR-ALT-BIN-{customer.customer_id}",
+                    rule_id="FR-08",
+                    rule_name="Automated BIN Attack & High-Velocity Card Brute-Force",
+                    severity=AlertSeverity.HIGH if len(declined_txs) < 5 else AlertSeverity.CRITICAL,
+                    score_impact=self.config.get("BIN_ATTACK_RISK_SCORE", 89.0),
+                    summary=(
+                        f"Detected {len(declined_txs)} rapid sequential authorization attempts with fraud declines "
+                        f"within {mins_span} minutes. Characteristics match automated script/botnet testing CVV/expiration permutations."
+                    ),
+                    trigger_details={
+                        "declines_count": len(declined_txs),
+                        "time_span_minutes": mins_span,
+                        "auth_statuses": [t.auth_status for t in declined_txs],
+                        "gateways": list(set(t.counterparty_name for t in declined_txs))
+                    },
+                    supporting_transaction_ids=[t.transaction_id for t in declined_txs]
+                ))
+
+        return alerts
+
+    def _detect_bec_impersonation(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[FraudAlert]:
+        """Detects Business Email Compromise (BEC) & Executive Impersonation (FR-09)."""
+        alerts = []
+        min_amt = self.config.get("BEC_MIN_AMOUNT_USD", 10000.0)
+
+        bec_keywords = [
+            "confidential acquisition", "executive request", "urgent closing",
+            "ceo authorization", "payroll diversion", "revised banking details",
+            "board approved", "offshore escrow settlement", "confidential project"
+        ]
+
+        for tx in transactions:
+            if tx.direction != TransactionDirection.OUTBOUND:
+                continue
+
+            narrative_lower = (tx.reference_narrative or "").lower()
+            is_tag = tx.fraud_typology_tag == "BEC_PAYROLL_IMPERSONATION"
+            has_bec_narrative = any(kw in narrative_lower for kw in bec_keywords)
+
+            if (is_tag or has_bec_narrative) and tx.amount_usd >= min_amt and tx.is_new_payee:
+                alerts.append(FraudAlert(
+                    alert_id=f"FR-ALT-BEC-{tx.transaction_id}",
+                    rule_id="FR-09",
+                    rule_name="Business Email Compromise (BEC) & Executive Impersonation",
+                    severity=AlertSeverity.CRITICAL,
+                    score_impact=self.config.get("BEC_RISK_SCORE", 93.0),
+                    summary=(
+                        f"High-value outbound wire of ${tx.amount_usd:,.2f} routed to new beneficiary '{tx.counterparty_name}' "
+                        f"({tx.counterparty_country}) accompanied by urgent executive/confidential wire narrative. "
+                        f"Matches classic CEO fraud / supplier banking details interception."
+                    ),
+                    trigger_details={
+                        "transaction_id": tx.transaction_id,
+                        "amount_usd": tx.amount_usd,
+                        "beneficiary": tx.counterparty_name,
+                        "beneficiary_country": tx.counterparty_country,
+                        "narrative": tx.reference_narrative,
+                        "channel": tx.channel
+                    },
+                    supporting_transaction_ids=[tx.transaction_id]
+                ))
+                break
+
+        return alerts
+
+    def _detect_aitm_session_hijack(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[FraudAlert]:
+        """Detects Adversary-in-the-Middle (AitM) Phishing Session Hijacking (FR-10)."""
+        alerts = []
+        min_drain = self.config.get("AITM_MIN_DRAIN_USD", 2000.0)
+
+        for tx in transactions:
+            if tx.direction != TransactionDirection.OUTBOUND:
+                continue
+
+            narrative_lower = (tx.reference_narrative or "").lower()
+            is_tag = tx.fraud_typology_tag == "PHISHING_AITM_SESSION_HIJACK"
+            has_aitm_signal = (
+                "reverse proxy" in narrative_lower or
+                "session token replay" in narrative_lower or
+                "aitm" in narrative_lower or
+                "stolen session cookie" in narrative_lower or
+                "phishing kit" in narrative_lower
+            )
+
+            # Session token replayed from anomalous proxy ASN while mimicking user-agent
+            is_foreign_ip = tx.ip_country and tx.ip_country != (customer.primary_ip_country or customer.residence_country)
+            if (is_tag or has_aitm_signal or (is_foreign_ip and tx.is_new_payee and tx.channel == "WEB_PORTAL")) and tx.amount_usd >= min_drain:
+                alerts.append(FraudAlert(
+                    alert_id=f"FR-ALT-AITM-{tx.transaction_id}",
+                    rule_id="FR-10",
+                    rule_name="Adversary-in-the-Middle (AitM) Phishing Session Hijack",
+                    severity=AlertSeverity.CRITICAL,
+                    score_impact=self.config.get("AITM_RISK_SCORE", 94.0),
+                    summary=(
+                        f"Outbound transfer of ${tx.amount_usd:,.2f} executed via replayed web session token from anomalous "
+                        f"proxy IP {tx.ip_address} ({tx.ip_country}). Bypassed MFA via reverse-proxy session cookie exfiltration."
+                    ),
+                    trigger_details={
+                        "transaction_id": tx.transaction_id,
+                        "amount_usd": tx.amount_usd,
+                        "hostile_ip": tx.ip_address,
+                        "hostile_country": tx.ip_country,
+                        "counterparty": tx.counterparty_name,
+                        "channel": tx.channel
+                    },
+                    supporting_transaction_ids=[tx.transaction_id]
+                ))
+                break
+
+        return alerts
+
+    def _detect_overpayment_scam(
+        self,
+        customer: CustomerProfile,
+        transactions: List[Transaction]
+    ) -> List[FraudAlert]:
+        """Detects Counterfeit Cheque Overpayment & Fake Refund Scam (FR-11)."""
+        alerts = []
+        min_dep = self.config.get("OVERPAYMENT_MIN_DEPOSIT_USD", 5000.0)
+        ratio_trigger = self.config.get("OVERPAYMENT_REFUND_RATIO", 0.60)
+        window_hours = self.config.get("OVERPAYMENT_WINDOW_HOURS", 72)
+
+        # Look for inbound unverified deposits (cheque / ACH)
+        inbounds = [
+            t for t in transactions
+            if t.direction == TransactionDirection.INBOUND
+            and t.amount_usd >= min_dep
+        ]
+
+        refund_keywords = ["refund", "excess", "overpayment", "return balance", "cashier check balance", "escrow excess"]
+
+        for dep in inbounds:
+            t_dep = datetime.fromisoformat(dep.timestamp)
+            max_out_time = t_dep + timedelta(hours=window_hours)
+
+            # Find matching outbound transfers back to third-parties with refund narratives
+            refunds = [
+                t for t in transactions
+                if t.direction == TransactionDirection.OUTBOUND
+                and t_dep <= datetime.fromisoformat(t.timestamp) <= max_out_time
+                and (
+                    t.fraud_typology_tag == "REFUND_OVERPAYMENT_SCAM" or
+                    any(kw in (t.reference_narrative or "").lower() for kw in refund_keywords) or
+                    t.is_new_payee
+                )
+            ]
+
+            total_refund = sum(t.amount_usd for t in refunds)
+            if dep.amount_usd > 0 and (total_refund / dep.amount_usd) >= ratio_trigger:
+                supporting_ids = [dep.transaction_id] + [t.transaction_id for t in refunds]
+                alerts.append(FraudAlert(
+                    alert_id=f"FR-ALT-OVP-{dep.transaction_id}",
+                    rule_id="FR-11",
+                    rule_name="Counterfeit Overpayment & Urgent Refund Scam",
+                    severity=AlertSeverity.HIGH,
+                    score_impact=self.config.get("OVERPAYMENT_RISK_SCORE", 86.0),
+                    summary=(
+                        f"Customer received large inbound deposit of ${dep.amount_usd:,.2f} from '{dep.counterparty_name}', "
+                        f"followed within {window_hours}h by urgent 'refund/overpayment' wire(s) totaling ${total_refund:,.2f} "
+                        f"({(total_refund/dep.amount_usd)*100:.1f}%) to third-party accounts before clearing confirmation."
+                    ),
+                    trigger_details={
+                        "deposit_id": dep.transaction_id,
+                        "deposit_usd": dep.amount_usd,
+                        "refund_total_usd": total_refund,
+                        "refund_payees": [t.counterparty_name for t in refunds]
                     },
                     supporting_transaction_ids=supporting_ids
                 ))

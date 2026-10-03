@@ -7,7 +7,7 @@ import unittest
 from evidencetrail import agent, evaluator
 from evidencetrail.eval_fixtures import EXPECTED_ACTIONS
 from evidencetrail.scenarios import get_case
-from tests.test_evidencetrail import FakeJev, ScriptedModel, finisher, full_plan
+from test_evidencetrail import FakeJev, ScriptedModel, finisher, full_plan
 
 try:
     from deepeval.models import DeepEvalBaseLLM

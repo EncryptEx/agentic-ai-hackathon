@@ -19,6 +19,7 @@ let chartChannels = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     initTabs();
+    initOverview();
     initControls();
     loadPortfolio();
     loadCustomers();
@@ -26,6 +27,31 @@ document.addEventListener("DOMContentLoaded", () => {
     initSimulator();
     initGenerator();
 });
+
+// Portfolio overview (KPI cards + charts): open on the landing page, collapsed on every other page. The user can
+// open or close it on any page. It follows the active tab itself, so every way of changing pages is covered.
+let overviewTab = null;
+
+function setOverview(expanded) {
+    document.getElementById("overview").classList.toggle("collapsed", !expanded);
+    document.getElementById("overview-toggle").setAttribute("aria-expanded", String(expanded));
+    if (expanded) [chartTiers, chartTypologies, chartChannels].forEach(c => c && c.resize());  // charts measure 0 while hidden
+}
+
+function initOverview() {
+    const root = document.getElementById("overview");
+    document.getElementById("overview-toggle").addEventListener("click", () => setOverview(root.classList.contains("collapsed")));
+    const syncToActiveTab = () => {
+        const target = document.querySelector(".nav-tab.active")?.dataset.target;
+        if (target && target !== overviewTab) {
+            overviewTab = target;
+            setOverview(target === "tab-customers");
+        }
+    };
+    new MutationObserver(syncToActiveTab).observe(document.querySelector(".nav-tabs"),
+        { subtree: true, attributes: true, attributeFilter: ["class"] });
+    syncToActiveTab();
+}
 
 function initTabs() {
     const tabs = document.querySelectorAll(".nav-tab");
@@ -125,12 +151,19 @@ async function loadPortfolio() {
 
         document.getElementById("kpi-total-cust").textContent = data.total_customers.toLocaleString();
         document.getElementById("kpi-total-tx").textContent = data.total_transactions.toLocaleString();
+        const volume = Number(data.total_volume_usd || 0);
+        document.getElementById("kpi-total-vol").textContent =
+            `$${volume.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD Gross Turnover`;
         document.getElementById("kpi-total-fraud").textContent = (data.total_fraud_alerts || 0).toLocaleString();
         document.getElementById("kpi-total-aml").textContent = (data.total_aml_alerts || 0).toLocaleString();
         
         const tiers = data.tier_distribution || {};
         const highCrit = (tiers.HIGH?.count || 0) + (tiers.CRITICAL?.count || 0);
         document.getElementById("kpi-high-crit").textContent = highCrit.toLocaleString();
+        document.getElementById("overview-summary").textContent =
+            `${data.total_customers.toLocaleString()} customers · ${data.total_transactions.toLocaleString()} transactions · ` +
+            `${(data.total_fraud_alerts || 0).toLocaleString()} fraud alerts · ${(data.total_aml_alerts || 0).toLocaleString()} AML alerts · ` +
+            `${highCrit.toLocaleString()} critical or high risk`;
 
         renderCharts(data);
     } catch (err) {

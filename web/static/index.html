@@ -30,54 +30,64 @@
     </header>
 
     <main>
-        <!-- KPI Metrics Grid -->
-        <section class="kpi-grid">
-            <div class="kpi-card">
-                <div class="kpi-label">Active Retail Customers</div>
-                <div class="kpi-value" id="kpi-total-cust">0</div>
-                <div class="kpi-sub">100% Individual Profiles</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Transactions Monitored</div>
-                <div class="kpi-value" id="kpi-total-tx">0</div>
-                <div class="kpi-sub" id="kpi-total-vol">$0.00 USD Gross Turnover</div>
-            </div>
-            <div class="kpi-card fraud">
-                <div class="kpi-label">Active Fraud Alerts</div>
-                <div class="kpi-value" id="kpi-total-fraud">0</div>
-                <div class="kpi-sub">ATO, Card Testing, SIM Swap, BEC & AitM</div>
-            </div>
-            <div class="kpi-card high">
-                <div class="kpi-label">Active AML Alerts</div>
-                <div class="kpi-value" id="kpi-total-aml">0</div>
-                <div class="kpi-sub">Structuring, Mules, TBML, Mixers & Corridors</div>
-            </div>
-            <div class="kpi-card crit">
-                <div class="kpi-label">Critical & High Risk</div>
-                <div class="kpi-value" id="kpi-high-crit">0</div>
-                <div class="kpi-sub">Priority EDD & SAR Candidates</div>
-            </div>
-        </section>
+        <!-- Portfolio overview: open on the landing page, collapsed on every other page -->
+        <section class="overview" id="overview">
+            <button type="button" class="overview-toggle" id="overview-toggle" aria-expanded="true" aria-controls="overview-body">
+                <span class="overview-title">Portfolio overview</span>
+                <span class="overview-summary" id="overview-summary">Loading…</span>
+                <span class="overview-chevron" aria-hidden="true">▾</span>
+            </button>
+            <div id="overview-body">
+            <!-- KPI Metrics Grid -->
+            <section class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Active Retail Customers</div>
+                    <div class="kpi-value" id="kpi-total-cust">0</div>
+                    <div class="kpi-sub">100% Individual Profiles</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Transactions Monitored</div>
+                    <div class="kpi-value" id="kpi-total-tx">0</div>
+                    <div class="kpi-sub" id="kpi-total-vol">$0.00 USD Gross Turnover</div>
+                </div>
+                <div class="kpi-card fraud">
+                    <div class="kpi-label">Active Fraud Alerts</div>
+                    <div class="kpi-value" id="kpi-total-fraud">0</div>
+                    <div class="kpi-sub">ATO, Card Testing, SIM Swap, BEC & AitM</div>
+                </div>
+                <div class="kpi-card high">
+                    <div class="kpi-label">Active AML Alerts</div>
+                    <div class="kpi-value" id="kpi-total-aml">0</div>
+                    <div class="kpi-sub">Structuring, Mules, TBML, Mixers & Corridors</div>
+                </div>
+                <div class="kpi-card crit">
+                    <div class="kpi-label">Critical & High Risk</div>
+                    <div class="kpi-value" id="kpi-high-crit">0</div>
+                    <div class="kpi-sub">Priority EDD & SAR Candidates</div>
+                </div>
+            </section>
 
-        <!-- Charts Row -->
-        <section class="charts-grid">
-            <div class="chart-card">
-                <h3>Portfolio Risk Tier Distribution</h3>
-                <div class="chart-wrap">
-                    <canvas id="chart-tiers"></canvas>
+            <!-- Charts Row -->
+            <section class="charts-grid">
+                <div class="chart-card">
+                    <h3>Portfolio Risk Tier Distribution</h3>
+                    <div class="chart-wrap">
+                        <canvas id="chart-tiers"></canvas>
+                    </div>
                 </div>
-            </div>
-            <div class="chart-card">
-                <h3>Top Fraud & AML Typologies</h3>
-                <div class="chart-wrap">
-                    <canvas id="chart-typologies"></canvas>
+                <div class="chart-card">
+                    <h3>Top Fraud & AML Typologies</h3>
+                    <div class="chart-wrap">
+                        <canvas id="chart-typologies"></canvas>
+                    </div>
                 </div>
-            </div>
-            <div class="chart-card">
-                <h3>Transaction Volume by Channel</h3>
-                <div class="chart-wrap">
-                    <canvas id="chart-channels"></canvas>
+                <div class="chart-card">
+                    <h3>Transaction Volume by Channel</h3>
+                    <div class="chart-wrap">
+                        <canvas id="chart-channels"></canvas>
+                    </div>
                 </div>
+            </section>
             </div>
         </section>
 

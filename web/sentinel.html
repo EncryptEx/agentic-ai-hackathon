@@ -2267,7 +2267,7 @@
   // that keeps streaming in live (KPI values, case rows, inspector fields), so
   // a minimized card never leaks new information.
   function setupCollapsiblePanels() {
-    const panelIds = ['kpis', 'mix', 'feed', 'inspector', 'controls'];
+    const panelIds = ['kpis', 'mix', 'feed', 'inspector', 'controls', 'tx-feed'];
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('sentinel-collapsed-panels') || '{}'); } catch (_) {}
 

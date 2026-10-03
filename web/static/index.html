@@ -23,6 +23,7 @@
             <button class="nav-tab" data-target="tab-transactions">Transactions</button>
             <button class="nav-tab" data-target="tab-fraud">Fraud Typologies</button>
             <button class="nav-tab" data-target="tab-aml">AML Typologies</button>
+            <button class="nav-tab" data-target="tab-investigator">Investigator</button>
             <button class="nav-tab" data-target="tab-simulator">Live Simulator</button>
             <button class="nav-tab" data-target="tab-generator">Cohort & Exports</button>
         </div>
@@ -495,6 +496,15 @@
             <div id="simulation-result" style="display: none; margin-top: 24px;"></div>
         </div>
 
+        <!-- EVIDENCETRAIL INVESTIGATOR -->
+        <div id="tab-investigator" class="tab-content" style="display: none;">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 18px; margin-bottom: 4px;">EvidenceTrail Investigator</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">One Gemini agent investigates a suspicious synthetic transfer with registered tools. Every tool result is stored as evidence, and a deterministic policy decides the simulated outcome.</p>
+            </div>
+            <div id="inv-root"></div>
+        </div>
+
         <!-- TAB 6: COHORT GENERATOR & DATA EXPORTS -->
         <div id="tab-generator" class="tab-content" style="display: none;">
             <div style="margin-bottom: 20px;">
@@ -553,5 +563,6 @@
     </div>
 
     <script src="/app.js"></script>
+    <script src="/investigator.js"></script>
 </body>
 </html>

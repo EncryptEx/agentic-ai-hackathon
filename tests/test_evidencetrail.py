@@ -96,6 +96,15 @@ class PolicyOutcomes(unittest.TestCase):
         policy.apply_context_answer(final, "yes")
         self.assertEqual(final["simulated_action"], "REVIEW")
 
+    def test_policy_label_compares_pre_answer_action(self):
+        from evidencetrail.metrics import deterministic_checks
+        _, _, r = run_case("case-manipulated")
+        run = {"case_id": "case-manipulated", "final": r["final"], "events": r["events"],
+               "tool_call_count": r["tool_call_count"]}
+        policy.apply_context_answer(run["final"], "yes")
+        self.assertEqual(run["final"]["simulated_action"], "REVIEW")
+        self.assertTrue(deterministic_checks(run)["policy_label_match"])
+
     def test_context_check_no_does_not_clear_signals(self):
         _, _, r = run_case("case-manipulated")
         final = policy.apply_context_answer(r["final"], "no")

@@ -13,7 +13,9 @@ from .trace import verify_chain
 
 
 class RunManager:
-    def __init__(self, model_factory=GeminiClient, jev_factory=JevClient, judge_factory=None):
+    def __init__(self, model_factory=GeminiClient, jev_factory=JevClient, judge_factory=None,
+                 run_mode="live"):
+        self._run_mode = run_mode  # "live", or "development" when providers are stand-ins
         self._model_factory = model_factory
         self._jev_factory = jev_factory
         self._judge_factory = judge_factory
@@ -23,7 +25,8 @@ class RunManager:
         self._lock = threading.Lock()
 
     # ---- single investigations -------------------------------------------------
-    def start(self, case_id, configuration=None, case=None, run_mode="live", experiment_id=None):
+    def start(self, case_id, configuration=None, case=None, run_mode=None, experiment_id=None):
+        run_mode = run_mode or self._run_mode
         case = case or get_case(case_id)
         if case is None:
             raise KeyError(case_id)

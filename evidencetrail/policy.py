@@ -149,6 +149,7 @@ def apply_context_answer(final, answer):
     if answer not in ("yes", "no"):
         raise ValueError("answer must be 'yes' or 'no'")
     final["context_check"]["answer"] = answer
+    final.setdefault("action_before_context_answer", final["simulated_action"])
     if answer == "yes":
         final["simulated_action"] = "REVIEW"
         final["reason_code"] = "COERCION_REPORTED"

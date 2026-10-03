@@ -50,12 +50,15 @@ def deterministic_checks(run):
     """Policy-label match, reference validity and trace facts. Labels never reach the agent."""
     final = run.get("final") or {}
     expected = EXPECTED_ACTIONS.get(run["case_id"].replace("-cf", ""))
+    # Labels describe the decision before any simulated customer answer.
+    compared = final.get("action_before_context_answer") or final.get("simulated_action")
     validity = final.get("reference_validity")
     elapsed = sum((e.get("duration_ms") or 0) for e in run.get("events", []))
     return {
         "expected_action": expected,
         "simulated_action": final.get("simulated_action"),
-        "policy_label_match": None if expected is None else final.get("simulated_action") == expected,
+        "action_compared": compared,
+        "policy_label_match": None if expected is None else compared == expected,
         "label_status": "illustrative policy label on a synthetic case, not real-world accuracy",
         "reference_validity": validity,
         "reference_validity_note": "Valid IDs do not establish semantic support.",

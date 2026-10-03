@@ -14,8 +14,22 @@ from engine.risk_engine import RiskEngine
 from models.customer import CustomerProfile, PEPStatus, AdverseMedia, SanctionStatus
 from models.transaction import Transaction, TransactionType, TransactionDirection
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-EXPORTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "exports"))
+# Sentinel Live Stream & Autonomous Agent Interrogation Layer
+import uuid
+from app.live_agent.scenarios import SCENARIOS, LiveStreamEngine
+from app.live_agent.agent import AgentRun
+from app.live_agent.policy import PolicyEngine
+from app.live_agent.database import DatabaseInformationService
+
+WEB_DIR = os.path.dirname(__file__)
+STATIC_DIR = os.path.join(WEB_DIR, "static")
+EXPORTS_DIR = os.path.abspath(os.path.join(WEB_DIR, "..", "exports"))
+LIVE_STREAM_HTML = os.path.join(WEB_DIR, "live_stream.html")
+SENTINEL_HTML = os.path.join(WEB_DIR, "Financialcrime.html")
+VISUALIZATION_HTML = os.path.join(WEB_DIR, "visualization.html")
+
+ACTIVE_AGENT_RUNS: Dict[str, AgentRun] = {}
+RUNS: Dict[str, Dict[str, Any]] = {}
 
 class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
     """Integrated HTTP handler serving REST APIs, data services, and interactive web dashboard."""
@@ -23,12 +37,79 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=STATIC_DIR, **kwargs)
 
+    def _serve_file(self, filepath: str, content_type: str = "text/html; charset=utf-8"):
+        if os.path.exists(filepath):
+            with open(filepath, "rb") as f:
+                content = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(content)
+        else:
+            self._send_error(404, f"File {os.path.basename(filepath)} not found")
+
     def do_GET(self):
         parsed_url = urllib.parse.urlparse(self.path)
         path = parsed_url.path
         query = urllib.parse.parse_qs(parsed_url.query)
 
-        if path == "/api/portfolio":
+        if path == "/live-stream" or path == "/investigator":
+            self._serve_file(LIVE_STREAM_HTML, "text/html; charset=utf-8")
+            return
+        elif path == "/sentinel":
+            self._serve_file(SENTINEL_HTML, "text/html; charset=utf-8")
+            return
+        elif path == "/visualizer":
+            self._serve_file(VISUALIZATION_HTML, "text/html; charset=utf-8")
+            return
+        elif path == "/api/scenarios":
+            summary_list = []
+            for cid, s in SCENARIOS.items():
+                summary_list.append({
+                    "id": s["id"],
+                    "title": s["title"],
+                    "subtitle": s["subtitle"],
+                    "expected_action": s["expected_action"],
+                    "transaction": s["transaction"],
+                    "customer": {
+                        "name": s["customer"]["name"],
+                        "typical_min": s["customer"]["typical_min"],
+                        "typical_max": s["customer"]["typical_max"]
+                    }
+                })
+            self._send_json(summary_list)
+            return
+        elif path == "/api/stream":
+            self._send_json(LiveStreamEngine.get_latest_stream())
+            return
+        elif path == "/api/stream/next":
+            self._send_json(LiveStreamEngine.generate_routine_tx())
+            return
+        elif path == "/api/database/questions":
+            self._send_json(DatabaseInformationService.get_all_questions())
+            return
+        elif path.startswith("/api/database/customer"):
+            cust_id = query.get("id", [""])[0]
+            profile = DatabaseInformationService.get_customer_profile(cust_id) if cust_id else None
+            if not profile:
+                profile = {
+                    "customer_id": cust_id or "CUST-3912",
+                    "full_name": "Elin Nygren" if "3912" in (cust_id or "") else ("Alice Lindqvist" if "1042" in (cust_id or "") else "Johan Holm"),
+                    "risk_score": 0.18,
+                    "risk_level": "LOW_BASELINE",
+                    "annual_income_sek": 468000,
+                    "monthly_turnover_baseline": 24500,
+                    "kyc_verified_date": "2021-04-14",
+                    "residential_address": "Karlavägen 42, Stockholm",
+                    "primary_device_id": "DEV-112 (Apple iPhone 15 Pro)",
+                    "bankid_auth_level": "High Assurance Level 3 (Biometric)",
+                    "historical_alert_count": 0
+                }
+            self._send_json({"status": "found", "customer": profile})
+            return
+        elif path == "/api/portfolio":
             self._handle_portfolio()
         elif path == "/api/customers":
             self._handle_customers(query)
@@ -62,7 +143,112 @@ class ComplianceHandler(http.server.SimpleHTTPRequestHandler):
             self._send_error(400, f"Invalid JSON payload: {str(e)}")
             return
 
-        if path == "/api/simulate":
+        if path == "/api/stream/inject":
+            case_id = payload.get("caseId") or payload.get("case_id", "case-3")
+            try:
+                tx = LiveStreamEngine.inject_case_tx(case_id)
+                self._send_json({"status": "injected", "transaction": tx})
+            except Exception as e:
+                self._send_error(400, str(e))
+            return
+        elif path == "/api/investigations":
+            case_id = payload.get("case_id", "case-3")
+            if case_id not in SCENARIOS:
+                self._send_error(400, f"Unknown case_id: {case_id}")
+                return
+            run_id = f"run-{case_id}-{uuid.uuid4().hex[:6]}"
+            agent_run = AgentRun(
+                run_id=run_id,
+                case_id=case_id,
+                scenario=SCENARIOS[case_id],
+                patches=payload.get("patches", {}),
+                api_key=self.headers.get("X-Gemini-Api-Key") or payload.get("api_key", "")
+            )
+            ACTIVE_AGENT_RUNS[run_id] = agent_run
+            res = agent_run.run_investigation()
+            RUNS[run_id] = res
+            self._send_json(res)
+            return
+        elif path == "/api/inquiry/submit":
+            run_id = payload.get("run_id")
+            question_id = payload.get("question_id")
+            selected_option = payload.get("selected_option", {})
+            agent_run = ACTIVE_AGENT_RUNS.get(run_id)
+            if not agent_run:
+                target_case = payload.get("case_id", "case-3")
+                agent_run = AgentRun(
+                    run_id=run_id or f"run-{target_case}-live",
+                    case_id=target_case,
+                    scenario=SCENARIOS.get(target_case, SCENARIOS["case-3"])
+                )
+                agent_run.run_investigation()
+                ACTIVE_AGENT_RUNS[agent_run.run_id] = agent_run
+            
+            ev_res = agent_run.env.record_customer_inquiry_response(question_id, selected_option)
+            new_eid = ev_res["evidence_id"]
+            DatabaseInformationService.log_customer_inquiry(
+                case_id=agent_run.case_id,
+                tx_id=agent_run.scenario["transaction"]["id"],
+                question_id=question_id,
+                option_key=selected_option.get("key", "UNKNOWN"),
+                statement=selected_option.get("statement", ""),
+                impact=selected_option.get("risk_verdict", "CONFIRMED_COERCION"),
+                evidence_id=new_eid
+            )
+            all_eids = [e["evidence_id"] for e in agent_run.evidence_store.get_all()]
+            jev_step = agent_run.execute_tool(
+                "assess_with_jev",
+                {"evidence_ids": all_eids},
+                f"Re-synthesizing decision with recorded customer testimony {new_eid}",
+                input_evidence_ids=all_eids
+            )
+            agent_run.claims.append({
+                "claim_id": f"C0{len(agent_run.claims) + 1}",
+                "text": f"Customer statement recorded: {selected_option.get('statement')}",
+                "supporting_evidence_ids": [new_eid]
+            })
+            agent_run.finalize_investigation()
+            updated_dict = agent_run.to_dict()
+            updated_dict["inquiry_resolution"] = {
+                "status": "PROCESSED",
+                "selected_option": selected_option,
+                "jev_judgment": jev_step["data"],
+                "evidence_id": new_eid,
+                "conclusive_dossier": jev_step["data"].get("dossier_brief")
+            }
+            RUNS[agent_run.run_id] = updated_dict
+            self._send_json(updated_dict)
+            return
+        elif path == "/api/repeatability":
+            case_id = payload.get("case_id", "case-3")
+            num_runs = int(payload.get("runs", 5))
+            if case_id not in SCENARIOS:
+                self._send_error(400, f"Unknown case_id: {case_id}")
+                return
+            actions = []
+            for i in range(num_runs):
+                run_res = AgentRun(
+                    run_id=f"rep-{i+1}-{uuid.uuid4().hex[:4]}",
+                    case_id=case_id,
+                    scenario=SCENARIOS[case_id]
+                ).run_investigation()
+                actions.append(run_res["policy_decision"]["action"])
+            counts = {}
+            for a in actions:
+                counts[a] = counts.get(a, 0) + 1
+            modal_action = max(counts, key=counts.get)
+            agreement_rate = counts[modal_action] / num_runs
+            self._send_json({
+                "case_id": case_id,
+                "total_runs": num_runs,
+                "actions": actions,
+                "distribution": counts,
+                "modal_action": modal_action,
+                "stability_rate": agreement_rate,
+                "is_stable": agreement_rate >= 0.8
+            })
+            return
+        elif path == "/api/simulate":
             self._handle_simulate(payload)
         elif path == "/api/generate":
             self._handle_generate(payload)

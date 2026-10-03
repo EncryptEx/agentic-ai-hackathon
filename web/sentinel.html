@@ -448,9 +448,6 @@
 
 <div class="panel" id="controls">
   <button id="btn-pause">Pause</button>
-  
-  
-  
   <button id="btn-clear">Clear alerts</button>
   <div class="sep"></div>
   <label>sensitivity <input id="sens" type="range" min="20" max="90" value="55" /></label>
@@ -487,17 +484,16 @@
   const insVehicle = $('ins-vehicle'), insOpacity = $('ins-opacity'), insUboDepth = $('ins-ubodepth');
   const insUbo = $('ins-ubo'), insOwns = $('ins-owns'), insChainPos = $('ins-chainpos');
   const insSigs = $('ins-sigs');
-  const btnPause = $('btn-pause'), btnBurst = $('btn-burst'), btnSanction = $('btn-sanction'), btnClear = $('btn-clear');
-  const btnLayer = $('btn-layer');
+  const btnPause = $('btn-pause'), btnClear = $('btn-clear');
+  const btnBurst = null, btnSanction = null, btnLayer = null;
   const sensEl = $('sens');
 
   let W = 0, H = 0, DPR = 1;
 
   // ---------------------------------------------------------------- config
   const CONFIG = {
-    accountCount: 0,
     ringSize: 9,
-    txPerSecond: 26,
+    txPerSecond: 0, // Disabled: using real-time websocket
     burstRate: 140,
     edgeLife: 2.6,
     edgeMax: 420,
@@ -735,26 +731,121 @@
     };
   }
 
-  function buildWorld() {
+  const accountIndexMap = {}; // mapping customer_id to accounts index
+
+  async function buildWorld() {
     accounts.length = 0;
-    for (let i = 0; i < CONFIG.accountCount; i++) {
-      const angle = rand(0, Math.PI * 2);
-      const radius = Math.pow(Math.random(), 0.6) * Math.min(W, H) * 0.42;
+    
+    try {
+      const res = await fetch('/api/customers');
+      const data = await res.json();
       
+      data.forEach((c, i) => {
+        const angle = rand(0, Math.PI * 2);
+        const radius = Math.pow(Math.random(), 0.6) * Math.min(W, H) * 0.42;
+        
+        const a = makeAccount(i, W / 2 + Math.cos(angle) * radius, H / 2 + Math.sin(angle) * radius);
+        a.customerId = c.customer_id;
+        a.name = c.name || c.customer_id;
+        a.kind = 'retail';
+        if (c.archetype && c.archetype.includes('BUSINESS')) a.kind = 'business';
+        if (c.archetype && c.archetype.includes('CORP')) a.kind = 'corporate';
+        
+        accounts.push(a);
+        accountIndexMap[c.customer_id] = i;
+      });
+      
+    } catch (e) {
+      console.error("Failed to load customers:", e);
     }
+  }
 
-    for (let i = 0; i < 6; i++) {
-      if (accounts.length > 0) {
-        const a = pick(accounts);
-        if (a) {
-          a.kind = 'exchange';
-          a.baseline *= 3.2;
-          a.volume *= 8;
+  function getOrCreateCounterparty(name) {
+    if (accountIndexMap[name] !== undefined) {
+      return accounts[accountIndexMap[name]];
+    }
+    // Create an external node dynamically
+    const angle = rand(0, Math.PI * 2);
+    const radius = Math.min(W, H) * 0.48; // place on the outer edge
+    const id = accounts.length;
+    const a = makeAccount(id, W / 2 + Math.cos(angle) * radius, H / 2 + Math.sin(angle) * radius);
+    a.customerId = name;
+    a.name = name;
+    a.kind = 'external';
+    accounts.push(a);
+    accountIndexMap[name] = id;
+    return a;
+  }
+
+  function setupWebsocket() {
+    const ws = new WebSocket(`ws://${window.location.host}/ws/transactions?speed_ms=250`);
+    
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.status || payload.error) return; // stream status or error
+        
+        const custId = payload.customer_id;
+        const cpName = payload.counterparty_name || payload.counterparty_account || 'Unknown';
+        const direction = payload.direction;
+        const amount = parseFloat(payload.amount_usd || payload.amount || 0);
+        
+        let srcCust = getOrCreateCounterparty(custId);
+        let dstCust = getOrCreateCounterparty(cpName);
+        
+        if (direction === 'INBOUND') {
+          const temp = srcCust;
+          srcCust = dstCust;
+          dstCust = temp;
         }
+        
+        const e = {
+          a: srcCust, b: dstCust,
+          amount,
+          t: time,
+          life: CONFIG.edgeLife,
+          alpha: 0,
+          suspicious: false,
+          reason: null,
+          score: 0,
+          sanction: false,
+          layer: false,
+          leg: null,
+        };
+        
+        // Basic real-time logic (no simulated fraud for now, but leave structure)
+        const struct = amount > 8000 && amount < 10000;
+        const big = amount > 25000;
+        let score = 0;
+        if (struct) { score += 0.55; e.reason = 'structuring'; }
+        if (big) { score += 0.35; e.reason = e.reason || 'large volume'; }
+        
+        if (score > 0.6) {
+          e.suspicious = true;
+          e.score = score;
+          srcCust.riskyFlow += amount;
+          dstCust.riskyFlow += amount;
+          srcCust.signals.velocity = (srcCust.signals.velocity || 0) + 0.3;
+        }
+        
+        srcCust.outTo.add(dstCust);
+        dstCust.inFrom.add(srcCust);
+        srcCust.counterparties.add(dstCust.id);
+        dstCust.counterparties.add(srcCust.id);
+        srcCust.recent.push(time);
+        dstCust.recent.push(time);
+        
+        txTotal++;
+        edges.push(e);
+        
+      } catch (err) {
+        console.error("WS error:", err);
       }
-    }
-
-    // buildOwnership();
+    };
+    
+    ws.onclose = () => {
+      setTimeout(setupWebsocket, 5000); // Try reconnect
+    };
   }
 
   // ---------------------------------------------------------------- ownership
@@ -1166,27 +1257,12 @@
     dst.riskTarget = Math.min(1, dst.riskTarget + score * CONFIG.riskRise * 0.6);
 
     edges.push(e);
-  if (edges.length > 2000) edges.shift();
-  txTotal++;
-  valueScreened += amount;
-  if (edges.length > 2000) edges.shift();
-  txTotal++;
-  valueScreened += amount;
     if (edges.length > CONFIG.edgeMax) edges.shift();
     txTotal++;
   }
 
   // ---------------------------------------------------------------- detection
   function detect() {
-  // Let us just reuse existing logic if possible. No need since we did manual alerts.
-
-  for (const e of edges) {
-    if (e.suspicious && e.score > 85 && !e.alerted) {
-      raiseAlert(e.a, true, "transaction");
-      e.alerted = true;
-    }
-  }
-
     for (const a of accounts) {
       if (a.exiting) continue;
       const s = a.signals;
@@ -1246,7 +1322,7 @@
         s.nested = clamp((a.uboDepth - 1) / 3, 0, 1) * (0.6 + a.opacity * 0.4);
       }
       if (a.nominee) s.nominee = clamp(0.55 + a.opacity * 0.4, 0, 1);
-      if (a.owns && a.owns.length > 2) s.nested = Math.max(s.nested, clamp((a.owns.length - 2) / 4, 0, 1) * 0.8);
+      if (a.owns.length > 2) s.nested = Math.max(s.nested, clamp((a.owns.length - 2) / 4, 0, 1) * 0.8);
 
       // ---- Nordic typologies -------------------------------------------
       // Trade-based laundering: high-value flows against counterparties in
@@ -1471,7 +1547,26 @@
         casesSlaBreached++;
       }
 
-      // Auto-analyst logic removed for production
+      if (c.status === 'open' && time >= c.autoAt) {
+        triageCase(c);
+        // a triaged case resolves quickly: escalate the serious ones, close
+        // the rest as false positives
+        const serious = c.level === 'crit' || c.account.listed || c.account.isFraud;
+        if (serious || Math.random() > CONFIG.autoCloseRate) {
+          escalateCase(c);
+          c.resolveAt = time + rand(CONFIG.autoResolveDelay[0], CONFIG.autoResolveDelay[1]);
+        } else {
+          c.resolveAt = time + rand(0.6, 1.8);
+        }
+      }
+
+      if (c.status === 'triaged' && c.resolveAt && time >= c.resolveAt) {
+        closeCase(c, c.account.isFraud || c.account.listed ? 'confirmed' : 'dismissed');
+      }
+
+      if (c.status === 'escalated' && c.resolveAt && time >= c.resolveAt) {
+        closeCase(c, c.account.isFraud || c.account.listed ? 'confirmed' : 'dismissed');
+      }
     }
   }
 
@@ -2042,7 +2137,7 @@
     insOpacity.style.color = a.opacity > CONFIG.opaqueThreshold ? '#c482ff' : 'rgba(150, 180, 220, 0.6)';
     insUboDepth.textContent = a.uboDepth > 0 ? a.uboDepth + ' layer' + (a.uboDepth === 1 ? '' : 's') : 'direct';
     insUbo.textContent = a.ubo && a.ubo !== a ? a.ubo.name : (a.uboDepth === 0 ? 'self' : '\u2014');
-    insOwns.textContent = (a.owns && a.owns.length) ? a.owns.length + ' entit' + (a.owns && a.owns.length === 1 ? 'y' : 'ies') : 'none';
+    insOwns.textContent = a.owns.length ? a.owns.length + ' entit' + (a.owns.length === 1 ? 'y' : 'ies') : 'none';
     if (a.chain !== null) {
       const c = chains.find(x => x.id === a.chain);
       insChainPos.textContent = (a.chainPos + 1) + '/' + (c ? c.members.length : '?') +
@@ -2094,7 +2189,7 @@
     nodesEl.textContent = accounts.length;
     edgesEl.textContent = edges.length;
     stTx.textContent = txTotal.toLocaleString();
-    stRate.textContent = Math.round(wsTxQueue.length > 0 ? (wsTxQueue.length + Math.random()*2) : (Math.random()*15 + 10)) + '/s';
+    stRate.textContent = Math.round(CONFIG.txPerSecond + rings.length * CONFIG.burstRate * 0.35) + '/s';
     stValue.textContent = money(valueScreened);
     stAlerts.textContent = alertTotal;
     stSanctions.textContent = sanctionHits;
@@ -2211,166 +2306,28 @@
   }
 
   // ---------------------------------------------------------------- loop
-  
-let ws;
-const wsTxQueue = [];
-function connectWs() {
-  const wsUrl = "ws://localhost:8003/ws/transactions?speed_ms=10";
-  ws = new WebSocket(wsUrl);
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      if (data.status || data.error) return;
-      wsTxQueue.push(data);
-    } catch(e) {}
-  };
-}
-connectWs();
-
-const knownAccounts = new Map();
-function getOrCreateAccount(idStr, isCustomer, countryCode, category) {
-  if (!idStr) return null;
-  if (knownAccounts.has(idStr)) return knownAccounts.get(idStr);
-  
-  // Pick random coordinates within bounds
-  const x = rand(0, W);
-  const y = rand(0, H);
-  
-  // determine kind based on category if available
-  let kind = isCustomer ? 'retail' : 'corporate';
-  if (category) {
-    if (category.toLowerCase().includes('retail')) kind = 'corporate';
-  }
-  
-  let jur = JURISDICTIONS[0]; // default SE
-  if (countryCode) {
-    const found = JURISDICTIONS.find(j => j.id === countryCode.toUpperCase());
-    if (found) jur = found;
-  }
-  
-  // ID is number in original, let's just make it length of accounts + 1
-  const idNum = accounts.length + 1;
-  const a = {
-    id: idNum,
-    idStr: idStr, // our custom addition
-    name: idStr,
-    kind,
-    jur,
-    x, y,
-    vx: rand(-0.12, 0.12),
-    vy: rand(-0.12, 0.12),
-    baseline: rand(0.6, 3.4),
-    volume: rand(2e4, 4e6),
-    counterparties: new Set(),
-    outTo: new Set(),
-    inFrom: new Set(),
-    recent: [],
-    band: [],
-    riskyFlow: 0,
-    risk: rand(0.02, 0.16),
-    riskTarget: 0,
-    signals: {},
-    verdict: 'clear',
-    thought: 'monitoring...',
-    thoughtT: 0,
-    lastAlert: -999,
-    ring: null,
-    isFraud: false,
-    pulse: 0,
-    structCount: 0,
-    exiting: false,
-    exitPhase: 0
-  };
-  accounts.push(a);
-  knownAccounts.set(idStr, a);
-  return a;
-}
-
-function processWsTransaction(row) {
-  if (row.is_suspicious_synthetic === "1" || row.is_fraud_synthetic === "1") {
-    let alertsCount = parseInt(stAlerts.textContent) || 0;
-    alertsCount++;
-    stAlerts.textContent = alertsCount;
-  }
-
-  // console.log("Processing", row.transaction_id);
-  txTotal++;
-  valueScreened += parseFloat(row.amount_usd) || rand(50, 500);
-
-  const customer = getOrCreateAccount(row.customer_id, true, null, null);
-  const cpty = getOrCreateAccount(row.counterparty_account || row.counterparty_name, false, row.counterparty_country, row.counterparty_category);
-  
-  if (!customer || !cpty) return;
-  
-  let src = row.direction === 'OUTBOUND' ? customer : cpty;
-  let dst = row.direction === 'OUTBOUND' ? cpty : customer;
-  
-  const amount = parseFloat(row.amount_usd) || rand(50, 500);
-  
-  const suspicious = row.is_suspicious_synthetic === '1' || row.is_fraud_synthetic === '1';
-  let reason = null;
-  if (suspicious) {
-    reason = row.synthetic_typology_tag || row.fraud_typology_tag || 'SUSPICIOUS_PATTERN';
-  }
-  
-  const e = {
-    a: src, b: dst,
-    amount,
-    t: time,
-    life: CONFIG.edgeLife,
-    alpha: 0,
-    suspicious: suspicious,
-    reason: reason,
-    score: suspicious ? rand(80, 99) : 0,
-    sanction: false,
-    layer: false,
-    leg: null
-  };
-  
-  edges.push(e);
-  
-  // Update internal metrics normally used
-  src.outTo.add(dst);
-  dst.inFrom.add(src);
-  src.counterparties.add(dst);
-  dst.counterparties.add(src);
-  
-  src.pulse = 1;
-  dst.pulse = 1;
-  
-  if (suspicious) {
-    if (src.riskTarget < 0.9) src.riskTarget += 0.2;
-    if (dst.riskTarget < 0.9) dst.riskTarget += 0.2;
-    src.signals[reason] = (src.signals[reason]||0) + 1;
-    src.riskyFlow += amount;
-  }
-}
-
-function frame(now) {
+  function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
 
     if (!paused) {
       time += dt;
 
+      // Disabled random transactions, waiting for websocket instead
       // const rate = CONFIG.txPerSecond + rings.length * CONFIG.burstRate * 0.35;
       // txAccum += rate * dt;
       // while (txAccum >= 1) { makeTransaction(); txAccum--; }
-      
-      const toProcess = Math.min(wsTxQueue.length, 50); // limit per frame
-      for (let i = 0; i < toProcess; i++) {
-        processWsTransaction(wsTxQueue.shift());
-      }
 
       updateAccounts(dt);
       updateEdges(dt);
       updateRings(dt);
-      updateChains(dt);
-      updateCases(dt);
+      // Disabled chain spawning & cases logic since we disabled simulated fraud
+      // updateChains(dt);
+      // updateCases(dt);
       // updateLifecycle(dt);
       // if (Math.random() < CONFIG.chainRate * dt * 60) spawnChain();
-      detect();
-      computeExposure();
+      // detect();
+      // computeExposure();
     }
 
     cam.zoom += (cam.targetZoom - cam.zoom) * Math.min(1, dt * 8);
@@ -2452,7 +2409,17 @@ function frame(now) {
     btnPause.classList.toggle('on', paused);
   });
 
-  // Simulation button listeners removed
+  if (btnBurst) btnBurst.addEventListener('click', () => {
+    injectRing();
+  });
+
+  if (btnSanction) btnSanction.addEventListener('click', () => {
+    designateEntity();
+  });
+
+  if (btnLayer) btnLayer.addEventListener('click', () => {
+    spawnChain();
+  });
 
   btnClear.addEventListener('click', () => {
     alerts.length = 0;
@@ -2494,7 +2461,7 @@ function frame(now) {
   setupCollapsiblePanels();
   resize();
   buildWorld();
-  for (let i = 0; i < 120; i++) makeTransaction();
+  // for (let i = 0; i < 120; i++) makeTransaction();
   for (let i = 0; i < 3; i++) spawnChain();
   detect();
   computeExposure();
